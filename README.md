@@ -29,23 +29,35 @@ Hệ thống tuân thủ nghiêm ngặt khung công nghệ được quy định,
 H-Solution-Project/
 ├── docs/                 # Tài liệu đặc tả và thiết kế hệ thống
 │   ├── api-specs/        # Danh sách API & cấu trúc Request/Response
-│   ├── ui-guidelines/    # UI Kit (Font Glacier Light, mã màu xanh dương, nút bấm bo góc)[cite: 1]
+│   ├── ui-guidelines/    # UI Kit (Font Glacier Light, mã màu xanh dương)[cite: 1]
 │   └── flows/            # Luồng User Flow của Admin và Kỹ thuật viên
 │
 ├── backend/              # Mã nguồn Backend chung (Phụ trách bởi Ly & Hà)
-│   └── app/              # Theo cấu trúc chuẩn hóa từng module
+│   └── app/              
 │       ├── main.py       # Điểm chạy chính của server FastAPI
-│       ├── auth/         # Module xác thực người dùng (Đăng ký/Đăng nhập)
-│       ├── repair_requests/ # Quản lý yêu cầu sửa chữa/SOS
-│       ├── assignments/  # Phân công kỹ thuật viên
-│       ├── diagnoses/    # Đăng ký chẩn đoán lỗi
-│       └── estimates/    # Tạo và duyệt báo giá
+│       │
+│       # --- MỖI MODULE CHỨA ĐỦ 5 FILE: router.py, schemas.py, models.py, service.py, repository.py ---
+│       ├── auth/             # Xác thực người dùng (Đăng ký/Đăng nhập)
+│       ├── customers/        # Quản lý khách hàng
+│       ├── devices/          # Quản lý thiết bị (Scooter/Xe lăn)
+│       ├── repair_requests/  # Quản lý yêu cầu sửa chữa/SOS
+│       ├── assignments/      # Phân công kỹ thuật viên
+│       ├── diagnoses/        # Đăng ký chẩn đoán lỗi
+│       ├── estimates/        # Tạo và duyệt báo giá
+│       ├── completions/      # Hoàn thành sửa chữa
+│       ├── repair_history/   # Lịch sử sửa chữa
+│       └── uploads/          # Quản lý hình ảnh tải lên (Supabase Storage)
 │
 ├── frontend/             # Mã nguồn Frontend của Team B (Phụ trách bởi Cường)
-│   └── src/              # Cấu trúc Next.js chuẩn
-│       ├── app/          # Định tuyến các màn hình Admin Web & Tech App
-│       ├── components/   # UI chung (nút bấm bo 8-12px, ô nhập liệu)[cite: 1]
-│       └── features/     # Logic và màn hình chi tiết theo chức năng
+│   └── src/              
+│       ├── app/          # Trang và định tuyến màn hình Admin Web & Tech App
+│       ├── components/   # UI chung dùng toàn dự án (Nút bấm bo góc, ô nhập liệu)
+│       ├── features/     # Màn hình & logic chi tiết theo chức năng
+│       ├── services/     # Các hàm gọi API lên Backend (Axios / Fetch)
+│       ├── types/        # Định nghĩa kiểu dữ liệu (TypeScript Types)
+│       ├── constants/    # Giá trị trạng thái (14 status) & hằng số dùng chung
+│       ├── hooks/        # Các React Custom Hooks dùng chung
+│       └── utils/        # Hàm tiện ích chung (định dạng ngày tháng, tiền tệ...)
 │
 ├── .gitignore            # Loại bỏ file rác (node_modules, .env, file tạm)
 └── README.md             # Tài liệu hướng dẫn này
