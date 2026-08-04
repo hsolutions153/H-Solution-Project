@@ -1,13 +1,29 @@
 from fastapi import APIRouter
-from app.auth.schemas import UserRegister, UserLogin, TokenResponse
-from app.auth.service import register_user, authenticate_user
+from pydantic import BaseModel
+from app.auth import service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/signup", response_model=dict)
-def register(user: UserRegister):
-    return register_user(user)
+class RegisterRequest(BaseModel):
+    id: str
+    role_id: str
+    full_name: str
+    phone: str | None = None
+    email: str
+    password: str
+    address: str | None = None
 
-@router.post("/login", response_model=TokenResponse)
-def login(form_data: UserLogin):
-    return authenticate_user(form_data)
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@router.post("/signup")
+def register(payload: RegisterRequest):
+    # Đưa password từ payload vào trường password_hash để service xử lý băm
+    user_data = payload.dict()
+    user_data["password_hash"] = user_data.pop("password") 
+    return service.register_user(user_data)
+
+@router.post("/login")
+def login(payload: LoginRequest):
+    return service.authenticate_user(payload.email, payload.password)

@@ -1,32 +1,31 @@
-fake_technicians_db = [
-    {"id": 1, "full_name": "Tech Van C", "email": "techc@gmail.com", "phone": "0911223344", "specialization": "Electric Wheelchair"},
-    {"id": 2, "full_name": "Tech Thi D", "email": "techd@gmail.com", "phone": "0988776655", "specialization": "Scooter"}
-]
+from app.db.database import supabase
+from app.technicians.models import TECHNICIANS_TABLE
+
 
 def get_all_technicians():
-    return fake_technicians_db
+    return supabase.table(TECHNICIANS_TABLE).select("*").order("full_name").execute().data
 
-def get_technician_by_id(tech_id: int):
-    for tech in fake_technicians_db:
-        if tech["id"] == tech_id:
-            return tech
-    return None
+
+def get_technician_by_id(tech_id: str):
+    response = supabase.table(TECHNICIANS_TABLE).select("*").eq("id", tech_id).maybe_single().execute()
+    return response.data
+
+
+def get_technician_by_email(email: str):
+    response = supabase.table(TECHNICIANS_TABLE).select("*").eq("email", email).maybe_single().execute()
+    return response.data
+
 
 def insert_technician(data: dict):
-    fake_technicians_db.append(data)
-    return data
+    response = supabase.table(TECHNICIANS_TABLE).insert(data).execute()
+    return response.data[0]
 
-def update_technician_in_db(tech_id: int, data: dict):
-    for tech in fake_technicians_db:
-        if tech["id"] == tech_id:
-            for key, value in data.items():
-                if value is not None:
-                    tech[key] = value
-            return tech
-    return None
 
-def delete_technician_from_db(tech_id: int):
-    for index, tech in enumerate(fake_technicians_db):
-        if tech["id"] == tech_id:
-            return fake_technicians_db.pop(index)
-    return None
+def update_technician_in_db(tech_id: str, data: dict):
+    response = supabase.table(TECHNICIANS_TABLE).update(data).eq("id", tech_id).execute()
+    return response.data[0] if response.data else None
+
+
+def delete_technician_from_db(tech_id: str):
+    response = supabase.table(TECHNICIANS_TABLE).delete().eq("id", tech_id).execute()
+    return response.data[0] if response.data else None
