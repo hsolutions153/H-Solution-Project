@@ -1,0 +1,130 @@
+'use client';
+
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { VerifyOtpFormData } from '@/types/auth';
+
+interface VerifyOtpFormProps {
+  onSubmit: (data: VerifyOtpFormData) => void;
+  onResendOtp?: () => void;
+}
+
+export interface VerifyOtpFormRef {
+  resetOtp: () => void;
+}
+
+export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
+  ({ onSubmit, onResendOtp }, ref) => {
+    const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    // Cung cấp hàm resetOtp ra bên ngoài thông qua ref
+    useImperativeHandle(ref, () => ({
+      resetOtp: () => {
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      },
+    }));
+
+    // Xử lý khi gõ từng số OTP
+    const handleChange = (text: string, index: number) => {
+      const value = text.replace(/[^0-9]/g, '');
+      const newOtp = [...otp];
+      newOtp[index] = value.slice(-1);
+      setOtp(newOtp);
+
+      if (value && index < 5) {
+        inputRefs.current[index + 1]?.focus();
+      }
+    };
+
+    // Xử lý khi bấm nút Xóa (Backspace)
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+      if (e.key === 'Backspace' && !otp[index] && index > 0) {
+        inputRefs.current[index - 1]?.focus();
+      }
+    };
+
+    // Xử lý khi Paste cả chuỗi 6 số
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+      if (!pastedData) return;
+
+      const newOtp = [...otp];
+      pastedData.split('').forEach((char, i) => {
+        newOtp[i] = char;
+      });
+      setOtp(newOtp);
+
+      const nextFocusIndex = Math.min(pastedData.length, 5);
+      inputRefs.current[nextFocusIndex]?.focus();
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const fullOtp = otp.join('');
+      if (fullOtp.length < 6) {
+        alert('Vui lòng nhập đủ 6 chữ số OTP!');
+        return;
+      }
+      onSubmit({ otp: fullOtp });
+    };
+
+    return (
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6 text-center">
+        {/* Tiêu đề & Mô tả */}
+        <div className="mb-5">
+          <h2 className="text-base font-bold text-slate-800 mb-2">
+            Nhập mã xác thực
+          </h2>
+          <p className="text-xs text-slate-500 leading-relaxed max-w-[260px] mx-auto">
+            Mã xác thực OTP đã được gửi đến số điện thoại/email của bạn. Vui lòng nhập mã gồm 6 chữ số dưới đây.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Khối 6 ô nhập OTP */}
+          <div className="flex justify-between gap-1.5 px-1">
+            {otp.map((digit, index) => (
+              <input
+                key={index}
+                ref={(el) => {
+                  inputRefs.current[index] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleChange(e.target.value, index)}
+                onKeyDown={(e) => handleKeyDown(e, index)}
+                onPaste={handlePaste}
+                className="w-10 h-12 text-center text-base font-bold bg-white border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all shadow-sm"
+              />
+            ))}
+          </div>
+
+          {/* Link Gửi lại mã */}
+          <div>
+            <button
+              type="button"
+              onClick={onResendOtp}
+              className="text-xs font-bold text-sky-800 hover:underline inline-block"
+            >
+              Gửi lại mã
+            </button>
+          </div>
+
+          {/* Nút Xác nhận */}
+          <button
+            type="submit"
+            className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
+          >
+            Xác nhận
+          </button>
+        </form>
+      </div>
+    );
+  }
+);
+
+VerifyOtpForm.displayName = 'VerifyOtpForm';

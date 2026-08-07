@@ -1,32 +1,48 @@
-from fastapi import APIRouter
-from typing import List
-from app.technicians.schemas import TechnicianCreate, TechnicianUpdate, TechnicianResponse
+from fastapi import APIRouter, Query, status
+
+from app.technicians.schemas import (
+    TechnicianCreate,
+    TechnicianKycReview,
+    TechnicianResponse,
+    TechnicianUpdate,
+)
 from app.technicians.service import (
-    fetch_all_technicians,
-    fetch_technician_by_id,
     create_technician,
+    delete_technician,
+    fetch_all_technicians,
+    fetch_technician_by_user_id,
+    review_technician_kyc,
     update_technician,
-    delete_technician
 )
 
-router = APIRouter(prefix="/technicians", tags=["Technicians Management"])
+router = APIRouter(prefix="/technicians", tags=["Technicians"])
 
-@router.get("/", response_model=List[TechnicianResponse])
-def get_technicians():
-    return fetch_all_technicians()
 
-@router.get("/{id}", response_model=TechnicianResponse)
-def get_technician(id: int):
-    return fetch_technician_by_id(id)
+@router.get("/", response_model=list[TechnicianResponse])
+def get_technicians(kyc_status: str | None = Query(default=None)):
+    return fetch_all_technicians(kyc_status)
 
-@router.post("/", response_model=TechnicianResponse)
+
+@router.get("/{user_id}", response_model=TechnicianResponse)
+def get_technician(user_id: str):
+    return fetch_technician_by_user_id(user_id)
+
+
+@router.post("/", response_model=TechnicianResponse, status_code=status.HTTP_201_CREATED)
 def add_technician(data: TechnicianCreate):
     return create_technician(data)
 
-@router.patch("/{id}", response_model=TechnicianResponse)
-def modify_technician(id: int, data: TechnicianUpdate):
-    return update_technician(id, data)
 
-@router.delete("/{id}")
-def remove_technician(id: int):
-    return delete_technician(id)
+@router.patch("/{user_id}", response_model=TechnicianResponse)
+def modify_technician(user_id: str, data: TechnicianUpdate):
+    return update_technician(user_id, data)
+
+
+@router.patch("/{user_id}/kyc", response_model=TechnicianResponse)
+def review_kyc(user_id: str, data: TechnicianKycReview):
+    return review_technician_kyc(user_id, data)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_technician(user_id: str):
+    delete_technician(user_id)

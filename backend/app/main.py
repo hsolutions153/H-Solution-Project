@@ -1,11 +1,6 @@
 from fastapi import FastAPI
-from app.auth.router import router as auth_router
-from app.technicians.router import router as technician_router
-app = FastAPI(title="H-Solution Backend", version="1.0.0")
+from app.api.v1.api import api_router
 
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(technician_router, prefix="/api/v1")
+app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"message": "Welcome to H-Solution Backend API!"}
+app.include_router(api_router, prefix="/api/v1")

@@ -1,13 +1,16 @@
-from fastapi import APIRouter
-from app.auth.schemas import UserRegister, UserLogin, TokenResponse
-from app.auth.service import register_user, authenticate_user
+from fastapi import APIRouter, status
+
+from app.auth.schemas import LoginRequest, SignupRequest, SignupResponse, TokenResponse
+from app.auth.service import authenticate_user, register_customer
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/signup", response_model=dict)
-def register(user: UserRegister):
-    return register_user(user)
+
+@router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
+def signup(payload: SignupRequest):
+    return register_customer(payload)
+
 
 @router.post("/login", response_model=TokenResponse)
-def login(form_data: UserLogin):
-    return authenticate_user(form_data)
+def login(payload: LoginRequest):
+    return authenticate_user(str(payload.email), payload.password)

@@ -1,0 +1,63 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ForgotPasswordFormData } from '@/types/auth';
+import { User, ArrowRight } from 'lucide-react'; // Import các icon từ lucide-react
+
+interface ForgotPasswordFormProps {
+  onSubmit: (data: ForgotPasswordFormData) => void;
+}
+
+export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
+  const [identity, setIdentity] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ identity });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
+      {/* Tiêu đề & Mô tả */}
+      <div className="mb-5">
+        <h2 className="text-base font-bold text-slate-800 mb-2">
+          Quên mật khẩu
+        </h2>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Nhập email hoặc số điện thoại đã đăng ký để nhận mã xác thực OTP.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Input Số điện thoại hoặc Email */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            Số điện thoại hoặc Email
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center justify-center">
+              <User className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              required
+              value={identity}
+              onChange={(e) => setIdentity(e.target.value)}
+              placeholder="Nhập thông tin của bạn"
+              className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Nút Gửi mã xác thực */}
+        <button
+          type="submit"
+          className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
+        >
+          <span>Gửi mã xác thực</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </form>
+    </div>
+  );
+};
