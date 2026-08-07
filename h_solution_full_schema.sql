@@ -1,198 +1,205 @@
--- ============================================================
---  H-SOLUTION PLATFORM - DATABASE SCHEMA (Từ File Ảnh Thiết Kế)
---  Cơ sở dữ liệu: PostgreSQL
---  Ghi chú: Đã sửa lại các lỗi logic từ bản thiết kế gốc (như sai kiểu dữ liệu BOOLEAN, INT, độ dài Foreign Key, và tham chiếu sai bảng).
--- ============================================================
+-- Dọn dẹp các bảng cũ để tránh lỗi "already exists" khi chạy lại file
+-- DROP TABLE IF EXISTS reviews CASCADE;
+-- DROP TABLE IF EXISTS quote_items CASCADE;
+-- DROP TABLE IF EXISTS repair_quotes CASCADE;
+-- DROP TABLE IF EXISTS repair_status_history CASCADE;
+-- DROP TABLE IF EXISTS repair_requests CASCADE;
+-- DROP TABLE IF EXISTS technician_profiles CASCADE;
+-- DROP TABLE IF EXISTS otps CASCADE;
+-- DROP TABLE IF EXISTS refresh_tokens CASCADE;
+-- DROP TABLE IF EXISTS customer_devices CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;
+-- DROP TABLE IF EXISTS roles CASCADE;
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ============================================================
--- 1. ĐỊNH NGHĨA CÁC KIỂU ENUM
--- ============================================================
-CREATE TYPE skills_enum AS ENUM ('WHEELCHAIR', 'SCOOTER', 'BOTH');
-CREATE TYPE kyc_status_enum AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
-CREATE TYPE device_type_enum AS ENUM ('WHEELCHAIR', 'SCOOTER');
-CREATE TYPE issue_type_enum AS ENUM ('BATTERY', 'MOTOR', 'TIRE', 'BRAKE', 'OTHER');
-CREATE TYPE repair_status_enum AS ENUM ('PENDING', 'ASSIGNED', 'ACCEPTED', 'ARRIVED', 'DIAGNOSED', 'REPAIRING', 'COMPLETED', 'CANCELLED');
-CREATE TYPE severity_enum AS ENUM ('MINOR', 'MAJOR');
-CREATE TYPE quote_status_enum AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
-CREATE TYPE item_type_enum AS ENUM ('SPARE_PART', 'LABOR', 'SERVICE');
-
--- ============================================================
--- 2. HÀM TRIGGER TỰ ĐỘNG CẬP NHẬT updated_at
--- ============================================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- ============================================================
--- 3. TẠO BẢNG DỮ LIỆU (TABLES)
--- ============================================================
-
--- Bảng roles (image.png)
+-- 1. ROLES
 CREATE TABLE roles (
-    id VARCHAR(10) PRIMARY KEY,
-    code VARCHAR(100) NOT NULL,
-    name VARCHAR(150),
-    description TEXT
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    code VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(255) NULL
 );
 
--- Bảng users (image copy.png)
+-- 2. USERS
 CREATE TABLE users (
-    id VARCHAR(10) PRIMARY KEY,
-    role_id VARCHAR(10) NOT NULL REFERENCES roles(id),
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    role_id VARCHAR(10) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(10) UNIQUE,
+    phone VARCHAR(20) NOT NULL UNIQUE,
     email VARCHAR(150) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    address VARCHAR(255),
+    password_hash VARCHAR(255) NULL,
+    address VARCHAR(255) NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_online BOOLEAN NOT NULL DEFAULT FALSE,
-    locked_reason TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles(id)
 );
-CREATE TRIGGER set_updated_at_users BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Bảng refresh_tokens (image copy 2.png)
--- Đã FIX: user_id trỏ về users(id) thay vì roles(id) như trong ảnh
+-- 3. CUSTOMER DEVICES
+CREATE TABLE customer_devices (
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    customer_id VARCHAR(10) NOT NULL,
+    device_type VARCHAR(50) NOT NULL CHECK (device_type IN ('WHEELCHAIR', 'SCOOTER')),
+    manufacturer VARCHAR(100) NOT NULL,
+    model_name VARCHAR(100) NOT NULL,
+    serial_number VARCHAR(100) NULL,
+    image_url VARCHAR(255) NULL,
+    notes TEXT NULL,
+    frame_number VARCHAR(100) NULL,
+    purchase_date DATE NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES users(id)
+);
+
+-- 4. REFRESH TOKENS
 CREATE TABLE refresh_tokens (
-    id VARCHAR(10) PRIMARY KEY,
-    user_id VARCHAR(10) NOT NULL REFERENCES users(id),
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    user_id VARCHAR(10) NOT NULL,
     token_hash VARCHAR(500) NOT NULL,
-    device_info VARCHAR(255),
+    device_info VARCHAR(255) NULL,
     expires_at TIMESTAMP NOT NULL,
-    revoked_at TIMESTAMP,
+    revoked_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- 5. OTPS
+CREATE TABLE otps (
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    otp_code VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    used_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_otps_phone ON otps (phone, created_at);
 
--- Bảng otps (image copy 3.png)
--- Đã FIX: is_used chuyển thành BOOLEAN thay vì VARCHAR(1)
-CREATE TABLE otps (
-    id VARCHAR(10) PRIMARY KEY,
-    phone VARCHAR(10) NOT NULL,
-    otp_code VARCHAR(6) NOT NULL,
-    expires_at TIMESTAMP NOT NULL, -- Bắt buộc phải có hạn sử dụng
-    is_used BOOLEAN NOT NULL DEFAULT FALSE,
-    used_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Bảng technician_profiles (image copy 4.png)
--- Đã FIX: experience_years và total_jobs_done chuyển thành INT, rating thành DECIMAL
+-- 6. TECHNICIAN PROFILES
 CREATE TABLE technician_profiles (
-    user_id VARCHAR(10) PRIMARY KEY REFERENCES users(id),
+    user_id VARCHAR(10) PRIMARY KEY NOT NULL,
     id_card_number VARCHAR(12) NOT NULL UNIQUE,
-    id_card_front_url VARCHAR(500),
-    id_card_back_url VARCHAR(500),
-    certificate_url VARCHAR(500),
-    skills skills_enum NOT NULL DEFAULT 'BOTH',
-    specialization VARCHAR(255),
-    experience_years INT NOT NULL DEFAULT 0,
-    kyc_status kyc_status_enum NOT NULL DEFAULT 'PENDING',
-    kyc_reviewed_by VARCHAR(10) REFERENCES users(id), -- Đổi thành có thể NULL khi chưa duyệt
-    kyc_reviewed_at TIMESTAMP,
-    kyc_note TEXT,
+    id_card_front_url VARCHAR(500) NOT NULL,
+    id_card_back_url VARCHAR(500) NOT NULL,
+    certificate_url VARCHAR(500) NOT NULL,
+    skills VARCHAR(50) NOT NULL DEFAULT 'BOTH' CHECK (skills IN ('WHEELCHAIR', 'SCOOTER', 'BOTH')),
+    specialization VARCHAR(255) NULL,
+    experience_years SMALLINT NOT NULL DEFAULT 0,
+    kyc_status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (kyc_status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    kyc_reviewed_by VARCHAR(10) NULL,
+    kyc_reviewed_at TIMESTAMP NULL,
+    kyc_note TEXT NULL,
     is_online BOOLEAN NOT NULL DEFAULT FALSE,
-    current_lat DECIMAL(10,8), -- Tọa độ GPS vĩ độ (Dành cho tracking)
-    current_lng DECIMAL(11,8), -- Tọa độ GPS kinh độ
-    last_location_at TIMESTAMP,
+    last_latitude DECIMAL(10, 8) NULL,
+    last_longitude DECIMAL(11, 8) NULL,
+    last_location_at TIMESTAMP NULL,
     rating_avg DECIMAL(3,2) NOT NULL DEFAULT 0.00,
     total_jobs_done INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (kyc_reviewed_by) REFERENCES users(id)
 );
-CREATE TRIGGER set_updated_at_technician_profiles BEFORE UPDATE ON technician_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_tech_available ON technician_profiles (is_online, kyc_status);
 
--- Bảng repair_requests (image copy 5.png)
--- Đã FIX: customer_id VARCHAR(10) để khớp users(id), arrived_at và cancelled_at cho phép NULL
+-- 7. REPAIR REQUESTS
 CREATE TABLE repair_requests (
-    id VARCHAR(10) PRIMARY KEY,
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
     request_code VARCHAR(10) NOT NULL UNIQUE,
-    customer_id VARCHAR(10) NOT NULL REFERENCES users(id),
-    technician_id VARCHAR(10) REFERENCES users(id),
-    device_type device_type_enum NOT NULL,
-    issue_type issue_type_enum,
+    customer_id VARCHAR(10) NOT NULL,
+    technician_id VARCHAR(10) NULL,
+    device_id VARCHAR(10) NOT NULL,
+    issue_type VARCHAR(50) NOT NULL CHECK (issue_type IN ('BATTERY', 'MOTOR', 'TIRE', 'BRAKE', 'OTHER')),
     issue_description TEXT NOT NULL,
     location_address VARCHAR(200) NOT NULL,
-    location_lat DECIMAL(10,8), -- Tọa độ khách hàng để thợ tìm đường
-    location_lng DECIMAL(11,8),
+    latitude DECIMAL(10, 8) NULL,
+    longitude DECIMAL(11, 8) NULL,
     is_sos BOOLEAN NOT NULL DEFAULT FALSE,
-    status repair_status_enum NOT NULL DEFAULT 'PENDING',
-    assigned_at TIMESTAMP,
-    accepted_at TIMESTAMP,
-    arrived_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    cancelled_at TIMESTAMP,
-    cancel_reason TEXT,
-    before_photo_url VARCHAR(500), -- Ảnh hiện trạng trước khi sửa
-    after_photo_url VARCHAR(500),  -- Ảnh sau khi sửa xong
-    customer_signature_url VARCHAR(500), -- Chữ ký nghiệm thu của khách
+    inspection_images TEXT NULL,
+    after_repair_images TEXT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ASSIGNED', 'ACCEPTED', 'ARRIVED', 'DIAGNOSED', 'REPAIRING', 'COMPLETED', 'CANCELLED')),
+    assigned_at TIMESTAMP NULL,
+    accepted_at TIMESTAMP NULL,
+    arrived_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    cancelled_at TIMESTAMP NULL,
+    cancel_reason TEXT NULL,
+    payment_method VARCHAR(50) NULL CHECK (payment_method IN ('CASH', 'BANK_TRANSFER')),
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('UNPAID', 'PAID')),
+    total_amount DECIMAL(12,0) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES users(id),
+    FOREIGN KEY (technician_id) REFERENCES users(id),
+    FOREIGN KEY (device_id) REFERENCES customer_devices(id)
 );
-CREATE TRIGGER set_updated_at_repair_requests BEFORE UPDATE ON repair_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_requests_status ON repair_requests (status);
+CREATE INDEX idx_customer_requests ON repair_requests (customer_id, status);
+CREATE INDEX idx_tech_requests ON repair_requests (technician_id, status);
 
--- Bảng repair_status_history (image copy 6.png)
--- Đã FIX: Default cho api_endpoint và note bị sai trong bản gốc
+-- 8. REPAIR STATUS HISTORY
 CREATE TABLE repair_status_history (
-    id VARCHAR(10) PRIMARY KEY,
-    repair_id VARCHAR(10) NOT NULL REFERENCES repair_requests(id),
-    old_status VARCHAR(50),
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    repair_id VARCHAR(10) NOT NULL,
+    old_status VARCHAR(50) NULL,
     new_status VARCHAR(50) NOT NULL,
-    changed_by VARCHAR(10) NOT NULL REFERENCES users(id), -- Sửa từ VARCHAR(1) thành VARCHAR(10)
-    api_endpoint VARCHAR(100),
-    note TEXT,
-    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    changed_by VARCHAR(10) NOT NULL,
+    api_endpoint VARCHAR(100) NULL,
+    note TEXT NULL,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repair_id) REFERENCES repair_requests(id),
+    FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
--- Bảng repair_quotes (image copy 7.png)
+-- 9. REPAIR QUOTES
 CREATE TABLE repair_quotes (
-    id VARCHAR(10) PRIMARY KEY,
-    repair_id VARCHAR(10) NOT NULL REFERENCES repair_requests(id),
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    repair_id VARCHAR(10) NOT NULL,
     diagnosis_note TEXT NOT NULL,
-    severity severity_enum,
+    severity VARCHAR(50) NOT NULL CHECK (severity IN ('MINOR', 'MAJOR')),
     labor_fee DECIMAL(12,0) NOT NULL DEFAULT 0,
-    parts_cost DECIMAL(12,0) DEFAULT 0,
+    parts_cost DECIMAL(12,0) NOT NULL DEFAULT 0,
     estimated_price DECIMAL(12,0) NOT NULL DEFAULT 0,
-    status quote_status_enum NOT NULL DEFAULT 'PENDING',
-    reject_reason TEXT,
-    replied_by VARCHAR(10) REFERENCES users(id),
-    replied_at TIMESTAMP,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED')),
+    reject_reason TEXT NULL,
+    replied_by VARCHAR(10) NULL,
+    replied_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repair_id) REFERENCES repair_requests(id),
+    FOREIGN KEY (replied_by) REFERENCES users(id)
 );
-CREATE TRIGGER set_updated_at_repair_quotes BEFORE UPDATE ON repair_quotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Bảng repair_quote_items (image copy 8.png)
-CREATE TABLE repair_quote_items (
-    id VARCHAR(10) PRIMARY KEY,
-    quote_id VARCHAR(10) NOT NULL REFERENCES repair_quotes(id),
+-- 10. QUOTE ITEMS
+CREATE TABLE quote_items (
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    quote_id VARCHAR(10) NOT NULL,
     item_name VARCHAR(200) NOT NULL,
-    item_type item_type_enum NOT NULL,
-    quantity DECIMAL(10,2) DEFAULT 1, -- Đổi sang DECIMAL(10,2) để hỗ trợ số lượng thập phân (VD: 1.5 giờ công)
+    item_type VARCHAR(50) NOT NULL CHECK (item_type IN ('SPARE_PART', 'LABOR', 'SERVICE')),
+    quantity DECIMAL(10,2) NOT NULL DEFAULT 1,
     unit_price DECIMAL(12,0) NOT NULL DEFAULT 0,
-    subtotal DECIMAL(12,0) DEFAULT 0,
-    note TEXT,
+    subtotal DECIMAL(12,0) NOT NULL DEFAULT 0,
+    note TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (quote_id) REFERENCES repair_quotes(id)
 );
-CREATE TRIGGER set_updated_at_repair_quote_items BEFORE UPDATE ON repair_quote_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Bảng repair_reviews (image copy 9.png)
--- Đã FIX: rating chuyển thành DECIMAL
-CREATE TABLE repair_reviews (
-    id VARCHAR(10) PRIMARY KEY,
-    repair_id VARCHAR(10) NOT NULL REFERENCES repair_requests(id),
-    customer_id VARCHAR(10) NOT NULL REFERENCES users(id),
-    technician_id VARCHAR(10) NOT NULL REFERENCES users(id),
-    rating DECIMAL(3,2) NOT NULL,
-    comment TEXT,
+-- 11. REVIEWS
+CREATE TABLE reviews (
+    id VARCHAR(10) PRIMARY KEY NOT NULL,
+    repair_id VARCHAR(10) NOT NULL UNIQUE,
+    customer_id VARCHAR(10) NOT NULL,
+    technician_id VARCHAR(10) NOT NULL,
+    rating SMALLINT NOT NULL,
+    comment TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repair_id) REFERENCES repair_requests(id),
+    FOREIGN KEY (customer_id) REFERENCES users(id),
+    FOREIGN KEY (technician_id) REFERENCES users(id)
 );
-CREATE TRIGGER set_updated_at_repair_reviews BEFORE UPDATE ON repair_reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+
