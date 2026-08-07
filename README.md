@@ -141,10 +141,12 @@ API Docs (Swagger UI): http://127.0.0.1:8000/docs
 
 2. Running the Admin Web
 
+
 cd frontend/Admin-web
 npm install
 npm run dev
 3. Running the Technician App
+
 
 cd frontend/Technician-app
 npm install
