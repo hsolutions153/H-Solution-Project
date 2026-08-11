@@ -33,3 +33,23 @@ class TokenResponse(BaseModel):
     role_id: str
     role: str
     user: AuthenticatedUser
+
+
+class ForgotPasswordRequest(BaseModel):
+    phone: str = Field(min_length=1, max_length=20)
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    expires_in_seconds: int
+    otp_code: str | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    phone: str = Field(min_length=1, max_length=20)
+    otp_code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    new_password: str = Field(min_length=8, max_length=72)
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

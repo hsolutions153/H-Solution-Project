@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+import os
 import secrets
 
 from fastapi import HTTPException, status
@@ -6,6 +8,9 @@ from app.auth import repository
 from app.auth.utils import create_access_token, hash_password, verify_password
 
 CUSTOMER_ROLE_CODE = "CUSTOMER"
+OTP_EXPIRE_MINUTES = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
+OTP_EXPOSE_IN_RESPONSE = os.getenv("OTP_EXPOSE_IN_RESPONSE", "false").lower() == "true"
+OTP_RESEND_COOLDOWN_SECONDS = 60
 
 
 def _generate_user_id() -> str:
@@ -82,3 +87,53 @@ def register_customer(data):
     if not new_user:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user")
     return {"message": "Registered successfully", "user_id": new_user["id"]}
+
+
+def request_password_reset(phone: str):
+    """Create a short-lived OTP without revealing whether the phone exists."""
+    user = repository.get_user_by_phone(phone)
+    expires_in_seconds = OTP_EXPIRE_MINUTES * 60
+    generic_response = {
+        "message": "If the phone number is registered, an OTP has been sent.",
+        "expires_in_seconds": expires_in_seconds,
+    }
+    if not user:
+        return generic_response
+
+    now = datetime.now(timezone.utc)
+    latest = repository.get_latest_otp(phone)
+    if latest:
+        created_at = datetime.fromisoformat(latest["created_at"].replace("Z", "+00:00"))
+        if (now - created_at).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Please wait before requesting another OTP")
+
+    otp_code = f"{secrets.randbelow(1_000_000):06d}"
+    repository.invalidate_unused_otps(phone, now.isoformat())
+    created = repository.create_otp(
+        {
+            "id": _generate_user_id(),
+            "phone": phone,
+            "otp_code": otp_code,
+            "expires_at": (now + timedelta(minutes=OTP_EXPIRE_MINUTES)).isoformat(),
+        }
+    )
+    if not created:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create OTP")
+
+    # Plug an SMS provider in here. The OTP is never returned in normal operation.
+    if OTP_EXPOSE_IN_RESPONSE:
+        generic_response["otp_code"] = otp_code
+    return generic_response
+
+
+def reset_password(phone: str, otp_code: str, new_password: str):
+    user = repository.get_user_by_phone(phone)
+    otp = repository.get_valid_otp(phone, datetime.now(timezone.utc).isoformat())
+    if not user or not otp or not secrets.compare_digest(otp["otp_code"], otp_code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP")
+
+    updated = repository.update_user_password(user["id"], hash_password(new_password))
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to reset password")
+    repository.mark_otp_used(otp["id"], datetime.now(timezone.utc).isoformat())
+    return {"message": "Password reset successfully"}

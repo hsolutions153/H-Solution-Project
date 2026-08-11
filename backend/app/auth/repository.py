@@ -19,6 +19,11 @@ def get_user_by_phone(phone: str):
     return response.data if response and hasattr(response, "data") else None
 
 
+def update_user_password(user_id: str, password_hash: str):
+    response = supabase.table(USERS_TABLE).update({"password_hash": password_hash}).eq("id", user_id).execute()
+    return response.data[0] if response and response.data else None
+
+
 def get_role_by_code(code: str):
     response = supabase.table(ROLES_TABLE).select("id,code,name").eq("code", code).maybe_single().execute()
     return response.data if response and hasattr(response, "data") else None
@@ -29,3 +34,49 @@ def create_user(data: dict):
     if response and hasattr(response, "data") and response.data:
         return response.data[0]
     return None
+
+
+def get_latest_otp(phone: str):
+    response = (
+        supabase.table("otps")
+        .select("id,created_at")
+        .eq("phone", phone)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response and response.data else None
+
+
+def invalidate_unused_otps(phone: str, used_at: str):
+    return (
+        supabase.table("otps")
+        .update({"is_used": True, "used_at": used_at})
+        .eq("phone", phone)
+        .eq("is_used", False)
+        .execute()
+    )
+
+
+def create_otp(data: dict):
+    response = supabase.table("otps").insert(data).execute()
+    return response.data[0] if response and response.data else None
+
+
+def get_valid_otp(phone: str, now: str):
+    response = (
+        supabase.table("otps")
+        .select("id,otp_code")
+        .eq("phone", phone)
+        .eq("is_used", False)
+        .gt("expires_at", now)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response and response.data else None
+
+
+def mark_otp_used(otp_id: str, used_at: str):
+    response = supabase.table("otps").update({"is_used": True, "used_at": used_at}).eq("id", otp_id).execute()
+    return response.data[0] if response and response.data else None

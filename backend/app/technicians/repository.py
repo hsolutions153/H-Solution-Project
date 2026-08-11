@@ -11,7 +11,8 @@ def get_all_technicians(kyc_status: str | None = None):
     query = supabase.table(TECHNICIAN_PROFILES_TABLE).select(PROFILE_SELECT).order("created_at", desc=True)
     if kyc_status:
         query = query.eq("kyc_status", kyc_status)
-    return query.execute().data
+    response = query.execute()
+    return response.data if response and hasattr(response, "data") else []
 
 
 def get_technician_by_user_id(user_id: str):
@@ -22,7 +23,7 @@ def get_technician_by_user_id(user_id: str):
         .maybe_single()
         .execute()
     )
-    return response.data
+    return response.data if response and hasattr(response, "data") else None
 
 
 def get_technician_by_id_card_number(id_card_number: str):
@@ -33,19 +34,19 @@ def get_technician_by_id_card_number(id_card_number: str):
         .maybe_single()
         .execute()
     )
-    return response.data
+    return response.data if response and hasattr(response, "data") else None
 
 
 def insert_technician(data: dict):
     response = supabase.table(TECHNICIAN_PROFILES_TABLE).insert(data).execute()
-    return response.data[0] if response.data else None
+    return response.data[0] if response and response.data else None
 
 
 def update_technician_in_db(user_id: str, data: dict):
     response = supabase.table(TECHNICIAN_PROFILES_TABLE).update(data).eq("user_id", user_id).execute()
-    return response.data[0] if response.data else None
+    return response.data[0] if response and response.data else None
 
 
 def delete_technician_from_db(user_id: str):
     response = supabase.table(TECHNICIAN_PROFILES_TABLE).delete().eq("user_id", user_id).execute()
-    return response.data[0] if response.data else None
+    return response.data[0] if response and response.data else None
