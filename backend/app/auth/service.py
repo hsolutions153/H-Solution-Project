@@ -102,10 +102,25 @@ def request_password_reset(phone: str):
 
     now = datetime.now(timezone.utc)
     latest = repository.get_latest_otp(phone)
-    if latest:
-        created_at = datetime.fromisoformat(latest["created_at"].replace("Z", "+00:00"))
+    if isinstance(latest, list) and len(latest) > 0:
+        latest = latest[0]
+    if latest and latest.get("created_at"):
+        raw_created_at = str(latest["created_at"])
+        
+        if "T" not in raw_created_at and " " in raw_created_at:
+            raw_created_at = raw_created_at.replace(" ", "T", 1)
+        
+        raw_created_at = raw_created_at.replace("Z", "").replace("z", "")
+        
+        created_at = datetime.fromisoformat(raw_created_at)
+        
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
         if (now - created_at).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Please wait before requesting another OTP")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
+                detail="Please wait before requesting another OTP"
+            )
 
     otp_code = f"{secrets.randbelow(1_000_000):06d}"
     repository.invalidate_unused_otps(phone, now.isoformat())
