@@ -2,7 +2,7 @@ from app.db.database import supabase
 
 USERS_TABLE = "users"
 ROLES_TABLE = "roles"
-USER_SELECT = "*,role:roles!users_role_id_fkey(id,code,name)"
+USER_SELECT = "*,role:roles(id,code,name)"
 
 
 def get_user_by_email(email: str):
