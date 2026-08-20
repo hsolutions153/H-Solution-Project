@@ -31,10 +31,17 @@ def get_technician_profile(user_id: str):
     return response.data if response and hasattr(response, "data") else None
 
 
-def assign_order(order_id: str, technician_id: str, assigned_at: str):
+def assign_order(order_id: str, technician_id: str, assigned_at: str, assigned_by: str):
     response = (
         supabase.table(ORDERS_TABLE)
-        .update({"technician_id": technician_id, "status": "ASSIGNED", "assigned_at": assigned_at})
+        .update(
+            {
+                "technician_id": technician_id,
+                "status": "ASSIGNED",
+                "assigned_at": assigned_at,
+                "updated_by": assigned_by,
+            }
+        )
         .eq("id", order_id)
         .execute()
     )

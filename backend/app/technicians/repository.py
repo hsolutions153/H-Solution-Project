@@ -14,7 +14,6 @@ def get_all_technicians(kyc_status: str | None = None):
     response = query.execute()
     return response.data if response and hasattr(response, "data") else []
 
-
 def get_technician_by_user_id(user_id: str):
     response = (
         supabase.table(TECHNICIAN_PROFILES_TABLE)
@@ -24,7 +23,6 @@ def get_technician_by_user_id(user_id: str):
         .execute()
     )
     return response.data if response and hasattr(response, "data") else None
-
 
 def get_technician_by_id_card_number(id_card_number: str):
     response = (
