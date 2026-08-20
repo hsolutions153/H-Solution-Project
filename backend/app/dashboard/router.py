@@ -9,9 +9,7 @@ class DashboardMetricsResponse(BaseModel):
     total_orders: int
     by_status: dict[str, int]
 
-
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(require_admin)])
-
 
 @router.get("/metrics", response_model=DashboardMetricsResponse)
 def get_metrics():

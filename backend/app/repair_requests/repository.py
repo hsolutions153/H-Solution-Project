@@ -1,6 +1,7 @@
 from app.db.database import supabase
 from app.repair_requests.models import (
     CUSTOMER_DEVICES_TABLE,
+    PAYMENTS_TABLE,
     REPAIR_QUOTES_TABLE,
     REPAIR_REQUESTS_TABLE,
     STATUS_HISTORY_TABLE,
@@ -44,6 +45,18 @@ def get_repair_requests(*, customer_id: str | None, technician_id: str | None, r
 def update_repair_request(request_id: str, data: dict):
     response = supabase.table(REPAIR_REQUESTS_TABLE).update(data).eq("id", request_id).execute()
     return response.data[0] if response and response.data else None
+
+
+def get_payments_for_repairs(repair_ids: list[str]):
+    if not repair_ids:
+        return {}
+    response = (
+        supabase.table(PAYMENTS_TABLE)
+        .select("repair_id,payment_method,payment_status")
+        .in_("repair_id", repair_ids)
+        .execute()
+    )
+    return {payment["repair_id"]: payment for payment in (response.data or [])}
 
 
 def has_accepted_quote(request_id: str) -> bool:
