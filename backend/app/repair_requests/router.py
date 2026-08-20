@@ -1,5 +1,3 @@
-from fastapi import APIRouter, Depends, Query, status
-
 from app.auth.utils import get_current_user
 from app.repair_requests.schemas import (
     RepairRequestCreate,
@@ -8,6 +6,7 @@ from app.repair_requests.schemas import (
     RepairRequestStatusUpdate,
 )
 from app.repair_requests.service import (
+    add_after_repair_image,
     create_request,
     fetch_all_requests,
     fetch_my_requests,
@@ -15,6 +14,7 @@ from app.repair_requests.service import (
     fetch_technician_requests,
     update_request_status,
 )
+from fastapi import APIRouter, Depends, Query, status, File, UploadFile
 
 router = APIRouter(prefix="/repair-requests", tags=["Repair Requests"])
 
@@ -68,3 +68,12 @@ def modify_repair_request_status(
     current_user: dict = Depends(get_current_user),
 ):
     return update_request_status(request_id, current_user, data)
+
+
+@router.post("/{request_id}/after-repair-images", response_model=RepairRequestResponse)
+def upload_after_repair_image(
+        request_id: str,
+        file: UploadFile = File(...),
+        current_user: dict = Depends(get_current_user),
+):
+    return add_after_repair_image(request_id, file, current_user)

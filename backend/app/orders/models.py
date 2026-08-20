@@ -1,6 +1,6 @@
 ORDERS_TABLE = "repair_requests"
 TECHNICIAN_PROFILES_TABLE = "technician_profiles"
-STATUS_HISTORY_TABLE = "repair_status_history"
+STATUS_HISTORY_TABLE = "repair_requests_history"
 
 ORDER_STATUSES = {
     "PENDING", "ASSIGNED", "ACCEPTED", "ARRIVED", "DIAGNOSED",

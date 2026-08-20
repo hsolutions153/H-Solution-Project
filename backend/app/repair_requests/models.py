@@ -1,8 +1,10 @@
 REPAIR_REQUESTS_TABLE = "repair_requests"
+REPAIR_IMAGES_TABLE = "repair_requests_images"
 CUSTOMER_DEVICES_TABLE = "customer_devices"
-STATUS_HISTORY_TABLE = "repair_status_history"
+STATUS_HISTORY_TABLE = "repair_requests_history"
 REPAIR_QUOTES_TABLE = "repair_quotes"
 
+IMAGE_TYPES = {"BEFORE_REPAIR", "AFTER_REPAIR"}
 ISSUE_TYPES = {"BATTERY", "MOTOR", "TIRE", "BRAKE", "OTHER"}
 REQUEST_STATUSES = {
     "PENDING", "ASSIGNED", "ACCEPTED", "ARRIVED", "DIAGNOSED",

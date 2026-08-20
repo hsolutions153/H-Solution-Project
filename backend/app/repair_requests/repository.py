@@ -1,6 +1,7 @@
 from app.db.database import supabase
 from app.repair_requests.models import (
     CUSTOMER_DEVICES_TABLE,
+    REPAIR_IMAGES_TABLE,
     REPAIR_QUOTES_TABLE,
     REPAIR_REQUESTS_TABLE,
     STATUS_HISTORY_TABLE,
@@ -61,3 +62,32 @@ def has_accepted_quote(request_id: str) -> bool:
 def add_status_history(data: dict):
     response = supabase.table(STATUS_HISTORY_TABLE).insert(data).execute()
     return response.data[0] if response and response.data else None
+
+
+def create_repair_image(data: dict):
+    response = supabase.table(REPAIR_IMAGES_TABLE).insert(data).execute()
+    return response.data[0] if response and response.data else None
+
+
+def get_repair_images(repair_id: str):
+    response = (
+        supabase.table(REPAIR_IMAGES_TABLE)
+        .select("*")
+        .eq("repair_id", repair_id)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return response.data if response and hasattr(response, "data") else []
+
+
+def get_repair_images_by_repair_ids(repair_ids: list[str]):
+    if not repair_ids:
+        return []
+    response = (
+        supabase.table(REPAIR_IMAGES_TABLE)
+        .select("*")
+        .in_("repair_id", repair_ids)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return response.data if response and hasattr(response, "data") else []

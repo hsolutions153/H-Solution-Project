@@ -1,11 +1,9 @@
+import secrets
+from app.orders import repository
+from app.orders.models import ASSIGNABLE_STATUSES, ORDER_STATUSES
 from collections import Counter
 from datetime import datetime, timezone
-import secrets
-
 from fastapi import HTTPException, status
-
-from app.orders.models import ASSIGNABLE_STATUSES, ORDER_STATUSES
-from app.orders import repository
 
 
 def fetch_orders(order_status: str | None, page: int, limit: int):
@@ -39,10 +37,8 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
         {
             "id": secrets.token_hex(5).upper(),
             "repair_id": order_id,
-            "old_status": order["status"],
-            "new_status": "ASSIGNED",
+            "status": "ASSIGNED",
             "changed_by": assigned_by,
-            "api_endpoint": f"/api/v1/orders/{order_id}/assign",
             "note": "Technician assigned by admin",
         }
     )

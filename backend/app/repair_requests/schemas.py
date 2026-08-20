@@ -4,11 +4,24 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 
+class RepairImageResponse(BaseModel):
+    id: str
+    repair_id: str
+    image_url: str
+    image_type: str
+    description: str | None = None
+    created_at: datetime
+    created_by: str
+
+    class Config:
+        from_attributes = True
+
+
 class RepairRequestCreate(BaseModel):
     device_id: str = Field(min_length=1, max_length=10)
     issue_type: str
     issue_description: str = Field(min_length=1)
-    location_address: str = Field(min_length=1, max_length=200)
+    location_address: str = Field(min_length=1, max_length=255)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     is_sos: bool = False
@@ -32,20 +45,24 @@ class RepairRequestResponse(BaseModel):
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     is_sos: bool
-    inspection_images: list[str] | None = None
-    after_repair_images: list[str] | None = None
     status: str
     assigned_at: datetime | None = None
     accepted_at: datetime | None = None
     arrived_at: datetime | None = None
+    diagnosed_at: datetime | None = None
+    repairing_at: datetime | None = None
     completed_at: datetime | None = None
     cancelled_at: datetime | None = None
     cancel_reason: str | None = None
-    payment_method: str | None = None
-    payment_status: str
     total_amount: Decimal | None = None
     created_at: datetime
+    created_by: str
     updated_at: datetime
+    updated_by: str
+    images: list[RepairImageResponse] = []
+
+    class Config:
+        from_attributes = True
 
 
 class RepairRequestListResponse(BaseModel):
