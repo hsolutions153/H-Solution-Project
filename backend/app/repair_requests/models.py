@@ -2,6 +2,7 @@ REPAIR_REQUESTS_TABLE = "repair_requests"
 CUSTOMER_DEVICES_TABLE = "customer_devices"
 STATUS_HISTORY_TABLE = "repair_status_history"
 REPAIR_QUOTES_TABLE = "repair_quotes"
+PAYMENTS_TABLE = "payments"
 
 ISSUE_TYPES = {"BATTERY", "MOTOR", "TIRE", "BRAKE", "OTHER"}
 REQUEST_STATUSES = {

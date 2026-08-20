@@ -1,6 +1,5 @@
 from collections import Counter
 from datetime import datetime, timezone
-import secrets
 
 from fastapi import HTTPException, status
 
@@ -34,18 +33,7 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Technician KYC is not approved")
 
     assigned_at = datetime.now(timezone.utc).isoformat()
-    repository.assign_order(order_id, technician_id, assigned_at)
-    repository.add_status_history(
-        {
-            "id": secrets.token_hex(5).upper(),
-            "repair_id": order_id,
-            "old_status": order["status"],
-            "new_status": "ASSIGNED",
-            "changed_by": assigned_by,
-            "api_endpoint": f"/api/v1/orders/{order_id}/assign",
-            "note": "Technician assigned by admin",
-        }
-    )
+    repository.assign_order(order_id, technician_id, assigned_at, assigned_by)
     return fetch_order(order_id)
 
 

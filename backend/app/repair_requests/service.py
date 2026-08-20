@@ -48,6 +48,18 @@ def _serialize_images(request: dict) -> dict:
     return result
 
 
+def _attach_payment_info(requests: list[dict]) -> list[dict]:
+    payments = repository.get_payments_for_repairs([request["id"] for request in requests])
+    result = []
+    for request in requests:
+        item = request.copy()
+        payment = payments.get(item["id"]) or {}
+        item["payment_method"] = payment.get("payment_method")
+        item["payment_status"] = payment.get("payment_status", "UNPAID")
+        result.append(item)
+    return result
+
+
 def _list(customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int):
     if request_status and request_status not in REQUEST_STATUSES:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid request status")
@@ -58,7 +70,12 @@ def _list(customer_id: str | None, technician_id: str | None, request_status: st
         page=page,
         limit=limit,
     )
-    return {"items": [_serialize_images(item) for item in items], "total": total, "page": page, "limit": limit}
+    return {
+        "items": [_serialize_images(item) for item in _attach_payment_info(items)],
+        "total": total,
+        "page": page,
+        "limit": limit,
+    }
 
 
 def create_request(current_user: dict, data):
@@ -120,7 +137,7 @@ def fetch_request(request_id: str, current_user: dict):
     )
     if not can_view:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-    return _serialize_images(request)
+    return _serialize_images(_attach_payment_info([request])[0])
 
 
 def update_request_status(request_id: str, current_user: dict, data):
@@ -151,7 +168,7 @@ def update_request_status(request_id: str, current_user: dict, data):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid status transition")
 
     now = datetime.now(timezone.utc).isoformat()
-    update_data = {"status": new_status}
+    update_data = {"status": new_status, "updated_by": current_user["sub"]}
     if new_status == "ACCEPTED":
         update_data["accepted_at"] = now
     elif new_status == "ARRIVED":
@@ -163,15 +180,4 @@ def update_request_status(request_id: str, current_user: dict, data):
         update_data["cancel_reason"] = payload.get("cancel_reason")
 
     repository.update_repair_request(request_id, update_data)
-    repository.add_status_history(
-        {
-            "id": _request_id(),
-            "repair_id": request_id,
-            "old_status": request["status"],
-            "new_status": new_status,
-            "changed_by": current_user["sub"],
-            "api_endpoint": f"/api/v1/repair-requests/{request_id}/status",
-            "note": payload.get("cancel_reason"),
-        }
-    )
     return fetch_request(request_id, current_user)
