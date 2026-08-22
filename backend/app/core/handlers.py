@@ -25,14 +25,14 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         code_mapping = {
-            status.HTTP_400_BAD_REQUEST: ErrorCode.INTERNAL_SERVER_ERROR.value,
-            status.HTTP_401_UNAUTHORIZED: ErrorCode.UNAUTHORIZED.value,
-            status.HTTP_403_FORBIDDEN: ErrorCode.FORBIDDEN.value,
-            status.HTTP_404_NOT_FOUND: ErrorCode.REQUEST_NOT_FOUND.value,
-            status.HTTP_409_CONFLICT: ErrorCode.INVALID_STATUS_TRANSITION.value,
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: ErrorCode.IMAGE_SIZE_TOO_LARGE.value,
-            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: ErrorCode.IMAGE_TYPE_UNSUPPORTED.value,
-            status.HTTP_422_UNPROCESSABLE_ENTITY: ErrorCode.VALIDATION_ERROR.value,
+            400: ErrorCode.INTERNAL_SERVER_ERROR.value,
+            401: ErrorCode.UNAUTHORIZED.value,
+            403: ErrorCode.FORBIDDEN.value,
+            404: ErrorCode.REQUEST_NOT_FOUND.value,
+            409: ErrorCode.INVALID_STATUS_TRANSITION.value,
+            413: ErrorCode.IMAGE_SIZE_TOO_LARGE.value,
+            415: ErrorCode.IMAGE_TYPE_UNSUPPORTED.value,
+            422: ErrorCode.VALIDATION_ERROR.value,
         }
         code = code_mapping.get(exc.status_code, ErrorCode.INTERNAL_SERVER_ERROR.value)
 
@@ -57,7 +57,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             })
 
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             content={
                 "code": ErrorCode.VALIDATION_ERROR.value,
                 "message": "Dữ liệu gửi lên không đúng định dạng",
