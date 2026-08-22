@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.utils import get_current_user
-
 from app.customers.schemas import (
     CustomerCreate,
     CustomerListResponse,
@@ -15,11 +14,11 @@ from app.customers.service import (
     fetch_customer,
     fetch_customers,
     fetch_own_customer,
+    require_admin,
     require_customer,
     update_customer,
     update_customer_status,
     update_own_customer,
-    require_admin,
 )
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
@@ -35,7 +34,8 @@ def modify_my_customer(data: CustomerUpdate, current_user: dict = Depends(get_cu
     return update_own_customer(current_user, data)
 
 
-@router.get("/", response_model=CustomerListResponse, dependencies=[Depends(require_admin)])
+@router.get("", response_model=CustomerListResponse, dependencies=[Depends(require_admin)])
+@router.get("/", response_model=CustomerListResponse, dependencies=[Depends(require_admin)], include_in_schema=False)
 def get_customers(
     search: str | None = Query(default=None, max_length=100),
     page: int = Query(default=1, ge=1),
@@ -49,7 +49,8 @@ def get_customer(customer_id: str):
     return fetch_customer(customer_id)
 
 
-@router.post("/", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+@router.post("", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+@router.post("/", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)], include_in_schema=False)
 def add_customer(data: CustomerCreate):
     return create_customer(data)
 

@@ -1,8 +1,11 @@
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+
 from app.auth.utils import get_current_user
 from app.repair_requests.schemas import (
     RepairRequestCreate,
     RepairRequestListResponse,
     RepairRequestResponse,
+    RepairRequestStatusSyncResponse,
     RepairRequestStatusUpdate,
 )
 from app.repair_requests.service import (
@@ -11,15 +14,16 @@ from app.repair_requests.service import (
     fetch_all_requests,
     fetch_my_requests,
     fetch_request,
+    fetch_request_status_sync,
     fetch_technician_requests,
     update_request_status,
 )
-from fastapi import APIRouter, Depends, Query, status, File, UploadFile
 
 router = APIRouter(prefix="/repair-requests", tags=["Repair Requests"])
 
 
 @router.post("", response_model=RepairRequestResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=RepairRequestResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_repair_request(data: RepairRequestCreate, current_user: dict = Depends(get_current_user)):
     return create_request(current_user, data)
 
@@ -45,6 +49,7 @@ def get_my_technician_requests(
 
 
 @router.get("", response_model=RepairRequestListResponse)
+@router.get("/", response_model=RepairRequestListResponse, include_in_schema=False)
 def get_repair_requests(
     status: str | None = Query(default=None),
     customer_id: str | None = Query(default=None),
@@ -61,6 +66,12 @@ def get_repair_request(request_id: str, current_user: dict = Depends(get_current
     return fetch_request(request_id, current_user)
 
 
+@router.get("/{request_id}/status", response_model=RepairRequestStatusSyncResponse)
+def get_repair_request_status_sync(request_id: str, current_user: dict = Depends(get_current_user)):
+    """API đồng bộ trạng thái thời gian thực và thông tin thợ cho Team A."""
+    return fetch_request_status_sync(request_id, current_user)
+
+
 @router.patch("/{request_id}/status", response_model=RepairRequestResponse)
 def modify_repair_request_status(
     request_id: str,
@@ -72,8 +83,8 @@ def modify_repair_request_status(
 
 @router.post("/{request_id}/after-repair-images", response_model=RepairRequestResponse)
 def upload_after_repair_image(
-        request_id: str,
-        file: UploadFile = File(...),
-        current_user: dict = Depends(get_current_user),
+    request_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
     return add_after_repair_image(request_id, file, current_user)

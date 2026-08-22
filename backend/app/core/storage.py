@@ -1,6 +1,8 @@
 import os
-from fastapi import UploadFile, HTTPException, status
+from fastapi import UploadFile
 from supabase import create_client, Client
+
+from app.core.exceptions import AppException, ErrorCode
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -28,7 +30,4 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
         return public_url
 
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload image to storage.",
-        )
+        raise AppException(ErrorCode.IMAGE_UPLOAD_FAILED)

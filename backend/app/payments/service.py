@@ -1,12 +1,13 @@
 import os
 import secrets
+from datetime import datetime, timezone
+from urllib.parse import urlencode
+
 from app.auth import repository as auth_repository
+from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.payments import repository
 from app.repair_requests.models import TECHNICIAN_ROLE_CODE
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from urllib.parse import urlencode
 
 PAYMENT_CODE_PREFIX = os.getenv("PAYMENT_CODE_PREFIX")
 SEPAY_BANK_ACCOUNT = os.getenv("SEPAY_BANK_ACCOUNT")
@@ -26,15 +27,17 @@ def _payment_code() -> str:
 def _role_id(code: str) -> str:
     role = auth_repository.get_role_by_code(code)
     if not role:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"{code} role is not configured",
-        )
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
     return role["id"]
 
 
 def _is_role(current_user: dict, code: str) -> bool:
-    return current_user["role_id"] == _role_id(code)
+    if current_user.get("role") == code:
+        return True
+    try:
+        return current_user.get("role_id") == _role_id(code)
+    except Exception:
+        return False
 
 
 def build_qr_url(payment_code: str, amount: int) -> str:
@@ -51,38 +54,31 @@ def build_qr_url(payment_code: str, amount: int) -> str:
 def fetch_qr(repair_id: str, current_user: dict):
     repair = repository.get_repair_request(repair_id)
     if not repair:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair request not found")
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
 
-    # kiểm tra quyền: admin, customer chủ repair, hoặc technician được giao
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
     is_customer_owner = (
-            _is_role(current_user, CUSTOMER_ROLE_CODE)
-            and repair["customer_id"] == current_user["sub"]
+        _is_role(current_user, CUSTOMER_ROLE_CODE)
+        and repair["customer_id"] == current_user["sub"]
     )
     is_assigned_technician = (
-            _is_role(current_user, TECHNICIAN_ROLE_CODE)
-            and repair.get("technician_id") == current_user["sub"]
+        _is_role(current_user, TECHNICIAN_ROLE_CODE)
+        and repair.get("technician_id") == current_user["sub"]
     )
     if not (is_admin or is_customer_owner or is_assigned_technician):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise AppException(ErrorCode.FORBIDDEN)
 
-    # tìm payment hiện tại nếu có
     payment = repository.get_payment_by_repair_id(repair_id)
     if payment and payment.get("payment_status") == "PAID":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This repair has already been paid")
+        raise AppException(ErrorCode.PAYMENT_ALREADY_PAID)
 
-    # resolve amount: ưu tiên total_amount, fallback sang accepted quote
     amount = repair.get("total_amount")
     if not amount:
         quote = repository.get_accepted_quote(repair_id)
         if not quote:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Payment amount is not determined yet. Please wait for a quote to be accepted.",
-            )
+            raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED)
         amount = quote["estimated_price"]
 
-    # tạo payment record nếu chưa có
     if not payment:
         payment_id = _payment_id()
         payment = repository.create_payment({
@@ -97,10 +93,7 @@ def fetch_qr(repair_id: str, current_user: dict):
             "updated_by": current_user["sub"],
         })
         if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create payment",
-            )
+            raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
         repository.add_payment_history({
             "id": _payment_id(),
             "payment_id": payment_id,
@@ -116,19 +109,13 @@ def fetch_qr(repair_id: str, current_user: dict):
 
 
 def handle_sepay_webhook(payload, auth_header: str | None):
-    # xác thực API Key từ SePay
     if not auth_header or not auth_header.startswith("Apikey "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
     provided_key = auth_header[len("Apikey "):]
     if not SEPAY_API_KEY or not secrets.compare_digest(provided_key, SEPAY_API_KEY):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
 
-    print(
-        f"[SePay Webhook] Received: code={payload.code}, amount={payload.transferAmount}, content='{payload.content}', type={payload.transferType}")
-
-    # chỉ xử lý giao dịch tiền vào
     if payload.transferType and payload.transferType != "in":
-        print(f"[SePay Webhook] Ignored transferType: {payload.transferType}")
         return {"success": True}
 
     target_code = payload.code.strip() if payload.code else None
@@ -137,7 +124,6 @@ def handle_sepay_webhook(payload, auth_header: str | None):
     if target_code:
         payment = repository.get_payment_by_code(target_code)
 
-    # Quét mã thanh toán trong content hoặc description
     if not payment:
         search_texts = [payload.content, payload.description]
         for text in search_texts:
@@ -155,12 +141,9 @@ def handle_sepay_webhook(payload, auth_header: str | None):
                 break
 
     if not payment:
-        print(f"[SePay Webhook] No matching payment found for code='{target_code}' or content='{payload.content}'")
         return {"success": True}
 
-    # đã PAID thì bỏ qua
     if payment["payment_status"] == "PAID":
-        print(f"[SePay Webhook] Payment {payment['id']} is already PAID")
         return {"success": True}
 
     now = datetime.now(timezone.utc).isoformat()

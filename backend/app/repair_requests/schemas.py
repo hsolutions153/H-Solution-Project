@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-
 from pydantic import BaseModel, Field
 
 
@@ -18,19 +17,38 @@ class RepairImageResponse(BaseModel):
 
 
 class RepairRequestCreate(BaseModel):
+    customer_id: str | None = None
     device_id: str = Field(min_length=1, max_length=10)
     issue_type: str
-    issue_description: str = Field(min_length=1)
-    location_address: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    issue_description: str | None = None
+    address_detail: str | None = None
+    location_address: str | None = None
+    location_lat: Decimal | None = None
+    location_lng: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
+    request_type: str | None = None
     is_sos: bool = False
+    image_urls: list[str] | None = None
     inspection_images: list[str] | None = None
 
 
 class RepairRequestStatusUpdate(BaseModel):
     status: str
     cancel_reason: str | None = None
+
+
+class TechnicianInfo(BaseModel):
+    name: str
+    phone: str
+
+
+class RepairRequestStatusSyncResponse(BaseModel):
+    request_id: str
+    current_status: str
+    technician_info: TechnicianInfo | None = None
+    last_updated: datetime | str
 
 
 class RepairRequestResponse(BaseModel):

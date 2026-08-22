@@ -2,10 +2,9 @@ from datetime import datetime, timedelta, timezone
 import os
 import secrets
 
-from fastapi import HTTPException, status
-
 from app.auth import repository
 from app.auth.utils import create_access_token, hash_password, verify_password
+from app.core.exceptions import AppException, ErrorCode
 
 CUSTOMER_ROLE_CODE = "CUSTOMER"
 OTP_EXPIRE_MINUTES = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
@@ -14,7 +13,6 @@ OTP_RESEND_COOLDOWN_SECONDS = 60
 
 
 def _generate_user_id() -> str:
-    """The SQL schema uses VARCHAR(10) user IDs rather than UUIDs."""
     return secrets.token_hex(5).upper()
 
 
@@ -22,30 +20,22 @@ def authenticate_user(email: str, password: str):
     user = repository.get_user_by_email(email)
     
     if not user or (isinstance(user, list) and len(user) == 0):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AppException(ErrorCode.INVALID_CREDENTIALS, headers={"WWW-Authenticate": "Bearer"})
     
     if isinstance(user, list):
         user = user[0]
 
     if not verify_password(password, user.get("password_hash", "")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AppException(ErrorCode.INVALID_CREDENTIALS, headers={"WWW-Authenticate": "Bearer"})
 
     if not user.get("is_active", True):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is locked or inactive")
+        raise AppException(ErrorCode.USER_LOCKED)
 
     role = user.get("role") or {}
     role_id = role.get("id")
     role_code = role.get("code")
     if not role_id or not role_code:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User role is not configured")
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
 
     access_token = create_access_token(
         data={"sub": user["id"], "email": user["email"], "role_id": role_id, "role": role_code}
@@ -61,16 +51,13 @@ def authenticate_user(email: str, password: str):
 
 def register_customer(data):
     if repository.get_user_by_email(str(data.email)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
     if data.phone and repository.get_user_by_phone(data.phone):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone already registered")
+        raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
 
     customer_role = repository.get_role_by_code(CUSTOMER_ROLE_CODE)
     if not customer_role:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CUSTOMER role is not configured",
-        )
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
     
     role_id = customer_role[0]["id"] if isinstance(customer_role, list) else customer_role["id"]
 
@@ -85,16 +72,15 @@ def register_customer(data):
     }
     new_user = repository.create_user(user_data)
     if not new_user:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user")
-    return {"message": "Registered successfully", "user_id": new_user["id"]}
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+    return {"message": "Đăng ký tài khoản thành công", "user_id": new_user["id"]}
 
 
 def request_password_reset(phone: str):
-    """Create a short-lived OTP without revealing whether the phone exists."""
     user = repository.get_user_by_phone(phone)
     expires_in_seconds = OTP_EXPIRE_MINUTES * 60
     generic_response = {
-        "message": "If the phone number is registered, an OTP has been sent.",
+        "message": "Mã OTP đã được gửi đến số điện thoại của bạn nếu tồn tại trong hệ thống",
         "expires_in_seconds": expires_in_seconds,
     }
     if not user:
@@ -111,16 +97,12 @@ def request_password_reset(phone: str):
             raw_created_at = raw_created_at.replace(" ", "T", 1)
         
         raw_created_at = raw_created_at.replace("Z", "").replace("z", "")
-        
         created_at = datetime.fromisoformat(raw_created_at)
         
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
         if (now - created_at).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
-                detail="Please wait before requesting another OTP"
-            )
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Vui lòng chờ ít phút trước khi yêu cầu mã OTP mới")
 
     otp_code = f"{secrets.randbelow(1_000_000):06d}"
     repository.invalidate_unused_otps(phone, now.isoformat())
@@ -133,9 +115,8 @@ def request_password_reset(phone: str):
         }
     )
     if not created:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create OTP")
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
 
-    # Plug an SMS provider in here. The OTP is never returned in normal operation.
     if OTP_EXPOSE_IN_RESPONSE:
         generic_response["otp_code"] = otp_code
     return generic_response
@@ -145,10 +126,10 @@ def reset_password(phone: str, otp_code: str, new_password: str):
     user = repository.get_user_by_phone(phone)
     otp = repository.get_valid_otp(phone, datetime.now(timezone.utc).isoformat())
     if not user or not otp or not secrets.compare_digest(otp["otp_code"], otp_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP")
+        raise AppException(ErrorCode.OTP_INVALID)
 
     updated = repository.update_user_password(user["id"], hash_password(new_password))
     if not updated:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to reset password")
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
     repository.mark_otp_used(otp["id"], datetime.now(timezone.utc).isoformat())
-    return {"message": "Password reset successfully"}
+    return {"message": "Đặt lại mật khẩu thành công"}

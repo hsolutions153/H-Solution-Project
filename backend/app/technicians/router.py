@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.utils import get_current_user
-
 from app.technicians.schemas import (
     TechnicianCreate,
     TechnicianKycReview,
@@ -13,13 +12,13 @@ from app.technicians.service import (
     create_technician,
     delete_technician,
     fetch_all_technicians,
-    fetch_technician_by_user_id,
     fetch_my_technician,
+    fetch_technician_by_user_id,
     require_admin,
     require_technician,
     review_technician_kyc,
-    update_technician,
     update_my_presence,
+    update_technician,
 )
 
 router = APIRouter(prefix="/technicians", tags=["Technicians"])
@@ -35,7 +34,8 @@ def modify_my_presence(data: TechnicianPresenceUpdate, current_user: dict = Depe
     return update_my_presence(current_user, data)
 
 
-@router.get("/", response_model=list[TechnicianResponse], dependencies=[Depends(require_admin)])
+@router.get("", response_model=list[TechnicianResponse], dependencies=[Depends(require_admin)])
+@router.get("/", response_model=list[TechnicianResponse], dependencies=[Depends(require_admin)], include_in_schema=False)
 def get_technicians(kyc_status: str | None = Query(default=None)):
     return fetch_all_technicians(kyc_status)
 
@@ -45,7 +45,8 @@ def get_technician(user_id: str):
     return fetch_technician_by_user_id(user_id)
 
 
-@router.post("/", response_model=TechnicianResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+@router.post("", response_model=TechnicianResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+@router.post("/", response_model=TechnicianResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)], include_in_schema=False)
 def add_technician(data: TechnicianCreate):
     return create_technician(data)
 

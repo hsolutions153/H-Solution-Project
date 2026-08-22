@@ -29,4 +29,4 @@ def assign_order(
     current_user: dict = Depends(get_current_user),
 ):
     order = assign_technician(order_id, data.technician_id, current_user["sub"])
-    return {"message": "Technician assigned successfully", "order": order}
+    return {"message": "Phân công kỹ thuật viên thành công", "order": order}

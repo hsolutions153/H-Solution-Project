@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 
 from app.auth import repository as auth_repository
 from app.auth.utils import get_current_user
+from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE
 from app.technicians.models import KYC_STATUSES, SKILLS
 from app.technicians.repository import (
@@ -26,38 +27,38 @@ def _payload(data, *, partial: bool = False):
 
 def _validate_profile_values(data: dict):
     if "skills" in data and data["skills"] not in SKILLS:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid technician skills")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Kỹ năng của kỹ thuật viên không hợp lệ")
 
 
 def _role_id(code: str) -> str:
     role = auth_repository.get_role_by_code(code)
     if not role:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{code} role is not configured")
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
     return role["id"]
 
 
 def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user["role_id"] != _role_id(ADMIN_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     return current_user
 
 
 def require_technician(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user["role_id"] != _role_id(TECHNICIAN_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Technician permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     return current_user
 
 
 def fetch_all_technicians(kyc_status: str | None = None):
     if kyc_status and kyc_status not in KYC_STATUSES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid KYC status")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái KYC không hợp lệ")
     return get_all_technicians(kyc_status)
 
 
 def fetch_technician_by_user_id(user_id: str):
     technician = get_technician_by_user_id(user_id)
     if not technician:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Technician profile not found")
+        raise AppException(ErrorCode.TECHNICIAN_NOT_FOUND)
     return technician
 
 
@@ -66,11 +67,11 @@ def create_technician(data):
     _validate_profile_values(payload)
     user = auth_repository.get_user_by_id(payload["user_id"])
     if not user or (user.get("role") or {}).get("code") != TECHNICIAN_ROLE_CODE:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="User must have TECHNICIAN role")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Người dùng phải có vai trò TECHNICIAN")
     if get_technician_by_user_id(payload["user_id"]):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Technician profile already exists")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Hồ sơ kỹ thuật viên đã tồn tại")
     if get_technician_by_id_card_number(payload["id_card_number"]):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="ID card number already exists")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Số CCCD đã tồn tại trong hệ thống")
     insert_technician(payload)
     return fetch_technician_by_user_id(payload["user_id"])
 
@@ -89,7 +90,7 @@ def review_technician_kyc(user_id: str, data, reviewed_by: str):
     fetch_technician_by_user_id(user_id)
     payload = _payload(data)
     if payload["kyc_status"] not in KYC_STATUSES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid KYC status")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái KYC không hợp lệ")
     update_technician_in_db(
         user_id,
         {

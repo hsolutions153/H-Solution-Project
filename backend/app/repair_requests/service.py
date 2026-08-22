@@ -1,7 +1,13 @@
 import secrets
 import uuid
+from collections import defaultdict
+from datetime import datetime, timezone
+
+from fastapi import UploadFile
+
 from app.auth import repository as auth_repository
 from app.core import storage
+from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.repair_requests import repository
 from app.repair_requests.models import (
@@ -10,9 +16,6 @@ from app.repair_requests.models import (
     TECHNICIAN_ROLE_CODE,
     TECHNICIAN_TRANSITIONS,
 )
-from collections import defaultdict
-from datetime import datetime, timezone
-from fastapi import HTTPException, status, UploadFile
 
 MAX_IMAGE_SIZE_MB = 50
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
@@ -28,12 +31,17 @@ def _payload(data):
 def _role_id(code: str) -> str:
     role = auth_repository.get_role_by_code(code)
     if not role:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{code} role is not configured")
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
     return role["id"]
 
 
 def _is_role(current_user: dict, code: str) -> bool:
-    return current_user["role_id"] == _role_id(code)
+    if current_user.get("role") == code:
+        return True
+    try:
+        return current_user.get("role_id") == _role_id(code)
+    except Exception:
+        return False
 
 
 def _request_id() -> str:
@@ -61,7 +69,7 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
 
 def _list(customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int):
     if request_status and request_status not in REQUEST_STATUSES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid request status")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái yêu cầu không hợp lệ")
     items, total = repository.get_repair_requests(
         customer_id=customer_id,
         technician_id=technician_id,
@@ -74,36 +82,50 @@ def _list(customer_id: str | None, technician_id: str | None, request_status: st
 
 def create_request(current_user: dict, data):
     if not _is_role(current_user, CUSTOMER_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     payload = _payload(data)
-    if payload["issue_type"] not in ISSUE_TYPES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid issue type")
-    if not repository.get_device_for_customer(payload["device_id"], current_user["sub"]):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+    issue_type = (payload.get("issue_type") or "").upper()
+    if issue_type not in ISSUE_TYPES:
+        raise AppException(ErrorCode.INVALID_ISSUE_TYPE)
+
+    device_id = payload.get("device_id")
+    if not repository.get_device_for_customer(device_id, current_user["sub"]):
+        raise AppException(ErrorCode.DEVICE_NOT_FOUND)
+
+    # Chuẩn hóa linh hoạt các trường giữa Team A & Team B
+    description = payload.get("description") or payload.get("issue_description") or ""
+    address = payload.get("address_detail") or payload.get("location_address") or ""
+    lat = payload.get("location_lat") or payload.get("latitude")
+    lng = payload.get("location_lng") or payload.get("longitude")
+    
+    is_sos = payload.get("is_sos", False)
+    if payload.get("request_type") == "SOS":
+        is_sos = True
+
+    images = payload.get("image_urls") or payload.get("inspection_images") or []
 
     request_id = _request_id()
     record = {
         "id": request_id,
         "request_code": _request_id(),
         "customer_id": current_user["sub"],
-        "device_id": payload["device_id"],
-        "issue_type": payload["issue_type"],
-        "issue_description": payload["issue_description"],
-        "location_address": payload["location_address"],
-        "latitude": payload.get("latitude"),
-        "longitude": payload.get("longitude"),
-        "is_sos": payload["is_sos"],
-        "status": "PENDING",
+        "device_id": device_id,
+        "issue_type": issue_type,
+        "issue_description": description,
+        "location_address": address,
+        "latitude": lat,
+        "longitude": lng,
+        "is_sos": is_sos,
+        "status": "REQUESTED",
         "created_by": current_user["sub"],
         "updated_by": current_user["sub"],
     }
     created = repository.create_repair_request(record)
     if not created:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create repair request")
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
 
-    # Lưu ảnh trước sửa chữa (nếu có danh sách URL)
-    inspection_images = payload.get("inspection_images") or []
-    for img_url in inspection_images:
+    for img_url in images:
         repository.create_repair_image({
             "id": _image_id(),
             "repair_id": request_id,
@@ -117,33 +139,33 @@ def create_request(current_user: dict, data):
 
 def fetch_my_requests(current_user: dict, request_status: str | None, page: int, limit: int):
     if not _is_role(current_user, CUSTOMER_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     return _list(current_user["sub"], None, request_status, page, limit)
 
 
 def fetch_technician_requests(current_user: dict, request_status: str | None, page: int, limit: int):
     if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Technician permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     return _list(None, current_user["sub"], request_status, page, limit)
 
 
 def fetch_all_requests(current_user: dict, request_status: str | None, customer_id: str | None, technician_id: str | None, page: int, limit: int):
     if not _is_role(current_user, ADMIN_ROLE_CODE):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
+        raise AppException(ErrorCode.FORBIDDEN)
     return _list(customer_id, technician_id, request_status, page, limit)
 
 
 def fetch_request(request_id: str, current_user: dict):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair request not found")
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
     can_view = (
         _is_role(current_user, ADMIN_ROLE_CODE)
         or (_is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"])
         or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"])
     )
     if not can_view:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise AppException(ErrorCode.FORBIDDEN)
 
     images = repository.get_repair_images(request_id)
     request_data = dict(request)
@@ -151,32 +173,68 @@ def fetch_request(request_id: str, current_user: dict):
     return request_data
 
 
+def fetch_request_status_sync(request_id: str, current_user: dict):
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+
+    can_view = (
+        _is_role(current_user, ADMIN_ROLE_CODE)
+        or (_is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"])
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"])
+    )
+    if not can_view:
+        raise AppException(ErrorCode.FORBIDDEN)
+
+    technician_info = None
+    if request.get("technician_id"):
+        tech_user = auth_repository.get_user_by_id(request["technician_id"])
+        if tech_user:
+            technician_info = {
+                "name": tech_user.get("full_name", ""),
+                "phone": tech_user.get("phone", ""),
+            }
+
+    return {
+        "request_id": request["id"],
+        "current_status": request["status"],
+        "technician_info": technician_info,
+        "last_updated": request.get("updated_at") or request.get("created_at"),
+    }
+
+
 def update_request_status(request_id: str, current_user: dict, data):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair request not found")
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
     payload = _payload(data)
-    new_status = payload["status"]
+    new_status = payload["status"].upper()
     if new_status not in REQUEST_STATUSES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid request status")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái yêu cầu không hợp lệ")
 
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
     is_customer = _is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"]
     is_technician = _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]
 
     if is_admin:
-        allowed = new_status == "CANCELLED" and request["status"] not in {"COMPLETED", "CANCELLED"}
+        allowed = (
+            new_status in {"CONFIRMED", "ASSIGNED", "CANCELLED"}
+            and request["status"] not in {"COMPLETED", "CANCELLED"}
+        )
     elif is_customer:
-        allowed = request["status"] == "PENDING" and new_status == "CANCELLED"
+        allowed = (
+            request["status"] in {"REQUESTED", "PENDING", "CONFIRMED"}
+            and new_status == "CANCELLED"
+        )
     elif is_technician:
         allowed = new_status in TECHNICIAN_TRANSITIONS.get(request["status"], set())
         if new_status == "REPAIRING" and allowed and not repository.has_accepted_quote(request_id):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An accepted quote is required before repairing")
+            raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
     else:
         allowed = False
 
     if not allowed:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid status transition")
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION)
 
     now = datetime.now(timezone.utc).isoformat()
     update_data = {
@@ -185,9 +243,9 @@ def update_request_status(request_id: str, current_user: dict, data):
     }
     if new_status == "ACCEPTED":
         update_data["accepted_at"] = now
-    elif new_status == "ARRIVED":
+    elif new_status in {"ARRIVED", "EN_ROUTE"}:
         update_data["arrived_at"] = now
-    elif new_status == "DIAGNOSED":
+    elif new_status in {"DIAGNOSED", "DIAGNOSING", "ESTIMATE_SUBMITTED"}:
         update_data["diagnosed_at"] = now
     elif new_status == "REPAIRING":
         update_data["repairing_at"] = now
@@ -212,29 +270,23 @@ def update_request_status(request_id: str, current_user: dict, data):
 
 def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported image type. Allowed types are {', '.join(ALLOWED_IMAGE_TYPES)}",
-        )
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
 
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
     if file_size > MAX_IMAGE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Image is too large. Maximum size is {MAX_IMAGE_SIZE_MB}MB.",
-        )
+        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
 
     request = repository.get_repair_request_by_id(request_id)
     if not request:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair request not found")
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
 
     is_assigned_technician = (
-            _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]
+        _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]
     )
     if not is_assigned_technician:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise AppException(ErrorCode.FORBIDDEN)
 
     file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
     file_name = f"{uuid.uuid4()}.{file_extension}"
