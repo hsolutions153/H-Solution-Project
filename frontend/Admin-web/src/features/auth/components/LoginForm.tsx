@@ -50,6 +50,7 @@ export const LoginForm = () => {
               src="/images/lg01.jpg"
               alt="AdminRepair Logo"
               fill
+              sizes="64px"
               className="object-contain"
               priority
             />

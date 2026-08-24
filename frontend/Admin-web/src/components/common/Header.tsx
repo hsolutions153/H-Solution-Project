@@ -1,13 +1,39 @@
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { Search, Bell, HelpCircle } from 'lucide-react';
 
+// Bảng ánh xạ tiền tố đường dẫn sang tiêu đề
+const PAGE_TITLES: Record<string, string> = {
+  '/dashboard': 'Bảng điều khiển',
+  '/repair-requests': 'Yêu cầu sửa chữa',
+  '/customers': 'Khách hàng',
+  '/devices': 'Thiết bị',
+  '/technicians': 'Kỹ thuật viên',
+  '/history': 'Lịch sử',
+};
+
 export const Header = () => {
+  const pathname = usePathname();
+
+  // Khớp chính xác hoặc tìm tiền tố khớp dài nhất (hỗ trợ cả route con/chi tiết)
+  const getTitle = () => {
+    if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+
+    const matchedKey = Object.keys(PAGE_TITLES).find((key) =>
+      pathname.startsWith(`${key}/`)
+    );
+
+    return matchedKey ? PAGE_TITLES[matchedKey] : 'Bảng điều khiển';
+  };
+
+  const title = getTitle();
+
   return (
     <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between">
-      <h2 className="text-2xl font-bold text-sky-950">Bảng điều khiển</h2>
-      
+      <h2 className="text-2xl font-bold text-sky-950">{title}</h2>
+
       <div className="flex items-center gap-5">
         {/* Search Bar */}
         <div className="relative w-96">
@@ -31,9 +57,9 @@ export const Header = () => {
         {/* User Info */}
         <div className="flex items-center gap-3.5 border-l border-slate-200 pl-5">
           <div className="w-10 h-10 bg-slate-300 rounded-full overflow-hidden border border-slate-200 flex-shrink-0">
-            <img 
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100" 
-              alt="Avatar" 
+            <img
+              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"
+              alt="Avatar"
               className="w-full h-full object-cover"
             />
           </div>

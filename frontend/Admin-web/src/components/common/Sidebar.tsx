@@ -1,7 +1,8 @@
 'use client';
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Briefcase,
@@ -17,14 +18,22 @@ import {
 
 export const Sidebar = () => {
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = () => {
-    // Xóa trạng thái đăng nhập
     localStorage.removeItem("isLoggedIn");
-
-    // Quay về trang đăng nhập
     router.replace("/");
   };
+
+  // Danh sách đường dẫn menu
+  const navItems = [
+    { label: "Bảng điều khiển", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Yêu cầu sửa chữa", href: "/repair-requests", icon: Briefcase },
+    { label: "Khách hàng", href: "/customers", icon: Users },
+    { label: "Thiết bị", href: "/devices", icon: Monitor },
+    { label: "Kỹ thuật viên", href: "/technicians", icon: UserRoundCog },
+    { label: "Lịch sử", href: "/history", icon: History },
+  ];
 
   return (
     <aside className="w-72 bg-white border-r border-slate-200 flex flex-col justify-between p-5 min-h-screen">
@@ -52,65 +61,41 @@ export const Sidebar = () => {
 
         {/* Menu Items */}
         <nav className="space-y-1.5 text-sm font-semibold">
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-sky-900 bg-sky-100/70 rounded-xl"
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            <span>Bảng điều khiển</span>
-          </a>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
 
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
-          >
-            <Briefcase className="w-5 h-5" />
-            <span>Yêu cầu sửa chữa</span>
-          </a>
-
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
-          >
-            <Users className="w-5 h-5" />
-            <span>Khách hàng</span>
-          </a>
-
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
-          >
-            <Monitor className="w-5 h-5" />
-            <span>Thiết bị</span>
-          </a>
-
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
-          >
-            <UserRoundCog className="w-5 h-5" />
-            <span>Kỹ thuật viên</span>
-          </a>
-
-          <a
-            href="#"
-            className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
-          >
-            <History className="w-5 h-5" />
-            <span>Lịch sử</span>
-          </a>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition ${
+                  isActive
+                    ? "text-sky-900 bg-sky-100/70"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
 
       {/* Footer */}
       <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold">
-        <a
-          href="#"
-          className="flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"
+        <Link
+          href="/settings"
+          className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition ${
+            pathname === "/settings"
+              ? "text-sky-900 bg-sky-100/70"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
         >
           <Settings className="w-5 h-5" />
           <span>Cài đặt</span>
-        </a>
+        </Link>
 
         {/* Logout */}
         <button
