@@ -1,0 +1,9 @@
+REPAIR_QUOTES_TABLE = "repair_quotes"
+QUOTE_ITEMS_TABLE = "quote_items"
+QUOTE_HISTORY_TABLE = "quote_history"
+REPAIR_REQUESTS_TABLE = "repair_requests"
+STATUS_HISTORY_TABLE = "repair_requests_history"
+
+SEVERITY_TYPES = {"MINOR", "MAJOR"}
+ITEM_TYPES = {"SPARE_PART", "LABOR", "SERVICE"}
+QUOTE_STATUSES = {"PENDING", "ACCEPTED", "REJECTED"}
