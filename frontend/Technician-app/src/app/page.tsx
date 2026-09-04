@@ -7,6 +7,7 @@ import { VerifyOtpScreen } from "@/features/auth/VerifyOtpScreen";
 import { ResetPasswordScreen } from "@/features/auth/ResetPasswordScreen";
 import { TaskListScreen } from "@/features/tasks/TaskListScreen";
 import { TaskHistoryScreen } from "@/features/tasks/components/TaskHistoryScreen";
+import { TechnicianProfileScreen } from "@/features/profile/TechnicianProfileScreen";
 import { AppLayout } from "@/components/AppLayout";
 import { HistoryTask } from "@/types/task";
 
@@ -26,10 +27,11 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const savedLoginState = sessionStorage.getItem("isLoggedIn");
-    if (savedLoginState === "true") {
-      setIsLoggedIn(true);
-    }
+    import("@/lib/api-client").then(({ getAuthToken }) => {
+      if (getAuthToken()) {
+        setIsLoggedIn(true);
+      }
+    });
   }, []);
 
   if (!isMounted) return null;
@@ -47,7 +49,7 @@ export default function HomePage() {
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         onLogout={() => {
-          sessionStorage.removeItem("isLoggedIn");
+          import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
           sessionStorage.removeItem("currentView");
           sessionStorage.removeItem("selectedTask");
           sessionStorage.removeItem("subStep");
@@ -79,9 +81,7 @@ export default function HomePage() {
 
         {/* Tab 4: Trang cá nhân */}
         {activeTab === "profile" && (
-          <div className="p-4 text-center text-xs text-slate-500 pt-10 font-medium">
-            Màn hình Profile (Tài khoản)
-          </div>
+          <TechnicianProfileScreen />
         )}
       </AppLayout>
     );
@@ -121,7 +121,6 @@ export default function HomePage() {
   return (
     <LoginScreen
       onLoginSuccess={() => {
-        sessionStorage.setItem("isLoggedIn", "true");
         setIsLoggedIn(true);
       }}
       onForgotPassword={() => setCurrentView("forgot-password")}

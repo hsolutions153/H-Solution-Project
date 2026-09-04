@@ -11,6 +11,7 @@ interface RepairHistoryItem {
   title: string;
   dateTime: string;
   status: RepairStatus;
+  rawStatus?: string;
   total: number;
 }
 
@@ -22,14 +23,43 @@ const filterTabs: { id: FilterTab; label: string }[] = [
   { id: "completed", label: "Hoàn thành" },
 ];
 
-function getStatusBadge(status: RepairStatus) {
-  switch (status) {
-    case "completed":
+function getStatusBadge(status: RepairStatus, rawStatus?: string) {
+  const s = (rawStatus || status || "").toUpperCase();
+
+  switch (s) {
+    case "PENDING":
+    case "REQUESTED":
+      return { label: "CHỜ PHÂN CÔNG KTV", className: "rh-status-badge--progress" };
+    case "CONFIRMED":
+      return { label: "ĐÃ TIẾP NHẬN", className: "rh-status-badge--progress" };
+    case "ASSIGNED":
+      return { label: "ĐÃ PHÂN CÔNG KTV", className: "rh-status-badge--progress" };
+    case "ACCEPTED":
+      return { label: "KTV ĐÃ NHẬN ĐƠN", className: "rh-status-badge--progress" };
+    case "REJECTED":
+      return { label: "KTV TỪ CHỐI ĐƠN", className: "rh-status-badge--cancelled" };
+    case "EN_ROUTE":
+      return { label: "KTV ĐANG TỚI", className: "rh-status-badge--progress" };
+    case "ARRIVED":
+      return { label: "KTV ĐÃ TỚI NƠI", className: "rh-status-badge--progress" };
+    case "DIAGNOSING":
+      return { label: "ĐANG CHẨN ĐOÁN", className: "rh-status-badge--progress" };
+    case "DIAGNOSED":
+      return { label: "ĐÃ CHẨN ĐOÁN", className: "rh-status-badge--progress" };
+    case "WAITING_FOR_APPROVAL":
+    case "ESTIMATE_SUBMITTED":
+      return { label: "CHỜ DUYỆT BÁO GIÁ", className: "rh-status-badge--progress" };
+    case "ESTIMATE_APPROVED":
+      return { label: "ĐÃ DUYỆT BÁO GIÁ", className: "rh-status-badge--progress" };
+    case "ESTIMATE_REJECTED":
+      return { label: "TỪ CHỐI BÁO GIÁ", className: "rh-status-badge--cancelled" };
+    case "REPAIRING":
+      return { label: "ĐANG SỬA CHỮA", className: "rh-status-badge--progress" };
+    case "COMPLETED":
+    case "PAID":
       return { label: "HOÀN THÀNH", className: "rh-status-badge--completed" };
-    case "cancelled":
-      return { label: "ĐÃ HỦY", className: "rh-status-badge--cancelled" };
-    case "in_progress":
-      return { label: "ĐANG XỬ LÝ", className: "rh-status-badge--progress" };
+    case "CANCELLED":
+      return { label: "ĐẢ HỦY", className: "rh-status-badge--cancelled" };
     default:
       return { label: "ĐANG XỬ LÝ", className: "rh-status-badge--progress" };
   }
@@ -63,27 +93,75 @@ export function HistoryList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchHistory() {
-      setLoading(true);
       try {
-        const queryParams = new URLSearchParams({
-          filter: activeFilter,
-          q: searchQuery,
+        const { fetchApi } = await import("@/lib/api-client");
+        const res = await fetchApi<any>("/repair-requests/me?page=1&limit=50");
+        const items = res?.items || [];
+        const mapped: RepairHistoryItem[] = items.map((item: any) => {
+          let status: RepairStatus = "in_progress";
+          if (item.status === "completed") status = "completed";
+          else if (item.status === "cancelled") status = "cancelled";
+
+          return {
+            id: item.id,
+            orderCode: item.request_code || item.id,
+            title: item.is_sos
+              ? "Cứu hộ khẩn cấp (SOS)"
+              : `Sửa chữa ${item.issue_type || "thiết bị"}`,
+            dateTime: item.created_at
+              ? new Date(item.created_at).toLocaleDateString("vi-VN", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "N/A",
+            status,
+            rawStatus: item.status,
+            total: item.total_amount
+              ? Number(item.total_amount)
+              : item.quote?.estimated_price
+                ? Number(item.quote.estimated_price)
+                : 0,
+          };
         });
-        const res = await fetch(`/api/history?${queryParams.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setHistoryData(data);
+
+        let filtered = mapped;
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          filtered = filtered.filter(
+            (i) =>
+              i.title.toLowerCase().includes(q) ||
+              i.orderCode.toLowerCase().includes(q),
+          );
+        }
+        if (activeFilter === "completed") {
+          filtered = filtered.filter((i) => i.status === "completed");
+        }
+
+        if (isMounted) {
+          setHistoryData(filtered);
         }
       } catch (err) {
-        console.error("Failed to fetch history:", err);
+        console.warn("Failed to fetch history:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
-    const timer = setTimeout(fetchHistory, 150); // debounce API calls
-    return () => clearTimeout(timer);
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [activeFilter, searchQuery]);
 
   return (
@@ -128,7 +206,7 @@ export function HistoryList() {
             <p>Đang tải lịch sử...</p>
           </div>
         ) : historyData.map((item, index) => {
-          const badge = getStatusBadge(item.status);
+          const badge = getStatusBadge(item.status, item.rawStatus);
           const style = getStyleForService(item.title);
           return (
             <div
@@ -167,7 +245,13 @@ export function HistoryList() {
               <div className="rh-card-bottom">
                 <div className="rh-card-cost">
                   <span className="rh-cost-label">CHI PHÍ</span>
-                  <span className="rh-cost-value">{formatCurrency(item.total || 0)}</span>
+                  <span className="rh-cost-value">
+                    {item.total > 0
+                      ? formatCurrency(item.total)
+                      : ["COMPLETED", "PAID"].includes(item.rawStatus?.toUpperCase() || "")
+                        ? formatCurrency(item.total || 0)
+                        : "Chờ KTV báo giá"}
+                  </span>
                 </div>
                 <Link
                   href={`/home/history/${item.id}`}

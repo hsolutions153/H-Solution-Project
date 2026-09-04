@@ -22,7 +22,7 @@ function OtpVerificationContent() {
   const searchParams = useSearchParams();
   const initialRequestId = searchParams.get("requestId") ?? "";
   const initialPhone = searchParams.get("phone") ?? "";
-  const [requestId, setRequestId] = useState(initialRequestId);
+  const [requestId] = useState(initialRequestId);
   const [phone] = useState(initialPhone);
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [seconds, setSeconds] = useState(60);
@@ -79,26 +79,13 @@ function OtpVerificationContent() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/password-reset/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, code }),
-      });
-      const payload = (await response.json()) as {
-        message?: string;
-        data?: { resetToken: string };
-      };
-      if (!response.ok || !payload.data) {
-        setError(payload.message ?? "Mã xác minh không chính xác.");
-        return;
-      }
       sessionStorage.setItem(
         "passwordResetVerified",
-        JSON.stringify({ requestId, resetToken: payload.data.resetToken }),
+        JSON.stringify({ phone, otp_code: code }),
       );
       router.push("/forgot-password/reset");
     } catch {
-      setError("Không thể kết nối tới máy chủ.");
+      setError("Không thể xử lý mã xác minh.");
     } finally {
       setLoading(false);
     }
@@ -108,27 +95,21 @@ function OtpVerificationContent() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/password-reset/request", {
+      const { fetchApi } = await import("@/lib/api-client");
+      const payload = await fetchApi<{
+        message: string;
+        expires_in_seconds: number;
+        otp_code?: string;
+      }>("/auth/forgot-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
-      const payload = (await response.json()) as { message?: string; data?: StoredRequest };
-      if (!response.ok || !payload.data) {
-        setError(payload.message ?? "Không thể gửi lại mã.");
-        return;
-      }
-      setRequestId(payload.data.requestId);
-      setDevelopmentCode(payload.data.developmentCode ?? "");
+      setDevelopmentCode(payload.otp_code ?? "");
       setDigits(["", "", "", "", "", ""]);
       setSeconds(60);
-      sessionStorage.setItem("passwordResetRequest", JSON.stringify(payload.data));
-      router.replace(
-        `/forgot-password/verify?requestId=${encodeURIComponent(payload.data.requestId)}&phone=${encodeURIComponent(payload.data.phone)}`,
-      );
       inputs.current[0]?.focus();
-    } catch {
-      setError("Không thể kết nối tới máy chủ.");
+    } catch (err: any) {
+      setError(err.message || "Không thể gửi lại mã.");
     } finally {
       setLoading(false);
     }

@@ -43,9 +43,13 @@ def _validate_device_values(data: dict):
 
 
 def _payload(data, *, partial: bool = False):
+    if isinstance(data, dict):
+        return data
     if hasattr(data, "model_dump"):
         return data.model_dump(exclude_unset=partial, mode="json")
-    return data.dict(exclude_unset=partial)
+    if hasattr(data, "dict"):
+        return data.dict(exclude_unset=partial)
+    return dict(data)
 
 
 def fetch_all_devices(customer_id: str | None, current_user: dict):

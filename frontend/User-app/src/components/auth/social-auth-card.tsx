@@ -10,6 +10,7 @@ import {
   EyeOff,
   LockKeyhole,
   Mail,
+  MapPin,
   Phone,
   ShieldCheck,
   UserRound,
@@ -46,6 +47,7 @@ export function SocialAuthCard({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -90,38 +92,33 @@ export function SocialAuthCard({
 
     setLoadingProvider("credentials");
     try {
+      const { fetchApi, setAuthToken } = await import("@/lib/api-client");
+
       if (!isLogin) {
-        const response = await fetch("/api/auth/register", {
+        await fetchApi<{ message: string; user_id: string }>("/auth/signup", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, phone, password, acceptTerms }),
+          body: JSON.stringify({ name, email, phone, password, address }),
         });
-        const payload = (await response.json()) as { message?: string };
-        if (!response.ok) {
-          setFormError(payload.message ?? "Không thể tạo tài khoản.");
-          return;
-        }
       }
 
-      const result = await signIn("credentials", {
-        phone,
-        password,
-        redirect: false,
+      const loginRes = await fetchApi<{
+        access_token: string;
+        token_type: string;
+        user: { id: string; name: string; phone?: string };
+      }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: email || phone, password }),
       });
 
-      if (result?.error) {
-        setFormError(
-          isLogin
-            ? "Số điện thoại hoặc mật khẩu không chính xác."
-            : "Tài khoản đã tạo nhưng không thể đăng nhập tự động.",
-        );
-        return;
+      if (loginRes.access_token) {
+        setAuthToken(loginRes.access_token, loginRes.user);
+        router.push("/home");
+        router.refresh();
+      } else {
+        setFormError("Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.");
       }
-
-      router.push("/home");
-      router.refresh();
-    } catch {
-      setFormError("Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
+    } catch (err: any) {
+      setFormError(err.message || "Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
     } finally {
       setLoadingProvider(null);
     }
@@ -199,6 +196,7 @@ export function SocialAuthCard({
                   id="name"
                   type="text"
                   autoComplete="name"
+                  placeholder="Nguyễn Văn A"
                   required
                   minLength={2}
                   maxLength={100}
@@ -224,6 +222,7 @@ export function SocialAuthCard({
                   id="email"
                   type="email"
                   autoComplete="email"
+                  placeholder="example@gmail.com"
                   required
                   pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}"
                   title="Nhập email đúng định dạng, ví dụ: ten@example.com"
@@ -253,13 +252,37 @@ export function SocialAuthCard({
                 pattern="0(?:3|5|7|8|9)[0-9]{8}"
                 maxLength={10}
                 title="Nhập số điện thoại Việt Nam, ví dụ 0912345678"
-                placeholder="Ví dụ: 0912345678"
+                placeholder="0912345678"
                 value={phone}
                 onChange={(event) => setPhone(digitsOnly(event.target.value))}
                 className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
           </div>
+
+          {!isLogin && (
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="address">
+                Địa chỉ
+              </label>
+              <div className="relative">
+                <MapPin
+                  aria-hidden="true"
+                  className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-outline pointer-events-none"
+                />
+                <input
+                  id="address"
+                  type="text"
+                  autoComplete="street-address"
+                  maxLength={255}
+                  placeholder="Ví dụ: 123 Nguyễn Trãi, Q.1, TP.HCM"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-xs">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="password">
@@ -274,6 +297,7 @@ export function SocialAuthCard({
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete={isLogin ? "current-password" : "new-password"}
+                placeholder="Abc123456@"
                 required
                 minLength={8}
                 maxLength={128}
@@ -329,6 +353,7 @@ export function SocialAuthCard({
                     id="confirmPassword"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
+                    placeholder="Abc123456@"
                     required
                     minLength={8}
                     maxLength={128}

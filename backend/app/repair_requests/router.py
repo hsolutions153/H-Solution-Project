@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
 from app.repair_requests.schemas import (
+    QuoteCreateRequest,
+    QuoteResponse,
     RepairRequestCreate,
     RepairRequestListResponse,
     RepairRequestResponse,
@@ -10,9 +12,11 @@ from app.repair_requests.schemas import (
 )
 from app.repair_requests.service import (
     add_after_repair_image,
+    create_quote_for_request,
     create_request,
     fetch_all_requests,
     fetch_my_requests,
+    fetch_quotes_for_request,
     fetch_request,
     fetch_request_status_sync,
     fetch_technician_requests,
@@ -88,3 +92,20 @@ def upload_after_repair_image(
     current_user: dict = Depends(get_current_user),
 ):
     return add_after_repair_image(request_id, file, current_user)
+
+
+@router.post("/{request_id}/quotes", response_model=QuoteResponse, status_code=status.HTTP_201_CREATED)
+def create_quote(
+    request_id: str,
+    data: QuoteCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return create_quote_for_request(request_id, data.model_dump(), current_user)
+
+
+@router.get("/{request_id}/quotes", response_model=list[QuoteResponse])
+def get_quotes(
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    return fetch_quotes_for_request(request_id, current_user)

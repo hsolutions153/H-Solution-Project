@@ -16,8 +16,13 @@ def _generate_user_id() -> str:
     return secrets.token_hex(5).upper()
 
 
-def authenticate_user(email: str, password: str):
-    user = repository.get_user_by_email(email)
+def authenticate_user(email_or_phone: str, password: str):
+    input_val = email_or_phone.strip()
+    user = repository.get_user_by_email(input_val.lower())
+    if not user:
+        user_by_phone = repository.get_user_by_phone(input_val)
+        if user_by_phone:
+            user = repository.get_user_by_id(user_by_phone["id"])
     
     if not user or (isinstance(user, list) and len(user) == 0):
         raise AppException(ErrorCode.INVALID_CREDENTIALS, headers={"WWW-Authenticate": "Bearer"})
@@ -30,6 +35,7 @@ def authenticate_user(email: str, password: str):
 
     if not user.get("is_active", True):
         raise AppException(ErrorCode.USER_LOCKED)
+
 
     role = user.get("role") or {}
     role_id = role.get("id")
@@ -50,9 +56,13 @@ def authenticate_user(email: str, password: str):
 
 
 def register_customer(data):
-    if repository.get_user_by_email(str(data.email)):
+    normalized_email = str(data.email).strip().lower()
+    normalized_phone = data.phone.strip() if data.phone and data.phone.strip() else None
+    normalized_address = data.address.strip() if data.address and data.address.strip() else None
+
+    if repository.get_user_by_email(normalized_email):
         raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
-    if data.phone and repository.get_user_by_phone(data.phone):
+    if normalized_phone and repository.get_user_by_phone(normalized_phone):
         raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
 
     customer_role = repository.get_role_by_code(CUSTOMER_ROLE_CODE)
@@ -64,16 +74,17 @@ def register_customer(data):
     user_data = {
         "id": _generate_user_id(),
         "role_id": role_id,
-        "full_name": data.name,
-        "phone": data.phone,
-        "email": str(data.email),
+        "full_name": data.name.strip(),
+        "phone": normalized_phone,
+        "email": normalized_email,
         "password_hash": hash_password(data.password),
-        "address": data.address,
+        "address": normalized_address,
     }
     new_user = repository.create_user(user_data)
     if not new_user:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
     return {"message": "Đăng ký tài khoản thành công", "user_id": new_user["id"]}
+
 
 
 def request_password_reset(phone: str):

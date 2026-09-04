@@ -9,9 +9,13 @@ from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 
 
 def _payload(data, *, partial: bool = False):
+    if isinstance(data, dict):
+        return data
     if hasattr(data, "model_dump"):
         return data.model_dump(exclude_unset=partial, mode="json")
-    return data.dict(exclude_unset=partial)
+    if hasattr(data, "dict"):
+        return data.dict(exclude_unset=partial)
+    return dict(data)
 
 
 def _customer_role_id() -> str:

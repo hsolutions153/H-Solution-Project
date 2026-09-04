@@ -3,8 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -22,7 +21,15 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import type { UserProfile } from "@/services/profile-db";
+export type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  avatar: string;
+  notifications: boolean;
+};
 
 type ProfileScreenProps = {
   initialProfile: UserProfile;
@@ -89,29 +96,58 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
+  useEffect(() => {
+    async function loadCustomerProfile() {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const data = await fetchApi<any>("/customers/me");
+        if (data) {
+          setProfile({
+            id: data.id || data.user_id || "",
+            name: data.full_name || data.name || initialProfile.name,
+            email: data.email || initialProfile.email,
+            phone: data.phone || initialProfile.phone,
+            address: data.address || initialProfile.address,
+            avatar: data.avatar_url || data.avatar || initialProfile.avatar,
+            notifications: initialProfile.notifications ?? true,
+          });
+        }
+      } catch {
+        // Fallback to initialProfile gracefully
+      }
+    }
+    loadCustomerProfile();
+  }, []);
+
   async function saveChanges(changes: Partial<UserProfile>) {
-    const response = await fetch("/api/profile", {
+    const { fetchApi } = await import("@/lib/api-client");
+    const payload: any = {};
+    if (changes.name !== undefined) payload.full_name = changes.name;
+    if (changes.phone !== undefined) payload.phone = changes.phone;
+    if (changes.address !== undefined) payload.address = changes.address;
+    if (changes.avatar !== undefined) payload.avatar_url = changes.avatar;
+
+    const data = await fetchApi<any>("/customers/me", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(changes),
+      body: JSON.stringify(payload),
     });
-    const result = (await response.json()) as { data?: UserProfile; message?: string };
-    if (!response.ok || !result.data) throw new Error(result.message || "Could not save your profile.");
-    return result.data;
+
+    return {
+      id: data.id || profile.id,
+      name: data.full_name || profile.name,
+      email: data.email || profile.email,
+      phone: data.phone || profile.phone,
+      address: data.address || profile.address,
+      avatar: data.avatar_url || profile.avatar,
+      notifications: changes.notifications ?? profile.notifications,
+    };
   }
 
   async function toggleNotifications() {
     const previous = profile.notifications;
     const notifications = !previous;
     setProfile((current) => ({ ...current, notifications }));
-    try {
-      const saved = await saveChanges({ notifications });
-      setProfile(saved);
-      setNotice({ type: "success", message: notifications ? "Notifications enabled" : "Notifications disabled" });
-    } catch (error) {
-      setProfile((current) => ({ ...current, notifications: previous }));
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Could not update notifications." });
-    }
+    setNotice({ type: "success", message: notifications ? "Đã bật thông báo" : "Đã tắt thông báo" });
   }
 
   async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -119,7 +155,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     event.target.value = "";
     if (!file) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 8_000_000) {
-      setNotice({ type: "error", message: "Choose a PNG, JPG, or WebP image under 8 MB." });
+      setNotice({ type: "error", message: "Chọn ảnh PNG, JPG hoặc WebP dưới 8 MB." });
       return;
     }
     try {
@@ -127,7 +163,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
       setProfile((current) => ({ ...current, avatar }));
       setNotice(null);
     } catch (error) {
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Could not process the image." });
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể xử lý ảnh." });
     }
   }
 
@@ -143,13 +179,13 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
         avatar: profile.avatar,
       });
       setProfile(saved);
-      setNotice({ type: "success", message: "Profile saved successfully." });
+      setNotice({ type: "success", message: "Lưu hồ sơ thành công." });
       window.setTimeout(() => {
         router.push("/home/profile");
         router.refresh();
       }, 500);
     } catch (error) {
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Could not save your profile." });
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể lưu hồ sơ." });
       setIsSaving(false);
     }
   }
@@ -322,13 +358,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
               type="button"
               className="profile-single-card profile-logout-button"
               disabled={isLoggingOut}
-              onClick={() => {
+              onClick={async () => {
                 setIsLoggingOut(true);
-                void signOut({ redirectTo: "/login" });
+                const { removeAuthToken } = await import("@/lib/api-client");
+                removeAuthToken();
+                router.push("/login");
               }}
             >
               <span className="profile-row-icon profile-row-icon--danger">{isLoggingOut ? <LoaderCircle className="profile-spinner" /> : <LogOut />}</span>
-              <strong>{isLoggingOut ? "Logging out..." : "Log Out"}</strong>
+              <strong>{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</strong>
             </button>
           </section>
 

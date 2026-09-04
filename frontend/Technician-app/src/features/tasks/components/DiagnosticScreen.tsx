@@ -170,7 +170,14 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         <div className="grid grid-cols-2 gap-2">
           {images.map((imgSrc, index) => (
             <div key={index} className="rounded-xl overflow-hidden h-20 border border-gray-100 relative group">
-              <img src={imgSrc} className="w-full h-full object-cover" alt="Hiện trạng" />
+              <img
+                src={imgSrc}
+                className="w-full h-full object-cover"
+                alt="Hiện trạng"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                }}
+              />
               <button
                 type="button"
                 onClick={() => handleRemoveImage(index)}

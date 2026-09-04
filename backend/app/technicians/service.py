@@ -20,9 +20,13 @@ TECHNICIAN_ROLE_CODE = "TECHNICIAN"
 
 
 def _payload(data, *, partial: bool = False):
+    if isinstance(data, dict):
+        return data
     if hasattr(data, "model_dump"):
         return data.model_dump(exclude_unset=partial, mode="json")
-    return data.dict(exclude_unset=partial)
+    if hasattr(data, "dict"):
+        return data.dict(exclude_unset=partial)
+    return dict(data)
 
 
 def _validate_profile_values(data: dict):

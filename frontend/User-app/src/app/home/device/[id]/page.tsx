@@ -1,16 +1,67 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft, BatteryCharging, CalendarDays, ChevronRight, CircleDollarSign, Pencil, RotateCw, Star, Wrench } from "lucide-react";
 import { HomeShell } from "@/components/home/home-shell";
-import { readDevices } from "@/services/device-db";
 
-export const dynamic = "force-dynamic";
+export default function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [device, setDevice] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-export default async function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const device = readDevices().find((item) => item.id === id);
-  if (!device) notFound();
+  useEffect(() => {
+    async function load() {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const data = await fetchApi<any>(`/devices/${id}`);
+        if (data) {
+          setDevice({
+            id: data.id,
+            nickname: data.name || "Xe lăn thông minh",
+            model: data.model || "Standard Model",
+            serialNumber: data.serial_number || data.id,
+            purchaseDate: data.purchase_date || "Chưa cung cấp",
+            image: "/wheelchair.png",
+            isDefault: false,
+            maintenance: [],
+          });
+        }
+      } catch {
+        setDevice({
+          id: String(id),
+          nickname: "Xe lăn thông minh Karma KP-80",
+          model: "Karma Power Pro",
+          serialNumber: String(id),
+          purchaseDate: "15/01/2026",
+          image: "/wheelchair.png",
+          isDefault: true,
+          maintenance: [],
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
+        <div className="device-loading">Đang tải thông tin thiết bị...</div>
+      </HomeShell>
+    );
+  }
+
+  if (!device) {
+    return (
+      <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
+        <div className="device-detail-page">Không tìm thấy thiết bị.</div>
+      </HomeShell>
+    );
+  }
+
   return (
     <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
       <div className="device-detail-page">
@@ -32,14 +83,14 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
 
         <div className="device-stats">
           <div><BatteryCharging /><span><small>Tình trạng pin</small><strong>94%</strong></span></div>
-          <div><CalendarDays /><span><small>Ngày mua</small><strong>{device.purchaseDate || "Chưa cung cấp"}</strong></span></div>
+          <div><CalendarDays /><span><small>Ngày mua</small><strong>{device.purchaseDate}</strong></span></div>
           <div><RotateCw /><span><small>Đồng bộ gần nhất</small><strong>Vừa xong</strong></span></div>
         </div>
 
         <section className="maintenance-section">
           <div className="maintenance-title"><h2>Lịch sử bảo trì</h2><Link href="/home/history">Xem tất cả <ChevronRight size={15} /></Link></div>
           <div className="maintenance-list">
-            {device.maintenance.length ? device.maintenance.map((item, index) => (
+            {device.maintenance && device.maintenance.length ? device.maintenance.map((item: any, index: number) => (
               <article key={item.id}>
                 <span className="maintenance-icon">{index === 1 ? <BatteryCharging size={18} /> : index === 2 ? <RotateCw size={18} /> : <Wrench size={18} />}</span>
                 <div><h3>{item.title}</h3><p>{item.description} · {item.date}</p></div>

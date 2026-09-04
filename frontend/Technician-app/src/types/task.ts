@@ -18,6 +18,13 @@ export interface Task {
   requestedTime?: string;
   distance?: string;
   travelTime?: string;
+  description?: string;
+  images?: string[];
+  isEmergency?: boolean;
+  bookingDate?: string;
+  bookingSlot?: string;
+  totalAmount?: number;
+  quote?: any;
 }
 
 export interface HistoryTask {

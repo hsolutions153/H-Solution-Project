@@ -269,26 +269,31 @@ export default function BookingPage() {
     setIsSubmitting(true);
     setError("");
     try {
-      const response = await fetch("/api/booking", {
+      const { fetchApi } = await import("@/lib/api-client");
+      const devices = await fetchApi<any[]>("/devices");
+      const deviceId = devices && devices.length > 0 ? devices[0].id : "DEV0000001";
+
+      const payload = {
+        device_id: deviceId,
+        issue_type: selectedIssue ? selectedIssue.toUpperCase() : "GENERAL",
+        issue_description: details,
+        location_address: fullAddress,
+        is_sos: false,
+        request_type: "NORMAL",
+        images: photos,
+        booking_date: selectedDate ? toDateKey(selectedDate) : "TODAY",
+        booking_slot: selectedTime,
+      };
+
+      const result = await fetchApi<any>("/repair-requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: selectedIssue,
-          notes: details,
-          date: toDateKey(selectedDate),
-          timeSlot: selectedTime,
-          timeSlotLabel: selectedTimeLabel,
-          address: fullAddress,
-          locationMethod: "manual",
-          images: photos,
-        }),
+        body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Không thể tạo lịch sửa chữa.");
-      setOrderCode(result.data.orderCode);
+
+      setOrderCode(result.request_code || result.id || "REQ-SUCCESS");
       setStep("SUCCESS");
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Không thể kết nối tới máy chủ.");
+    } catch (submitError: any) {
+      setError(submitError.message || "Không thể tạo lịch sửa chữa.");
     } finally {
       setIsSubmitting(false);
     }
@@ -421,7 +426,7 @@ export default function BookingPage() {
               <h2 className="sos-section-title">Ảnh đã thêm</h2>
               <div className="sos-photo-row booking-photo-row">
                 {photos.map((photo, index) => (
-                  <div className="sos-photo-thumb" key={photo}>
+                  <div className="sos-photo-thumb" key={`photo-${index}`}>
                     <Image src={photo} alt={`Ảnh sự cố ${index + 1}`} width={96} height={74} unoptimized />
                     <button type="button" onClick={() => removePhoto(index)} aria-label="Xóa ảnh">
                       <span className="material-symbols-outlined">close</span>

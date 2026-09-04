@@ -43,24 +43,24 @@ export default function ResetPasswordPage() {
     setError("");
     try {
       const credentials = JSON.parse(stored) as {
-        requestId: string;
-        resetToken: string;
+        phone: string;
+        otp_code: string;
       };
-      const response = await fetch("/api/auth/password-reset/reset", {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi<{ message: string }>("/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...credentials, password }),
+        body: JSON.stringify({
+          phone: credentials.phone,
+          otp_code: credentials.otp_code,
+          new_password: password,
+        }),
       });
-      const payload = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        setError(payload.message ?? "Không thể cập nhật mật khẩu.");
-        return;
-      }
+
       sessionStorage.removeItem("passwordResetRequest");
       sessionStorage.removeItem("passwordResetVerified");
       router.push("/login?reset=success");
-    } catch {
-      setError("Không thể kết nối tới máy chủ.");
+    } catch (err: any) {
+      setError(err.message || "Không thể cập nhật mật khẩu.");
     } finally {
       setLoading(false);
     }

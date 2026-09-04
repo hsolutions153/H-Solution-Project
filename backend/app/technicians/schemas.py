@@ -51,6 +51,9 @@ class TechnicianPresenceUpdate(BaseModel):
 class TechnicianResponse(BaseModel):
     user_id: str
     id_card_number: str
+    id_card_front: str | None = None
+    id_card_back: str | None = None
+    certificate_img: str | None = None
     id_card_front_url: str | None = None
     id_card_back_url: str | None = None
     certificate_url: str | None = None

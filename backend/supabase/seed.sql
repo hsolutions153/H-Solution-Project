@@ -22,16 +22,19 @@ insert into public.users (
   updated_by
 )
 values
-  ('ADMIN0001', 'ROLEADMIN1', 'Admin H Solution', '0900000001', 'admin@h-solution.local', null, 'Ho Chi Minh City', true, 'SYSTEM', 'SYSTEM'),
-  ('CUST000001', 'ROLECUST01', 'Nguyen Van Khach', '0900000002', 'customer@h-solution.local', null, '12 Nguyen Trai, District 1', true, 'SYSTEM', 'SYSTEM'),
-  ('TECH000001', 'ROLETECH01', 'Tran Van Ky Thuat', '0900000003', 'tech1@h-solution.local', null, '34 Le Loi, District 3', true, 'SYSTEM', 'SYSTEM'),
-  ('TECH000002', 'ROLETECH01', 'Le Thi Sua Chua', '0900000004', 'tech2@h-solution.local', null, '56 Hai Ba Trung, District 1', true, 'SYSTEM', 'SYSTEM')
+  ('ADMIN0001', 'ROLEADMIN1', 'Admin H Solution', '0900000001', 'admin@h-solution.local', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', 'Ho Chi Minh City', true, 'SYSTEM', 'SYSTEM'),
+  ('CUST000001', 'ROLECUST01', 'Nguyen Van Khach', '0900000002', 'customer@h-solution.local', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', '12 Nguyen Trai, District 1', true, 'SYSTEM', 'SYSTEM'),
+  ('TECH000001', 'ROLETECH01', 'Tran Van Ky Thuat', '0900000003', 'tech1@h-solution.local', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', '34 Le Loi, District 3', true, 'SYSTEM', 'SYSTEM'),
+  ('TECH000002', 'ROLETECH01', 'Le Thi Sua Chua', '0900000004', 'tech2@h-solution.local', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', '56 Hai Ba Trung, District 1', true, 'SYSTEM', 'SYSTEM'),
+  ('ADM0000002', 'ROLEADMIN1', 'Quan Tri Vien Admin', '0901111222', 'admin.new@hsolution.com', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', 'TP. Ho Chi Minh', true, 'SYSTEM', 'SYSTEM'),
+  ('TCH0000002', 'ROLETECH01', 'Ky Thuat Vien Technician', '0903333444', 'tech.new@hsolution.com', '$2b$12$5GU6RnOy2ljLhmI2lnJ0iuligJbGMM5NFl7lO/5G5SmXxjs0irUHu', 'TP. Ho Chi Minh', true, 'SYSTEM', 'SYSTEM')
 on conflict (id) do update
 set
   role_id = excluded.role_id,
   full_name = excluded.full_name,
   phone = excluded.phone,
   email = excluded.email,
+  password_hash = excluded.password_hash,
   address = excluded.address,
   is_active = excluded.is_active,
   updated_by = excluded.updated_by;
@@ -90,7 +93,8 @@ insert into public.technician_profiles (
 )
 values
   ('TECH000001', '012345678901', 'https://example.local/tech1-front.jpg', 'https://example.local/tech1-back.jpg', 'https://example.local/tech1-cert.jpg', 'SCOOTER', 'Battery and motor diagnostics', 4, 'APPROVED', 'ADMIN0001', now(), 'Seed approved technician', true, 10.77690000, 106.70090000, now(), 4.80, 32, 'ADMIN0001', 'ADMIN0001'),
-  ('TECH000002', '112345678901', 'https://example.local/tech2-front.jpg', 'https://example.local/tech2-back.jpg', 'https://example.local/tech2-cert.jpg', 'BOTH', 'Brake and tire repair', 6, 'APPROVED', 'ADMIN0001', now(), 'Seed approved technician', false, 10.78010000, 106.69980000, now(), 4.60, 45, 'ADMIN0001', 'ADMIN0001')
+  ('TECH000002', '112345678901', 'https://example.local/tech2-front.jpg', 'https://example.local/tech2-back.jpg', 'https://example.local/tech2-cert.jpg', 'BOTH', 'Brake and tire repair', 6, 'APPROVED', 'ADMIN0001', now(), 'Seed approved technician', false, 10.78010000, 106.69980000, now(), 4.60, 45, 'ADMIN0001', 'ADMIN0001'),
+  ('TCH0000002', '212345678901', 'https://example.local/tech3-front.jpg', 'https://example.local/tech3-back.jpg', 'https://example.local/tech3-cert.jpg', 'BOTH', 'Kỹ thuật viên Sửa chữa H-Solution', 3, 'APPROVED', 'ADMIN0001', now(), 'Seed approved technician', true, 10.77690000, 106.70090000, now(), 5.00, 10, 'ADMIN0001', 'ADMIN0001')
 on conflict (user_id) do update
 set
   id_card_number = excluded.id_card_number,

@@ -16,6 +16,7 @@ import {
   Navigation,
   Bike,
   CheckCircle2,
+  Calendar,
 } from "lucide-react";
 
 interface TaskDetailScreenProps {
@@ -84,17 +85,20 @@ export const TaskDetailScreen = ({
 
   // Khi đang ở trạng thái IN_PROGRESS, điều phối hiển thị các bước con
   if (task.status === "IN_PROGRESS") {
+    // Với đơn đặt lịch hẹn (không phải SOS khẩn cấp), nếu chưa chọn bước nào khác thì mặc định vào màn hình Sửa chữa & Báo giá
+    const activeSubStep = !task.isEmergency && subStep === "DIAGNOSTIC" ? "REPAIR" : subStep;
+
     // 1. Màn hình Tạo báo giá
-    if (subStep === "QUOTE") {
+    if (activeSubStep === "QUOTE") {
       return (
         <CreateQuoteScreen
           task={task}
           diagnosticData={diagnosticData}
-          onBack={() => setSubStep("DIAGNOSTIC")}
+          onBack={() => setSubStep(task.isEmergency ? "DIAGNOSTIC" : "REPAIR")}
           onSubmitQuote={(data) => {
             console.log("Dữ liệu báo giá:", data);
             setQuoteData(data);
-            
+
             if (data.status === "SENT") {
               onUpdateStatus(task.id, "IN_PROGRESS", "Đã gửi báo giá");
               setSubStep("QUOTE_STATUS");
@@ -107,36 +111,39 @@ export const TaskDetailScreen = ({
     }
 
     // 2. Màn hình Trạng thái báo giá (Chờ khách duyệt & Bắt đầu sửa chữa)
-    if (subStep === "QUOTE_STATUS") {
+    if (activeSubStep === "QUOTE_STATUS") {
       return (
         <QuoteStatusScreen
           task={task}
           onBack={() => setSubStep("QUOTE")}
           onViewDetailQuote={() => setSubStep("QUOTE")}
-          onContinueRepair={() => setSubStep("REPAIR")} // Chuyển sang màn hình Sửa chữa & Hoàn tất
+          onContinueRepair={() => setSubStep("REPAIR")}
         />
       );
     }
 
-    // 3. Màn hình Sửa chữa & Hoàn tất (Đã cập nhật tích hợp RepairScreen)
-    if (subStep === "REPAIR") {
+    // 3. Màn hình Sửa chữa & Hoàn tất (RepairScreen)
+    if (activeSubStep === "REPAIR") {
       return (
         <RepairScreen
           task={task}
-          onBack={() => setSubStep("QUOTE_STATUS")}
+          onBack={() => {
+            if (task.isEmergency) {
+              setSubStep("QUOTE_STATUS");
+            } else {
+              onBack();
+            }
+          }}
           onComplete={() => {
-            // Cập nhật trạng thái hoàn thành công việc
             onUpdateStatus(task.id, "COMPLETED", "Hoàn thành");
-            // Xóa bộ nhớ subStep tạm thời
             sessionStorage.removeItem("subStep");
-            // Quay về danh sách hoặc màn hình chi tiết chính
             onBack();
           }}
         />
       );
     }
 
-    // Mặc định: Màn hình Chẩn đoán
+    // Mặc định: Màn hình Chẩn đoán (cho đơn SOS)
     return (
       <DiagnosticScreen
         task={task}
@@ -182,20 +189,42 @@ export const TaskDetailScreen = ({
           </p>
 
           <h3 className="text-sm font-bold text-slate-900 mt-0.5">
-            {task.customerName}
+            {task.customerName && !/^[0-9A-F]{8,12}$/i.test(task.customerName) && !/^(USR|TCH|DEV|ADM)\d+$/i.test(task.customerName)
+              ? task.customerName
+              : "Khách hàng"}
           </h3>
 
           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-            <Smartphone className="w-3 h-3 text-slate-400" /> {task.customerPhone || "090 123 4567"}
+            <Smartphone className="w-3.5 h-3.5 text-slate-400" />{" "}
+            {task.customerPhone || "0912 345 678"}
           </p>
         </div>
 
         <a
-          href={`tel:${task.customerPhone || "0901234567"}`}
-          className="w-10 h-10 bg-sky-800 rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-sky-900 transition-colors"
+          href={`tel:${task.customerPhone || "0912345678"}`}
+          className="w-10 h-10 bg-sky-800 rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-sky-900 transition-colors shadow-sm"
+          title="Gọi cho khách hàng"
         >
           <Phone className="w-4 h-4" />
         </a>
+      </div>
+
+      {/* Khung giờ đặt lịch */}
+      <div className="bg-gradient-to-r from-sky-50 to-blue-50/60 rounded-2xl p-3.5 border border-sky-100 flex items-center gap-3">
+        <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-sky-800 shadow-xs border border-sky-100 shrink-0">
+          <Calendar className="w-4 h-4" />
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-sky-800 uppercase tracking-wider">
+            Thời gian & Khung giờ đặt
+          </p>
+          <p className="text-xs font-bold text-slate-800 mt-0.5">
+            {task.bookingDate} {" "}
+            <span className="text-sky-700">
+              {task.bookingSlot || task.requestedTime || task.time || ""}
+            </span>
+          </p>
+        </div>
       </div>
 
       {/* Thiết bị */}
@@ -206,13 +235,12 @@ export const TaskDetailScreen = ({
           </p>
 
           <div className="flex gap-3 mt-2">
-            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-sky-800">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-sky-800 shrink-0">
               <Accessibility className="w-5 h-5" />
             </div>
 
             <div>
-              <h4 className="text-xs font-bold">Xe lăn điện Karma</h4>
-
+              <h4 className="text-xs font-bold">{task.deviceInfo || "Thiết bị sửa chữa"}</h4>
               <p className="text-[11px] text-slate-500">{task.serviceName}</p>
             </div>
           </div>
@@ -221,35 +249,37 @@ export const TaskDetailScreen = ({
         <hr className="border-gray-100" />
 
         <div>
-          <p className="text-[11px] font-bold mb-1">Mô tả chi tiết</p>
+          <p className="text-[11px] font-bold mb-1">Mô tả chi tiết từ khách hàng</p>
 
           <p className="text-[11px] text-slate-500 leading-relaxed mb-3">
-            Bánh xe bị kẹt cứng không di chuyển được, xích xe có dấu hiệu bị
-            lệch và rỉ sét nặng sau khi va chạm. Khách hàng yêu cầu kiểm tra
-            và thay thế phụ tùng gấp.
+            {task.description || "Khách hàng không để lại ghi chú chi tiết."}
           </p>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl overflow-hidden h-24">
-              <img
-                src="/images/s1.jpg"
-                className="w-full h-full object-cover"
-                alt=""
-              />
-            </div>
-
-            <div className="relative rounded-xl overflow-hidden h-24">
-              <img
-                src="/images/s2.jpg"
-                className="w-full h-full object-cover"
-                alt=""
-              />
-
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-xs font-bold">
-                +2 ảnh
+          {task.images && task.images.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Hình ảnh đính kèm ({task.images.length} ảnh)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {task.images.slice(0, 4).map((imgUrl, idx) => (
+                  <div key={idx} className="rounded-xl overflow-hidden h-24 border border-slate-100 bg-slate-50 relative">
+                    <img
+                      src={imgUrl}
+                      className="w-full h-full object-cover"
+                      alt={`Ảnh sự cố ${idx + 1}`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+              <p className="text-[11px] text-slate-400 italic">Chưa có ảnh đính kèm từ khách hàng</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -290,49 +320,108 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      {/* Nút hành động tương ứng theo từng trạng thái */}
-      {task.status === "PENDING" && (
-        <button
-          onClick={() => {
-            onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển");
-            setIsTravelModalOpen(true);
-          }}
-          className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-        >
-          <Bike className="w-4 h-4" />
-          Xác nhận di chuyển
-        </button>
-      )}
+      {/* Nút hành động tương ứng theo từng loại đơn và trạng thái */}
+      {!task.isEmergency ? (
+        // ==================== ĐƠN ĐẶT LỊCH HẸN TRƯỚC ====================
+        task.status === "WAITING_ACCEPT" ? (
+          <button
+            onClick={() => {
+              onUpdateStatus(task.id, "PENDING", "Đã xác nhận lịch");
+              import("@/lib/api-client").then(({ fetchApi }) => {
+                fetchApi(`/repair-requests/${task.id}/status`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ status: "ACCEPTED" }),
+                }).catch(() => {});
+              });
+            }}
+            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Xác nhận lịch hẹn
+          </button>
+        ) : task.status !== "COMPLETED" && task.status !== "CANCELLED" ? (
+          <button
+            onClick={() => {
+              onUpdateStatus(task.id, "IN_PROGRESS", "Đang sửa chữa");
+              setSubStep("REPAIR");
+              import("@/lib/api-client").then(({ fetchApi }) => {
+                fetchApi(`/repair-requests/${task.id}/status`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ status: "REPAIRING" }),
+                }).catch(() => {});
+              });
+            }}
+            className="w-full py-3 bg-[#005288] hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Đến nơi & Bắt đầu sửa chữa (Báo giá)
+          </button>
+        ) : null
+      ) : (
+        // ==================== ĐƠN CỨU HỘ KHẨN CẤP (SOS) ====================
+        <>
+          {task.status === "WAITING_ACCEPT" && (
+            <button
+              onClick={() => {
+                onUpdateStatus(task.id, "PENDING", "Tiếp nhận đơn");
+                import("@/lib/api-client").then(({ fetchApi }) => {
+                  fetchApi(`/repair-requests/${task.id}/status`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ status: "ACCEPTED" }),
+                  }).catch(() => {});
+                });
+              }}
+              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Tiếp nhận đơn cứu hộ
+            </button>
+          )}
 
-      {(task.status === "WAITING_MOVE" || task.status === "MOVING") && (
-        <button
-          onClick={() => setIsTravelModalOpen(true)}
-          className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-        >
-          <Bike className="w-4 h-4" />
-          {task.status === "WAITING_MOVE" ? "Tiếp tục di chuyển" : "Tiếp tục hành trình"}
-        </button>
-      )}
+          {task.status === "PENDING" && (
+            <button
+              onClick={() => {
+                onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển");
+                setIsTravelModalOpen(true);
+              }}
+              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Bike className="w-4 h-4" />
+              Xác nhận di chuyển
+            </button>
+          )}
 
-      {task.status === "ARRIVED" && (
-        <button
-          onClick={() => {
-            onUpdateStatus(task.id, "IN_PROGRESS", "Đang thực hiện");
-            setSubStep("DIAGNOSTIC");
-          }}
-          className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          Bắt đầu công việc
-        </button>
-      )}
+          {(task.status === "WAITING_MOVE" || task.status === "MOVING") && (
+            <button
+              onClick={() => setIsTravelModalOpen(true)}
+              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Bike className="w-4 h-4" />
+              {task.status === "WAITING_MOVE" ? "Tiếp tục di chuyển" : "Tiếp tục hành trình"}
+            </button>
+          )}
 
-      {isTravelModalOpen && (
-        <TravelMapModal
-          task={task}
-          onClose={() => setIsTravelModalOpen(false)}
-          onStatusChange={handleStatusChange}
-        />
+          {task.status === "ARRIVED" && (
+            <button
+              onClick={() => {
+                onUpdateStatus(task.id, "IN_PROGRESS", "Đang thực hiện");
+                setSubStep("DIAGNOSTIC");
+              }}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Bắt đầu công việc
+            </button>
+          )}
+
+          {isTravelModalOpen && (
+            <TravelMapModal
+              task={task}
+              onClose={() => setIsTravelModalOpen(false)}
+              onStatusChange={handleStatusChange}
+            />
+          )}
+        </>
       )}
     </div>
   );

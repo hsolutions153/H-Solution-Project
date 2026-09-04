@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from postgrest.exceptions import APIError
+from postgrest import APIError
 
 from app.core.exceptions import AppException, ErrorCode
 

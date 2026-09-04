@@ -10,15 +10,6 @@ import {
   VIETNAM_PHONE_PATTERN,
 } from "@/utils/auth-validation";
 
-type RequestResponse = {
-  message?: string;
-  data?: {
-    requestId: string;
-    phone: string;
-    expiresAt: string;
-    developmentCode?: string;
-  };
-};
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -35,25 +26,26 @@ export default function ForgotPasswordPage() {
     }
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/password-reset/request", {
+      const { fetchApi } = await import("@/lib/api-client");
+      const payload = await fetchApi<{
+        message: string;
+        expires_in_seconds: number;
+        otp_code?: string;
+      }>("/auth/forgot-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
-      const payload = (await response.json()) as RequestResponse;
-      if (!response.ok || !payload.data) {
-        setError(payload.message ?? "Không thể gửi mã xác minh.");
-        return;
-      }
+
       sessionStorage.setItem(
         "passwordResetRequest",
-        JSON.stringify(payload.data),
+        JSON.stringify({
+          phone,
+          developmentCode: payload.otp_code,
+        }),
       );
-      router.push(
-        `/forgot-password/verify?requestId=${encodeURIComponent(payload.data.requestId)}&phone=${encodeURIComponent(payload.data.phone)}`,
-      );
-    } catch {
-      setError("Không thể kết nối tới máy chủ.");
+      router.push(`/forgot-password/verify?phone=${encodeURIComponent(phone)}`);
+    } catch (err: any) {
+      setError(err.message || "Không thể kết nối tới máy chủ.");
     } finally {
       setLoading(false);
     }

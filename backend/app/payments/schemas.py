@@ -26,6 +26,15 @@ class PaymentResponse(BaseModel):
 class QRResponse(BaseModel):
     payment: PaymentResponse
     qr_url: str
+    pay_url: str | None = None
+
+
+class MoMoPaymentResponse(BaseModel):
+    success: bool
+    pay_url: str
+    qr_code_url: str | None = None
+    order_id: str
+    amount: float
 
 
 class SepayWebhookPayload(BaseModel):

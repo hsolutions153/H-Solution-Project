@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Camera, Save, Star, Trash2 } from "lucide-react";
-import type { Device } from "@/services/device-db";
+import type { Device } from "@/types/device";
 
 type Props = { device?: Device };
 
@@ -28,26 +28,46 @@ export function DeviceForm({ device }: Props) {
     event.preventDefault();
     setSaving(true);
     setError("");
-    const response = await fetch(isEditing ? `/api/devices/${device!.id}` : "/api/devices", {
-      method: isEditing ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(body.message ?? "Không thể lưu thiết bị.");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const payload = {
+        name: form.nickname,
+        model: form.model,
+        serial_number: form.serialNumber,
+        notes: form.macAddress,
+      };
+
+      if (isEditing) {
+        await fetchApi<any>(`/devices/${device!.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetchApi<any>("/devices", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      router.push("/home/device");
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "Không thể lưu thiết bị.");
+    } finally {
       setSaving(false);
-      return;
     }
-    router.push(`/home/device/${body.data.id}`);
-    router.refresh();
   };
 
   const remove = async () => {
     if (!device || !window.confirm(`Xóa ${device.nickname}? Thao tác này không thể hoàn tác.`)) return;
-    await fetch(`/api/devices/${device.id}`, { method: "DELETE" });
-    router.push("/home/device");
-    router.refresh();
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi(`/devices/${device.id}`, { method: "DELETE" });
+      router.push("/home/device");
+      router.refresh();
+    } catch (err: any) {
+      alert(err.message || "Không thể xóa thiết bị.");
+    }
   };
 
   return (
