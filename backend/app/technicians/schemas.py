@@ -17,9 +17,9 @@ class TechnicianCreate(BaseModel):
 
     user_id: str = Field(min_length=1, max_length=10)
     id_card_number: str = Field(min_length=12, max_length=12)
-    id_card_front_url: str | None = Field(default=None, max_length=500)
-    id_card_back_url: str | None = Field(default=None, max_length=500)
-    certificate_url: str | None = Field(default=None, max_length=500)
+    id_card_front_url: str = Field(min_length=1, max_length=500)
+    id_card_back_url: str = Field(min_length=1, max_length=500)
+    certificate_url: str = Field(min_length=1, max_length=500)
     skills: str = "BOTH"
     specialization: str | None = Field(default=None, max_length=255)
     experience_years: int = Field(default=0, ge=0)
@@ -33,19 +33,27 @@ class TechnicianUpdate(BaseModel):
     specialization: str | None = Field(default=None, max_length=255)
     experience_years: int | None = Field(default=None, ge=0)
     is_online: bool | None = None
-    current_lat: Decimal | None = None
-    current_lng: Decimal | None = None
+    last_latitude: Decimal | None = None
+    last_longitude: Decimal | None = None
 
 
 class TechnicianKycReview(BaseModel):
     kyc_status: str
     kyc_note: str | None = None
-    reviewed_by: str = Field(min_length=1, max_length=10)
+
+
+class TechnicianPresenceUpdate(BaseModel):
+    is_online: bool
+    last_latitude: Decimal | None = None
+    last_longitude: Decimal | None = None
 
 
 class TechnicianResponse(BaseModel):
     user_id: str
     id_card_number: str
+    id_card_front: str | None = None
+    id_card_back: str | None = None
+    certificate_img: str | None = None
     id_card_front_url: str | None = None
     id_card_back_url: str | None = None
     certificate_url: str | None = None
@@ -57,8 +65,8 @@ class TechnicianResponse(BaseModel):
     kyc_reviewed_at: datetime | None = None
     kyc_note: str | None = None
     is_online: bool
-    current_lat: Decimal | None = None
-    current_lng: Decimal | None = None
+    last_latitude: Decimal | None = None
+    last_longitude: Decimal | None = None
     last_location_at: datetime | None = None
     rating_avg: Decimal
     total_jobs_done: int

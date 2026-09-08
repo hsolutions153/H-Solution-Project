@@ -9,7 +9,31 @@ interface HeaderProps {
 
 export const Header = ({ onLogout }: HeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [techName, setTechName] = useState<string>("Kỹ thuật viên");
+  const [isOnline, setIsOnline] = useState<boolean>(true);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const { fetchApi, getUserInfo } = await import("@/lib/api-client");
+        const cached = getUserInfo();
+        if (cached && cached.name) {
+          setTechName(cached.name);
+        }
+        const me = await fetchApi<any>("/technicians/me");
+        if (me && me.user && me.user.full_name) {
+          setTechName(me.user.full_name);
+        }
+        if (me && typeof me.is_online === "boolean") {
+          setIsOnline(me.is_online);
+        }
+      } catch (err) {
+        console.warn("Header profile fetch error:", err);
+      }
+    }
+    loadProfile();
+  }, []);
 
   // Đóng menu khi click ra bên ngoài
   useEffect(() => {
@@ -22,6 +46,8 @@ export const Header = ({ onLogout }: HeaderProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const avatarChar = techName ? techName.charAt(0).toUpperCase() : "K";
+
   return (
     <div className="relative flex items-center justify-between p-4 bg-white border-b border-gray-100">
       {/* Khung thông tin User có thể bấm vào */}
@@ -33,13 +59,13 @@ export const Header = ({ onLogout }: HeaderProps) => {
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-3 cursor-pointer select-none hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
         >
-          <div className="w-10 h-10 rounded-full bg-slate-300 overflow-hidden flex items-center justify-center font-bold text-slate-700">
-            A
+          <div className="w-10 h-10 rounded-full bg-blue-600 text-white overflow-hidden flex items-center justify-center font-bold text-sm shadow-xs">
+            {avatarChar}
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 text-sm leading-tight">Nguyễn Văn A</h2>
-            <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Đang hoạt động
+            <h2 className="font-bold text-slate-900 text-sm leading-tight">{techName}</h2>
+            <span className={`text-[11px] font-medium flex items-center gap-1 mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+              <span className={`w-2 h-2 rounded-full inline-block ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></span> {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
             </span>
           </div>
         </div>

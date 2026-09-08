@@ -17,6 +17,14 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   onViewDetailQuote,
   onContinueRepair,
 }) => {
+  const savedQuote = typeof window !== "undefined" ? sessionStorage.getItem("quoteData") : null;
+  let quoteObj: any = null;
+  try {
+    quoteObj = savedQuote ? JSON.parse(savedQuote) : null;
+  } catch {}
+
+  const displayTotal = task.totalAmount || quoteObj?.totalCost || quoteObj?.estimated_price || task.quote?.estimated_price || 0;
+
   return (
     <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between">
       <div className="p-4 space-y-4">
@@ -35,7 +43,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
         <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold px-2.5 py-1 bg-sky-50 text-sky-700 rounded-md">
-              Mã đơn:{task.code}
+              Mã đơn: {task.code}
             </span>
             <span className="text-xs font-medium px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -71,17 +79,19 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-4 text-left mt-4">
             <div className="pl-2">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Tổng chi phí
+                Tổng chi phí báo giá
               </span>
               <span className="text-base font-bold text-sky-700">
-                500.000 đ
+                {displayTotal > 0 ? `${Number(displayTotal).toLocaleString("vi-VN")} đ` : "Chờ tính phí"}
               </span>
             </div>
             <div className="border-l border-slate-100 pl-4">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Dự kiến
               </span>
-              <span className="text-base font-bold text-slate-800">2 giờ</span>
+              <span className="text-base font-bold text-slate-800">
+                {quoteObj?.estimatedTime || "2 giờ"}
+              </span>
             </div>
           </div>
 
@@ -108,7 +118,14 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
 
           <button
             onClick={() => {
-              console.log("Đã bấm Bắt đầu sửa chữa");
+              if (task?.id) {
+                import("@/lib/api-client").then(({ fetchApi }) => {
+                  fetchApi(`/repair-requests/${task.id}/status`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ status: "REPAIRING" }),
+                  }).catch((err) => console.error("Error starting repair:", err));
+                });
+              }
               onContinueRepair();
             }}
             className="w-full py-3 bg-sky-800 hover:bg-sky-900 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer shadow-sm"

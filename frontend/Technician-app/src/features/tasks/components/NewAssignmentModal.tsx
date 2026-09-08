@@ -17,7 +17,8 @@ interface NewAssignmentModalProps {
   task: Task | null;
   onClose: () => void;
   onAccept: (taskId: string) => void;
-  onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối
+  onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối thủ công
+  onTimeout?: (taskId: string) => void; // Tự động xử lý khi hết 2 phút
 }
 
 export const NewAssignmentModal = ({
@@ -26,20 +27,25 @@ export const NewAssignmentModal = ({
   onClose,
   onAccept,
   onReject,
+  onTimeout,
 }: NewAssignmentModalProps) => {
-  const [timeLeft, setTimeLeft] = useState(300); // 5 phút
+  const [timeLeft, setTimeLeft] = useState(120); // 2 phút đếm ngược
 
   useEffect(() => {
     if (!isOpen || !task) return;
 
-    // Reset về 5 phút mỗi lần mở popup
-    setTimeLeft(300);
+    // Reset về 2 phút (120 giây) mỗi lần nhận phân công mới
+    setTimeLeft(120);
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          onReject(task.id); // Hết 5 phút -> Tự động gọi handler từ chối
+          if (onTimeout) {
+            onTimeout(task.id);
+          } else {
+            onReject(task.id);
+          }
           return 0;
         }
         return prev - 1;
@@ -47,7 +53,7 @@ export const NewAssignmentModal = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, task, onReject]);
+  }, [isOpen, task, onReject, onTimeout]);
 
   if (!isOpen || !task) return null;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { HistoryTask } from "@/types/task";
 import { initialHistoryTasks } from "@/constants/mockHistory";
 import {
@@ -19,13 +19,80 @@ interface TaskHistoryScreenProps {
 export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
   newCompletedTask,
 }) => {
-  // State lưu tạm thời trong bộ nhớ (Tải lại trang sẽ khôi phục về initialHistoryTasks)
   const [historyList, setHistoryList] = useState<HistoryTask[]>(() => {
     if (newCompletedTask) {
       return [newCompletedTask, ...initialHistoryTasks];
     }
     return initialHistoryTasks;
   });
+  const [, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCompletedTasks() {
+      try {
+        setLoading(true);
+        const { fetchApi } = await import("@/lib/api-client");
+        const res = await fetchApi<any>("/repair-requests/technician/me?page=1&limit=50");
+        if (res && Array.isArray(res.items)) {
+          const completedFromApi: HistoryTask[] = res.items
+            .filter((item: any) => item.status === "COMPLETED" || item.status === "completed")
+            .map((item: any) => {
+              const effectiveTotal = item.total_amount
+                ? Number(item.total_amount)
+                : item.quote?.estimated_price
+                ? Number(item.quote.estimated_price)
+                : item.quote?.total_amount
+                ? Number(item.quote.total_amount)
+                : 0;
+
+              const cust = item.customer || {};
+              const dev = item.device || {};
+              const d = item.completed_at || item.created_at ? new Date(item.completed_at || item.created_at) : new Date();
+
+              return {
+                id: item.id,
+                code: item.request_code || item.id,
+                date: d.toLocaleDateString("vi-VN"),
+                time: d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+                serviceType: item.is_sos ? "Cứu hộ khẩn cấp (SOS)" : `Sửa chữa ${item.issue_type || "thiết bị"}`,
+                customerName: cust.full_name || item.customer_name || "Khách hàng",
+                deviceInfo: dev.model_name ? `${dev.manufacturer || ""} ${dev.model_name}` : `Xe lăn điện ${dev.device_type || ""}`,
+                address: item.location_address || cust.address || "Địa chỉ không xác định",
+                type: item.is_sos ? "repair" : "maintenance",
+                diagnosis: item.issue_description || "Kiểm tra và xử lý theo yêu cầu khách hàng.",
+                solution: item.quote?.diagnosis_note || "Đã hoàn thành sửa chữa & kiểm tra thiết bị.",
+                images: {
+                  before: item.images && item.images[0] ? (typeof item.images[0] === "string" ? item.images[0] : item.images[0].image_url) : "/images/before-repair.jpg",
+                  after: item.images && item.images[1] ? (typeof item.images[1] === "string" ? item.images[1] : item.images[1].image_url) : "/images/after-repair.jpg",
+                },
+                totalAmount: effectiveTotal,
+              };
+            });
+
+          if (isMounted) {
+            if (completedFromApi.length > 0) {
+              if (newCompletedTask) {
+                const filtered = completedFromApi.filter((t) => t.id !== newCompletedTask.id && t.code !== newCompletedTask.code);
+                setHistoryList([newCompletedTask, ...filtered]);
+              } else {
+                setHistoryList(completedFromApi);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi tải lịch sử công việc KTV:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadCompletedTasks();
+    return () => {
+      isMounted = false;
+    };
+  }, [newCompletedTask]);
 
   const [activeTab, setActiveTab] = useState<"all" | "this_month" | "maintenance" | "repair">("all");
   const [expandedId, setExpandedId] = useState<string | null>(
@@ -206,6 +273,9 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                                 src="/images/s4.jpg"
                                 alt="Trước khi làm"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
                               />
                               <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
                                 Trước khi làm
@@ -218,6 +288,9 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                                 src="/images/s5.jpg"
                                 alt="Sau khi làm"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
                               />
                               <span className="absolute bottom-1 left-1 bg-sky-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
                                 Sau khi làm
