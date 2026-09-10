@@ -15,7 +15,7 @@ def get_user_by_id(user_id: str):
 
 
 def get_user_by_phone(phone: str):
-    response = supabase.table(USERS_TABLE).select("id").eq("phone", phone).maybe_single().execute()
+    response = supabase.table(USERS_TABLE).select(USER_SELECT).eq("phone", phone).maybe_single().execute()
     return response.data if response and hasattr(response, "data") else None
 
 

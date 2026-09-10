@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import type { UserProfile } from "@/services/profile-db";
+import type { UserProfile } from "@/services/profile";
 
 type ProfileScreenProps = {
   initialProfile: UserProfile;
@@ -139,6 +139,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
       const saved = await saveChanges({
         name: profile.name,
         phone: profile.phone,
+        email: profile.email,
         address: profile.address,
         avatar: profile.avatar,
       });
@@ -207,7 +208,13 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                 </label>
                 <label>
                   <span>Email</span>
-                  <input value={profile.email} type="email" readOnly aria-readonly="true" />
+                  <input
+                    value={profile.email}
+                    type="email"
+                    autoComplete="email"
+                    maxLength={100}
+                    onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))}
+                  />
                 </label>
               </div>
             </div>

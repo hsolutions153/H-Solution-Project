@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SignupRequest(BaseModel):
@@ -12,7 +12,7 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    phone: str = Field(min_length=1, max_length=20)  # số điện thoại đăng nhập
     password: str = Field(min_length=1, max_length=72)
 
 
