@@ -1,10 +1,15 @@
 import secrets
+import uuid
+
+from fastapi import UploadFile
 
 from app.auth import repository as auth_repository
+from app.core import storage
 from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.devices.models import DEVICE_TYPES
 from app.devices.repository import (
+    clear_default_device,
     delete_device_from_db,
     get_all_devices,
     get_devices_by_customer_id,
@@ -14,9 +19,30 @@ from app.devices.repository import (
     update_device_in_db,
 )
 
+MAX_IMAGE_SIZE_MB = 10
+MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
+ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
 
 def _device_id() -> str:
     return secrets.token_hex(5).upper()
+
+
+def upload_device_image(file: UploadFile, current_user: dict) -> str:
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > MAX_IMAGE_SIZE_BYTES:
+        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
+
+    file_extension = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
+    file_name = f"{uuid.uuid4()}.{file_extension}"
+    supabase_path = f"public/devices/{current_user['sub']}/{file_name}"
+
+    return storage.upload_file_to_supabase(file, supabase_path)
 
 
 def _role_id(code: str) -> str:
@@ -104,6 +130,17 @@ def create_device(data, current_user: dict):
     if serial_number and get_device_by_serial_number(serial_number):
         raise AppException(ErrorCode.SERIAL_NUMBER_EXISTS)
 
+    requested_default = payload.pop("is_default", None)
+    has_existing_devices = bool(get_devices_by_customer_id(customer_id))
+    if not has_existing_devices:
+        # First device for this customer is always the default one.
+        payload["is_default"] = True
+    elif requested_default:
+        clear_default_device(customer_id)
+        payload["is_default"] = True
+    else:
+        payload["is_default"] = False
+
     device_id = _device_id()
     payload["id"] = device_id
     payload["created_by"] = current_user["sub"]
@@ -126,6 +163,10 @@ def update_device(device_id: str, data, current_user: dict):
         if duplicate and duplicate["id"] != existing["id"]:
             raise AppException(ErrorCode.SERIAL_NUMBER_EXISTS)
 
+    if payload.get("is_default") is True:
+        # Only one device can be default per customer, so unset the others first.
+        clear_default_device(existing["customer_id"], exclude_device_id=device_id)
+
     payload["updated_by"] = current_user["sub"]
     updated = update_device_in_db(device_id, payload)
     if not updated:
@@ -134,7 +175,13 @@ def update_device(device_id: str, data, current_user: dict):
 
 
 def delete_device(device_id: str, current_user: dict):
-    fetch_device_by_id(device_id, current_user)
+    existing = fetch_device_by_id(device_id, current_user)
     deleted = delete_device_from_db(device_id)
     if not deleted:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+
+    if existing.get("is_default"):
+        # Promote another device of this customer to default, if any remain.
+        remaining = get_devices_by_customer_id(existing["customer_id"])
+        if remaining:
+            update_device_in_db(remaining[0]["id"], {"is_default": True, "updated_by": current_user["sub"]})

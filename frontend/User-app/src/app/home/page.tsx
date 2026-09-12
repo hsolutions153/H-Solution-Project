@@ -1,12 +1,45 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { HomeShell } from "@/components/home/home-shell";
 
 export default function HomePage() {
   const router = useRouter();
+  const [device, setDevice] = useState<{
+    name: string;
+    model: string;
+    image: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadPrimaryDevice() {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const list = await fetchApi<any[]>("/devices");
+        if (Array.isArray(list) && list.length > 0) {
+          const item = list[0];
+          const hasCustomNotes = item.notes && !item.notes.includes(":") && item.notes.length < 50;
+          const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
+          const modelName = item.model_name || item.model || "";
+
+          // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
+          let displayName = item.nickname || item.name || (hasCustomNotes ? item.notes : "");
+          if (!displayName) {
+            displayName = item.device_type === "SCOOTER" ? "Xe scooter điện" : "Xe lăn điện";
+          }
+
+          setDevice({
+            name: displayName,
+            model: modelName || (item.device_type === "SCOOTER" ? "Scooter" : "Xe lăn"),
+            image: item.image_url || "/wheelchair.png",
+          });
+        }
+      } catch {}
+    }
+    loadPrimaryDevice();
+  }, []);
 
   return (
     <HomeShell activeNav="home" mainClassName="home-content--dashboard">
@@ -65,10 +98,16 @@ export default function HomePage() {
         {/* My Chair Card */}
         <section className="chair-card">
           <div className="chair-card-image">
-            <Image src="/wheelchair.png" alt="Xe lăn của tôi" width={1024} height={1024} />
+            <Image
+              src={device?.image || "/wheelchair.png"}
+              alt={device?.name || "Xe lăn của tôi"}
+              width={1024}
+              height={1024}
+              unoptimized
+            />
             <div className="chair-label">
-              <span className="chair-name">Xe của tôi</span>
-              <span className="chair-model">Model X-200</span>
+              <span className="chair-name">{device?.name || "Xe của tôi"}</span>
+              <span className="chair-model">{device?.model || "Model X-200"}</span>
             </div>
           </div>
           <div className="chair-card-info">

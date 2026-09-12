@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Task } from "@/types/task";
-import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X } from "lucide-react";
+import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X, FileText, Sparkles } from "lucide-react";
 
 interface DiagnosticScreenProps {
   task: Task;
@@ -86,16 +86,82 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
       </div>
 
       {/* Nội dung chẩn đoán */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-2">
-        <label className="text-xs font-bold text-slate-800 block">
-          Nội dung chẩn đoán (Nguyên nhân & Vấn đề mới)
-        </label>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Nhập chi tiết lỗi và các vấn đề phát sinh..."
-          className="w-full h-24 p-3 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-800 resize-none"
-        />
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800 flex-shrink-0">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-900 block leading-tight">
+                Nội dung chẩn đoán kỹ thuật
+              </label>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Nguyên nhân hư hỏng & phát sinh thực tế
+              </span>
+            </div>
+          </div>
+          {note.trim().length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                {note.trim().length} ký tự
+              </span>
+              <button
+                type="button"
+                onClick={() => setNote("")}
+                className="text-[10px] text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 hover:bg-red-50 rounded cursor-pointer transition"
+                title="Xóa nội dung"
+              >
+                Xóa
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Textarea hiển thị độ tương phản cao, chữ rõ nét */}
+        <div className="relative">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Nhập chi tiết lỗi kiểm tra được và các vấn đề phát sinh (ví dụ: Bình ắc quy bị chai phồng, sụt áp nhanh; cần thay cụm bình mới)..."
+            rows={4}
+            className="w-full p-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-sky-800 focus:bg-white focus:ring-3 focus:ring-sky-800/10 transition-all resize-none leading-relaxed"
+          />
+        </div>
+
+        {/* Gợi ý chẩn đoán nhanh */}
+        <div className="space-y-1.5 pt-0.5">
+          <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>Gợi ý chẩn đoán nhanh:</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              "Ắc quy chai / sụt áp",
+              "Hỏng bộ điều khiển (IC)",
+              "Mòn lốp / nổ xăm",
+              "Đứt dây phanh / kẹt phanh",
+              "Hỏng cần lái Joystick / tay ga",
+              "Động cơ kêu / kẹt trục",
+            ].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => {
+                  setNote((prev) => {
+                    const trimmed = prev.trim();
+                    if (!trimmed) return tag;
+                    if (trimmed.includes(tag)) return trimmed;
+                    return `${trimmed}, ${tag}`;
+                  });
+                }}
+                className="text-[11px] font-semibold px-2.5 py-1 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer active:scale-95 shadow-2xs"
+              >
+                + {tag}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Đánh giá khả năng sửa chữa */}

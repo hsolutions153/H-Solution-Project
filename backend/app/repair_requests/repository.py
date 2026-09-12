@@ -49,8 +49,9 @@ def create_default_device_for_customer(customer_id: str):
         "id": new_id,
         "customer_id": customer_id,
         "device_type": "WHEELCHAIR",
-        "manufacturer": "Generic",
-        "model_name": "Electric Wheelchair",
+        "manufacturer": "Chưa xác định",
+        "model_name": "Thiết bị cá nhân",
+        "notes": "Thiết bị tự động tạo khi đặt lịch",
         "created_by": customer_id,
         "updated_by": customer_id,
     }

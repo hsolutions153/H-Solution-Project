@@ -19,7 +19,7 @@ export const Header = ({ title = "Bảng điều khiển" }: HeaderProps) => {
   }, []);
 
   return (
-    <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-30 flex-shrink-0">
       <div>
         <h2 className="text-2xl font-black text-sky-950">{title}</h2>
         <p className="text-xs text-slate-400 font-medium">Hệ thống Quản trị & Điều phối H-Solution</p>

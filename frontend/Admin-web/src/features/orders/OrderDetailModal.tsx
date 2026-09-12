@@ -5,6 +5,7 @@ import {
   X,
   User,
   Phone,
+  Mail,
   MapPin,
   Clock,
   Wrench,
@@ -19,6 +20,11 @@ import {
   Receipt,
   Settings,
   CreditCard,
+  ZoomIn,
+  ExternalLink,
+  ShieldCheck,
+  Tag,
+  Hash,
 } from "lucide-react";
 import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 
@@ -37,29 +43,60 @@ export const OrderDetailModal = ({
   onRefresh,
   onToast,
 }: OrderDetailProps) => {
+  const [orderDetail, setOrderDetail] = useState<any>(order);
+  const [images, setImages] = useState<any[]>(
+    Array.isArray(order?.images) ? order.images : []
+  );
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [selectedTechId, setSelectedTechId] = useState<string>(
-    order.technician_id || (technicians[0]?.user_id || "TECH000001")
+    order?.technician_id || (technicians[0]?.user_id || "TECH000001")
   );
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedPresetReason, setSelectedPresetReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customReasonNote, setCustomReasonNote] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [quoteData, setQuoteData] = useState<any>(order.quote || null);
+  const [quoteData, setQuoteData] = useState<any>(order?.quote || null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Fetch full details (images, quote, device, customer) on mount
   useEffect(() => {
     let isMounted = true;
     if (order?.id) {
+      setLoadingDetail(true);
       import("@/lib/api-client")
-        .then(({ fetchApi }) => {
-          return fetchApi<any[]>(`/repair-requests/${order.id}/quotes`);
-        })
-        .then((res) => {
+        .then(async ({ fetchApi }) => {
+          const [orderRes, quoteRes] = await Promise.allSettled([
+            fetchApi<any>(`/orders/${order.id}`).catch(() =>
+              fetchApi<any>(`/repair-requests/${order.id}`)
+            ),
+            fetchApi<any[]>(`/repair-requests/${order.id}/quotes`),
+          ]);
+
           if (!isMounted) return;
-          if (res && res.length > 0) {
-            setQuoteData(res[0]);
+
+          if (orderRes.status === "fulfilled" && orderRes.value) {
+            const data = orderRes.value;
+            setOrderDetail((prev: any) => ({ ...prev, ...data }));
+            if (Array.isArray(data.images) && data.images.length > 0) {
+              setImages(data.images);
+            }
+            if (data.technician_id) {
+              setSelectedTechId(data.technician_id);
+            }
+          }
+
+          if (
+            quoteRes.status === "fulfilled" &&
+            Array.isArray(quoteRes.value) &&
+            quoteRes.value.length > 0
+          ) {
+            setQuoteData(quoteRes.value[0]);
           }
         })
-        .catch(() => { });
+        .catch((err) => console.warn("Error fetching full order detail:", err))
+        .finally(() => {
+          if (isMounted) setLoadingDetail(false);
+        });
     }
     return () => {
       isMounted = false;
@@ -87,16 +124,21 @@ export const OrderDetailModal = ({
     setIsCancelModalOpen(false);
   };
 
-  const badge = getStatusBadge(order.status);
+  const badge = getStatusBadge(orderDetail.status || order.status);
   const issueLabel =
-    ISSUE_TYPE_LABELS[order.issue_type] || order.issue_type || "Sự cố kỹ thuật";
+    ISSUE_TYPE_LABELS[orderDetail.issue_type] ||
+    orderDetail.issue_type ||
+    "Sự cố kỹ thuật";
+
+  const isFinished =
+    orderDetail.status === "COMPLETED" || orderDetail.status === "CANCELLED";
 
   const handleAssign = async () => {
-    if (!selectedTechId) return;
+    if (!selectedTechId || isFinished) return;
     setActionLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
-      await fetchApi(`/orders/${order.id}/assign`, {
+      await fetchApi(`/orders/${orderDetail.id}/assign`, {
         method: "PATCH",
         body: JSON.stringify({ technician_id: selectedTechId }),
       });
@@ -114,7 +156,7 @@ export const OrderDetailModal = ({
     setActionLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
-      await fetchApi(`/repair-requests/${order.id}/status`, {
+      await fetchApi(`/repair-requests/${orderDetail.id}/status`, {
         method: "PATCH",
         body: JSON.stringify({
           status: newStatus,
@@ -133,157 +175,272 @@ export const OrderDetailModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+      {/* Modal Container */}
+      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+          
           {/* Header */}
-          <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
+          <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white flex justify-between items-start flex-shrink-0">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
-                  Chi tiết yêu cầu
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="text-[11px] font-black tracking-wider text-sky-300 uppercase bg-sky-900/60 px-2.5 py-0.5 rounded-full border border-sky-400/30">
+                  Chi tiết yêu cầu sửa chữa
                 </span>
-                {order.is_sos && (
-                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                {orderDetail.is_sos && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm shadow-red-500/30 animate-pulse">
                     <AlertTriangle className="w-3 h-3" /> CỨU HỘ SOS
                   </span>
                 )}
-              </div>
-              <h3 className="text-xl font-black">
-                Đơn #{order.request_code || order.id?.substring(0, 8)}
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Tạo lúc:{" "}
-                {order.created_at
-                  ? new Date(order.created_at).toLocaleString("vi-VN")
-                  : "Chưa xác định"}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Status Banner */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <div>
-                <div className="text-xs text-slate-500 font-bold mb-1 uppercase">
-                  Trạng thái hiện tại
-                </div>
                 <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black border ${badge.bg} ${badge.text} ${badge.border}`}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
                 >
                   {badge.label}
                 </span>
               </div>
-              {order.total_amount && (
-                <div className="text-right">
-                  <div className="text-xs text-slate-500 font-bold mb-1 uppercase">
-                    Tổng chi phí
+
+              <h3 className="text-2xl font-black text-white flex items-center gap-2">
+                <span>Đơn #{orderDetail.request_code || orderDetail.id?.substring(0, 8)}</span>
+              </h3>
+
+              <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                <span>
+                  Tạo lúc:{" "}
+                  {orderDetail.created_at
+                    ? new Date(orderDetail.created_at).toLocaleString("vi-VN")
+                    : "Chưa xác định"}
+                </span>
+              </p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition cursor-pointer flex-shrink-0"
+              title="Đóng modal"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-6 space-y-6 overflow-y-auto flex-1 bg-slate-50/40">
+            
+            {/* 1. Customer & Device Information Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Customer Box */}
+              <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
+                    <div className="w-6 h-6 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                    <span>Thông tin Khách hàng</span>
                   </div>
-                  <div className="text-lg font-black text-emerald-600">
-                    {Number(order.total_amount).toLocaleString("vi-VN")} đ
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                    Khách cá nhân
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="font-extrabold text-slate-900 text-base">
+                    {orderDetail.customer?.full_name ||
+                      orderDetail.customer_name ||
+                      "Khách hàng"}
                   </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>
+                      {orderDetail.customer?.phone ||
+                        orderDetail.customer_phone ||
+                        orderDetail.phone ||
+                        "Chưa có số điện thoại"}
+                    </span>
+                  </div>
+                  {orderDetail.customer?.email && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="truncate">{orderDetail.customer.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Device Box */}
+              <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
+                    <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800">
+                      <Wrench className="w-3.5 h-3.5" />
+                    </div>
+                    <span>Phương tiện & Thiết bị</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    {issueLabel}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="font-extrabold text-slate-900 text-base truncate">
+                    {orderDetail.device?.model_name ||
+                      orderDetail.device?.device_type ||
+                      orderDetail.device ||
+                      "Thiết bị di chuyển"}
+                  </div>
+                  <div className="text-xs text-slate-600 flex items-center gap-1.5">
+                    <span className="text-slate-400 font-medium">Hãng sản xuất:</span>
+                    <span className="font-bold text-slate-800">
+                      {orderDetail.device?.manufacturer || "Chưa xác định"}
+                    </span>
+                  </div>
+                  {orderDetail.device?.serial_number && (
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <span className="text-slate-400 font-medium">Số Sê-ri / ID:</span>
+                      <span className="font-mono font-bold text-slate-700">
+                        {orderDetail.device.serial_number}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Incident Location & Description */}
+            <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3.5">
+              {/* Location */}
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase mb-1">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Địa chỉ sự cố / Nơi cần cứu hộ</span>
+                </div>
+                <div className="text-sm font-bold text-slate-900 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  {orderDetail.location_address ||
+                    orderDetail.address_detail ||
+                    "Chưa có thông tin địa chỉ cụ thể"}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase mb-1">
+                  <FileText className="w-3.5 h-3.5 text-sky-800" />
+                  <span>Mô tả sự cố từ khách hàng</span>
+                </div>
+                <div className="text-sm text-slate-800 bg-slate-50 p-3.5 rounded-xl border border-slate-100 leading-relaxed font-medium">
+                  {orderDetail.issue_description ||
+                    orderDetail.description ||
+                    "Không có mô tả chi tiết."}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Photo Gallery (Hình ảnh sự cố & Hiện trường) */}
+            <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
+                  <div className="w-6 h-6 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                  </div>
+                  <span>Hình ảnh hiện trường & sự cố</span>
+                </div>
+                <span className="text-xs font-bold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-100">
+                  {images.length} ảnh đính kèm
+                </span>
+              </div>
+
+              {images.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1">
+                  {images.map((img: any, idx: number) => {
+                    const imgUrl =
+                      typeof img === "string" ? img : img.image_url || img.url || "";
+                    const imgType =
+                      typeof img === "object" && img.image_type === "AFTER_REPAIR"
+                        ? "Sau sửa"
+                        : "Trước sửa";
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setPreviewImageUrl(imgUrl)}
+                        className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-100 cursor-pointer shadow-2xs hover:shadow-md hover:border-sky-400 transition-all"
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Ảnh sự cố ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          onError={(e) => {
+                            // Fallback to sample photo if broken URL
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/images/s1.jpg";
+                          }}
+                        />
+
+                        {/* Tag */}
+                        <span className="absolute top-2 left-2 bg-black/65 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          {imgType}
+                        </span>
+
+                        {/* Zoom Overlay */}
+                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs">
+                          <ZoomIn className="w-4 h-4" />
+                          <span>Xem ảnh</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-1 bg-slate-50/50">
+                  <ImageIcon className="w-6 h-6 mx-auto text-slate-300 mb-1" />
+                  <p className="font-semibold text-slate-600">
+                    Không có hình ảnh đính kèm cho đơn này
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Khách hàng không đính kèm ảnh khi tạo yêu cầu.
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Customer & Device Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Customer Box */}
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-900 uppercase">
-                  <User className="w-4 h-4 text-sky-700" />
-                  <span>Khách hàng</span>
-                </div>
-                <div className="font-bold text-slate-900">
-                  {order.customer?.full_name || order.customer_name || "Khách vãng lai"}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-600">
-                  <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{order.customer?.phone || order.customer_phone || order.phone || "Chưa có SĐT"}</span>
-                </div>
-                {order.customer?.email && (
-                  <div className="text-xs text-slate-500 truncate">
-                    {order.customer.email}
-                  </div>
-                )}
-              </div>
-
-              {/* Device Box */}
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-900 uppercase">
-                  <Wrench className="w-4 h-4 text-sky-700" />
-                  <span>Thiết bị</span>
-                </div>
-                <div className="font-bold text-slate-900">
-                  {order.device?.model_name || order.device?.device_type || order.device || "Thiết bị hỗ trợ"}
-                </div>
-                <div className="text-xs text-slate-600">
-                  Hãng: <span className="font-semibold">{order.device?.manufacturer || "Chưa rõ"}</span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Loại sự cố: <span className="font-bold text-slate-800">{issueLabel}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Incident Location & Description */}
-            <div className="space-y-3">
-              <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase">
-                  <MapPin className="w-4 h-4 text-rose-500" />
-                  <span>Địa chỉ sự cố</span>
-                </div>
-                <div className="text-sm font-medium text-slate-800">
-                  {order.location_address || order.address_detail || "Chưa có thông tin địa chỉ"}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase">
-                  <FileText className="w-4 h-4 text-slate-500" />
-                  <span>Mô tả sự cố</span>
-                </div>
-                <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">
-                  {order.issue_description || order.description || "Không có mô tả chi tiết."}
-                </div>
-              </div>
-            </div>
-
-            {/* Bảng kê Báo giá & Chi tiết linh kiện từ KTV */}
+            {/* 4. Quote Breakdown (Bảng kê Báo giá & Chi phí) */}
             {(() => {
               const effectiveTotal = Number(
                 quoteData?.estimated_price ||
-                quoteData?.total_amount ||
-                order.total_amount ||
-                0
+                  quoteData?.total_amount ||
+                  orderDetail.total_amount ||
+                  order.total_amount ||
+                  0
               );
 
               let parsedItems = quoteData?.items || [];
-              let parsedLaborFee = Number(quoteData?.labor_fee || quoteData?.laborCost || 0);
-              let parsedPartsCost = Number(quoteData?.parts_cost || quoteData?.partsCost || 0);
+              let parsedLaborFee = Number(
+                quoteData?.labor_fee || quoteData?.laborCost || 0
+              );
+              let parsedPartsCost = Number(
+                quoteData?.parts_cost || quoteData?.partsCost || 0
+              );
 
               if (parsedItems.length > 0) {
-                const laborItem = parsedItems.find((it: any) =>
-                  it.item_name?.toLowerCase().includes("tiền công") ||
-                  it.item_name?.toLowerCase().includes("công sửa") ||
-                  it.item_name?.toLowerCase().includes("công kỹ thuật")
+                const laborItem = parsedItems.find(
+                  (it: any) =>
+                    it.item_name?.toLowerCase().includes("tiền công") ||
+                    it.item_name?.toLowerCase().includes("công sửa") ||
+                    it.item_name?.toLowerCase().includes("công kỹ thuật")
                 );
                 if (laborItem) {
-                  parsedLaborFee = Number(laborItem.subtotal || laborItem.unit_price || 0);
+                  parsedLaborFee = Number(
+                    laborItem.subtotal || laborItem.unit_price || 0
+                  );
                 }
-                const partsList = parsedItems.filter((it: any) =>
-                  !it.item_name?.toLowerCase().includes("tiền công") &&
-                  !it.item_name?.toLowerCase().includes("công sửa") &&
-                  !it.item_name?.toLowerCase().includes("công kỹ thuật")
+                const partsList = parsedItems.filter(
+                  (it: any) =>
+                    !it.item_name?.toLowerCase().includes("tiền công") &&
+                    !it.item_name?.toLowerCase().includes("công sửa") &&
+                    !it.item_name?.toLowerCase().includes("công kỹ thuật")
                 );
                 parsedPartsCost = partsList.reduce(
-                  (sum: number, it: any) => sum + Number(it.subtotal || it.unit_price * it.quantity || 0),
+                  (sum: number, it: any) =>
+                    sum + Number(it.subtotal || it.unit_price * it.quantity || 0),
                   0
                 );
               } else if (effectiveTotal > 0) {
@@ -360,31 +517,32 @@ export const OrderDetailModal = ({
               );
 
               return (
-                <div className="p-5 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-4">
+                <div className="p-4.5 rounded-2xl border border-amber-200/90 bg-amber-50/40 space-y-4 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900 uppercase">
-                      <Receipt className="w-4 h-4 text-amber-600" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-950 uppercase">
+                      <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800">
+                        <Receipt className="w-3.5 h-3.5" />
+                      </div>
                       <span>Bảng kê Báo giá & Chi phí sửa chữa (KTV đề xuất)</span>
                     </div>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
                       {quoteData?.status === "APPROVED"
                         ? "Khách đã duyệt ✓"
                         : quoteData?.status === "REJECTED"
-                          ? "Khách từ chối ✕"
-                          : "Báo giá KTV"}
+                        ? "Khách từ chối ✕"
+                        : "Báo giá KTV"}
                     </span>
                   </div>
 
                   {parsedItems.length > 0 ? (
                     <div className="space-y-3">
-                      {/* Khối TỔNG HỢP CHI PHÍ THANH TOÁN CHI TIẾT */}
                       <div className="bg-white rounded-xl p-4 border border-amber-200/80 shadow-2xs space-y-2.5 text-xs">
-                        <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider text-amber-900 mb-1">
+                        <div className="font-extrabold text-[11px] uppercase tracking-wider text-amber-950 mb-1">
                           Tổng hợp chi phí thanh toán
                         </div>
 
                         <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 font-medium">
                             <Wrench className="w-3.5 h-3.5 text-amber-600" />
                             Tiền công kỹ thuật viên (Kiểm tra & căn chỉnh):
                           </span>
@@ -394,9 +552,15 @@ export const OrderDetailModal = ({
                         </div>
 
                         <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 font-medium">
                             <Settings className="w-3.5 h-3.5 text-amber-600" />
-                            Tiền phụ tùng thay thế ({partsOnlyList.length > 0 ? `${partsOnlyList.length} loại: ${partsOnlyList.map((p: any) => `${p.item_name} x${p.quantity}`).join(", ")}` : "Không có"}):
+                            Tiền phụ tùng thay thế (
+                            {partsOnlyList.length > 0
+                              ? `${partsOnlyList.length} loại: ${partsOnlyList
+                                  .map((p: any) => `${p.item_name} x${p.quantity}`)
+                                  .join(", ")}`
+                              : "Không có"}
+                            ):
                           </span>
                           <span className="font-bold text-slate-900">
                             {parsedPartsCost.toLocaleString("vi-VN")} đ
@@ -404,39 +568,43 @@ export const OrderDetailModal = ({
                         </div>
 
                         <div className="flex justify-between items-center text-slate-600 pt-0.5">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 font-medium">
                             <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                             Phương thức thanh toán:
                           </span>
                           <span className="font-bold text-slate-800">
-                            {order.payment_method === "Cash" ? "Tiền mặt" : "Chuyển khoản ngân hàng"}
+                            {orderDetail.payment_method === "Cash"
+                              ? "Tiền mặt"
+                              : "Chuyển khoản ngân hàng"}
                           </span>
                         </div>
 
-                        <div className="bg-amber-100/70 p-3 rounded-lg flex justify-between items-center mt-2 border border-amber-200">
+                        <div className="bg-amber-100/80 p-3.5 rounded-xl flex justify-between items-center mt-2 border border-amber-300">
                           <div>
-                            <span className="text-[11px] font-bold uppercase text-amber-950 block">
+                            <span className="text-[11px] font-black uppercase text-amber-950 block">
                               Tổng cộng thanh toán
                             </span>
-                            <span className="text-[10px] text-amber-800 italic">
+                            <span className="text-[10px] text-amber-900 italic font-medium">
                               * Đã gồm tiền công ({parsedLaborFee.toLocaleString("vi-VN")} đ) + linh kiện ({parsedPartsCost.toLocaleString("vi-VN")} đ)
                             </span>
                           </div>
-                          <span className="font-black text-base text-amber-950">
+                          <span className="font-black text-lg text-amber-950">
                             {effectiveTotal.toLocaleString("vi-VN")} đ
                           </span>
                         </div>
                       </div>
 
-                      {(quoteData?.diagnosis_note || order.issue_description) && (
-                        <div className="text-xs text-slate-600 bg-white/80 p-2.5 rounded-xl border border-amber-100">
-                          <span className="font-semibold text-amber-900">Chi tiết công việc sửa chữa & ghi chú KTV:</span>{" "}
-                          {quoteData?.diagnosis_note || order.issue_description}
+                      {(quoteData?.diagnosis_note || orderDetail.issue_description) && (
+                        <div className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-amber-200">
+                          <span className="font-bold text-amber-950">
+                            Chi tiết công việc sửa chữa & ghi chú KTV:
+                          </span>{" "}
+                          {quoteData?.diagnosis_note || orderDetail.issue_description}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="p-4 bg-white/70 rounded-xl border border-dashed border-amber-200 text-center text-xs text-slate-500">
+                    <div className="p-4 bg-white rounded-xl border border-dashed border-amber-200 text-center text-xs text-slate-500">
                       Kỹ thuật viên chưa lập bảng kê chi tiết linh kiện cho đơn này.
                     </div>
                   )}
@@ -444,55 +612,29 @@ export const OrderDetailModal = ({
               );
             })()}
 
-            {/* Photos */}
-            {Array.isArray(order.images) && order.images.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase mb-2">
-                  <ImageIcon className="w-4 h-4 text-slate-500" />
-                  <span>Hình ảnh đính kèm ({order.images.length})</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {order.images.map((img: any, idx: number) => (
-                    <a
-                      key={idx}
-                      href={img.image_url || img}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block aspect-square rounded-xl overflow-hidden border border-slate-200 hover:opacity-90 transition relative group"
-                    >
-                      <img
-                        src={img.image_url || img}
-                        alt={`Ảnh đính kèm ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">
-                        {img.image_type || "Ảnh"}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Technician Assignment */}
-            <div className="p-4 rounded-2xl border border-sky-100 bg-sky-50/50 space-y-3">
+            {/* 5. Technician Assignment Box */}
+            <div className="p-4.5 rounded-2xl border border-sky-200/90 bg-sky-50/50 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
-                  <UserCheck className="w-4 h-4 text-sky-700" />
-                  <span>Kỹ thuật viên phụ trách</span>
+                  <div className="w-6 h-6 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800">
+                    <UserCheck className="w-3.5 h-3.5" />
+                  </div>
+                  <span>Kỹ thuật viên phụ trách & Điều phối</span>
                 </div>
-                {order.technician && (
-                  <span className="text-xs text-sky-800 font-bold">
-                    {order.technician.name || order.technician.full_name} ({order.technician.phone})
+                {orderDetail.technician && (
+                  <span className="text-xs text-sky-900 font-bold bg-white px-2.5 py-1 rounded-lg border border-sky-200">
+                    {orderDetail.technician.name || orderDetail.technician.full_name} (
+                    {orderDetail.technician.phone || "---"})
                   </span>
                 )}
               </div>
 
               <div className="flex gap-2">
                 <select
+                  disabled={isFinished}
                   value={selectedTechId}
                   onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 outline-none"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-semibold focus:ring-2 focus:ring-sky-800 outline-none disabled:opacity-50 disabled:bg-slate-100 cursor-pointer"
                 >
                   {technicians.map((t: any) => (
                     <option key={t.user_id || t.id} value={t.user_id || t.id}>
@@ -505,38 +647,38 @@ export const OrderDetailModal = ({
 
                 <button
                   onClick={handleAssign}
-                  disabled={actionLoading}
-                  className="bg-sky-900 hover:bg-sky-950 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  disabled={actionLoading || isFinished}
+                  className="bg-sky-900 hover:bg-sky-950 text-white px-4.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   <UserCheck className="w-4 h-4" />
-                  <span>{order.technician_id ? "Đổi thợ" : "Phân công"}</span>
+                  <span>{orderDetail.technician_id ? "Đổi thợ" : "Phân công"}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {order.status !== "CANCELLED" && order.status !== "COMPLETED" && (
+          {/* Footer */}
+          <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+            <div>
+              {!isFinished && (
                 <button
                   type="button"
                   onClick={() => setIsCancelModalOpen(true)}
                   className="text-red-600 hover:bg-red-50 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-red-200"
                 >
                   <XCircle className="w-4 h-4" />
-                  <span>Hủy đơn</span>
+                  <span>Hủy đơn này</span>
                 </button>
               )}
             </div>
 
             <div className="flex items-center gap-2.5">
-              {order.status === "REQUESTED" || order.status === "PENDING" ? (
+              {orderDetail.status === "REQUESTED" || orderDetail.status === "PENDING" ? (
                 <button
                   type="button"
                   onClick={() => handleStatusChange("CONFIRMED")}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-500/20 disabled:opacity-50"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-500/20 disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Xác nhận đơn</span>
@@ -546,7 +688,7 @@ export const OrderDetailModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Đóng
               </button>
@@ -554,6 +696,48 @@ export const OrderDetailModal = ({
           </div>
         </div>
       </div>
+
+      {/* Lightbox: Xem ảnh phóng to (Zoom Modal) */}
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-70 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[88vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImageUrl}
+              alt="Ảnh phóng to"
+              className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain border border-white/20"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/images/s1.jpg";
+              }}
+            />
+            
+            <div className="flex items-center gap-3 mt-3">
+              <a
+                href={previewImageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Mở trong tab mới</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl(null)}
+                className="bg-white text-slate-900 text-xs font-bold px-4 py-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+              >
+                Đóng xem ảnh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pop-up Xác nhận Hủy Đơn */}
       {isCancelModalOpen && (
@@ -568,7 +752,7 @@ export const OrderDetailModal = ({
                   Xác nhận hủy đơn hàng
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Đơn #{order.request_code || order.id?.substring(0, 8)} sẽ được chuyển sang trạng thái ĐÃ HỦY.
+                  Đơn #{orderDetail.request_code || orderDetail.id?.substring(0, 8)} sẽ được chuyển sang trạng thái ĐÃ HỦY.
                 </p>
               </div>
             </div>
@@ -584,10 +768,11 @@ export const OrderDetailModal = ({
                     key={preset}
                     type="button"
                     onClick={() => setSelectedPresetReason(preset)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition border cursor-pointer ${selectedPresetReason === preset
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition border cursor-pointer ${
+                      selectedPresetReason === preset
                         ? "bg-red-50 text-red-700 border-red-300 font-bold"
                         : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
+                    }`}
                   >
                     {preset}
                   </button>

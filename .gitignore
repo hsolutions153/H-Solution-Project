@@ -41,3 +41,10 @@ build/
 # Supabase local CLI state
 **/supabase/.branches/
 **/supabase/.temp/
+
+# Locally uploaded user files (device photos, technician ID cards, etc.)
+# These are runtime data, not source code, and can contain personal information.
+backend/uploads/
+
+# Crash dumps from Git Bash / MinGW on Windows
+*.stackdump

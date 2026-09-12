@@ -16,15 +16,24 @@ export default function EditDevicePage({ params }: { params: Promise<{ id: strin
         const { fetchApi } = await import("@/lib/api-client");
         const data = await fetchApi<any>(`/devices/${id}`);
         if (data) {
+          const hasCustomNotes = data.notes && !data.notes.includes(":") && data.notes.length < 50;
+          const brand = data.manufacturer && data.manufacturer !== "Generic" ? data.manufacturer : "";
+          const modelName = data.model_name || data.model || "";
+
+          // Tên gợi nhớ trong form chỉ lấy tên người dùng đã lưu, không tự động gắn brand/model
+          const customNickname = data.nickname || (hasCustomNotes ? data.notes : "");
+
           setDevice({
             id: data.id,
-            nickname: data.name || "Xe lăn thông minh",
-            model: data.model || "Standard Model",
+            nickname: customNickname,
+            deviceType: data.device_type || "",
+            manufacturer: brand || data.manufacturer || "",
+            model: modelName,
             serialNumber: data.serial_number || data.id,
             purchaseDate: data.purchase_date || "",
-            macAddress: data.notes || "AA:BB:CC:DD:EE:FF",
-            image: "/wheelchair.png",
-            isDefault: false,
+            macAddress: data.notes || "",
+            image: data.image_url || "/wheelchair.png",
+            isDefault: Boolean(data.is_default),
           });
         }
       } catch {

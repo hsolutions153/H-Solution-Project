@@ -46,6 +46,13 @@ const MONTHS = [
   "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
 ];
 
+function slotDateTime(date: Date, slotId: string) {
+  const [hours, minutes] = slotId.split(":").map(Number);
+  const result = new Date(date);
+  result.setHours(hours || 0, minutes || 0, 0, 0);
+  return result;
+}
+
 function toDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -94,6 +101,7 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedTime, setSelectedTime] = useState("09:00");
+  const [nowTick, setNowTick] = useState(() => new Date());
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCode, setOrderCode] = useState("");
@@ -108,6 +116,23 @@ export default function BookingPage() {
   const selectedTimeLabel =
     TIME_GROUPS.flatMap((group) => group.slots).find((slot) => slot.id === selectedTime)?.label ?? selectedTime;
   const fullAddress = [streetAddress.trim(), ward.trim(), province.trim()].filter(Boolean).join(", ");
+
+  const isSlotDisabled = (slotId: string) => slotDateTime(selectedDate, slotId) < nowTick;
+  const hasAvailableSlot = TIME_GROUPS.some((group) => group.slots.some((slot) => !isSlotDisabled(slot.id)));
+
+  useEffect(() => {
+    if (step !== "SCHEDULE") return;
+    setNowTick(new Date());
+    const id = setInterval(() => setNowTick(new Date()), 30000);
+    return () => clearInterval(id);
+  }, [step]);
+
+  useEffect(() => {
+    if (!isSlotDisabled(selectedTime)) return;
+    const nextAvailable = TIME_GROUPS.flatMap((group) => group.slots).find((slot) => !isSlotDisabled(slot.id));
+    setSelectedTime(nextAvailable ? nextAvailable.id : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, nowTick]);
 
   useEffect(() => {
     if (step !== "CAMERA") return;
@@ -266,6 +291,10 @@ export default function BookingPage() {
   };
 
   const submitBooking = async () => {
+    if (!selectedTime || isSlotDisabled(selectedTime)) {
+      setError("Khung giờ đã chọn không còn khả dụng, vui lòng chọn lại.");
+      return;
+    }
     setIsSubmitting(true);
     setError("");
     try {
@@ -582,20 +611,27 @@ export default function BookingPage() {
           <div className="booking-time-section">
             <h2>Khung giờ</h2>
             <p>Chọn thời gian nhân viên có thể đến.</p>
+            {!hasAvailableSlot && (
+              <p className="booking-time-empty">Đã hết khung giờ nhận đơn hôm nay, vui lòng chọn ngày khác.</p>
+            )}
             {TIME_GROUPS.map((group) => (
               <div className="booking-time-group" key={group.label}>
                 <span>{group.label}</span>
                 <div className="booking-time-grid">
-                  {group.slots.map((slot) => (
-                    <button
-                      type="button"
-                      key={slot.id}
-                      className={selectedTime === slot.id ? "is-selected" : ""}
-                      onClick={() => setSelectedTime(slot.id)}
-                    >
-                      {slot.label}
-                    </button>
-                  ))}
+                  {group.slots.map((slot) => {
+                    const disabled = isSlotDisabled(slot.id);
+                    return (
+                      <button
+                        type="button"
+                        key={slot.id}
+                        disabled={disabled}
+                        className={selectedTime === slot.id ? "is-selected" : ""}
+                        onClick={() => setSelectedTime(slot.id)}
+                      >
+                        {slot.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -622,7 +658,12 @@ export default function BookingPage() {
           {error && <p className="sos-form-error">{error}</p>}
           <div className="sos-inline-actions">
             <button type="button" className="sos-ghost-btn" onClick={goBack}>Quay lại</button>
-            <button type="button" className="sos-manual-submit" disabled={isSubmitting} onClick={submitBooking}>
+            <button
+              type="button"
+              className="sos-manual-submit"
+              disabled={isSubmitting || !selectedTime || isSlotDisabled(selectedTime)}
+              onClick={submitBooking}
+            >
               {isSubmitting ? "Đang xác nhận..." : "Xác nhận đặt lịch"}
             </button>
           </div>

@@ -13,7 +13,10 @@ import {
   LogOut,
   Plus,
   Circle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+import { useAdmin } from "@/context/AdminContext";
 
 export interface SidebarProps {
   activeTab: string;
@@ -27,6 +30,7 @@ export const Sidebar = ({
   onOpenCreateOrder,
 }: SidebarProps) => {
   const router = useRouter();
+  const { sidebarCollapsed, toggleSidebar } = useAdmin();
 
   const handleLogout = () => {
     import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
@@ -44,35 +48,66 @@ export const Sidebar = ({
   ];
 
   return (
-    <aside className="w-72 bg-white border-r border-slate-200 flex flex-col justify-between p-5 min-h-screen flex-shrink-0">
-      <div>
-        {/* Logo */}
-        <div className="flex items-center gap-3.5 px-2 py-3 mb-5">
-          <div className="w-10 h-10 bg-sky-900 rounded-xl flex items-center justify-center text-white shadow-sm">
-            <Circle className="w-6 h-6 fill-white" />
+    <aside
+      className={`bg-white border-r border-slate-200 flex flex-col justify-between h-screen sticky top-0 flex-shrink-0 z-40 transition-all duration-300 ease-in-out select-none ${
+        sidebarCollapsed ? "w-20 p-3" : "w-72 p-5"
+      }`}
+    >
+      <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        {/* Logo & Toggle Button */}
+        <div
+          className={`flex items-center ${
+            sidebarCollapsed ? "justify-center flex-col gap-2.5 mb-4" : "justify-between mb-5"
+          } px-1 py-2`}
+        >
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 bg-sky-900 rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0">
+              <Circle className="w-6 h-6 fill-white" />
+            </div>
+            {!sidebarCollapsed && (
+              <div className="truncate animate-in fade-in duration-200">
+                <h1 className="font-bold text-sky-950 text-lg leading-tight truncate">
+                  AdminRepair
+                </h1>
+                <span className="text-[10px] text-slate-400 font-bold tracking-wider block">
+                  GLACIER EDITION
+                </span>
+              </div>
+            )}
           </div>
-          <div>
-            <h1 className="font-bold text-sky-950 text-lg leading-tight">
-              AdminRepair
-            </h1>
-            <span className="text-[11px] text-slate-400 font-bold tracking-wider">
-              GLACIER EDITION
-            </span>
-          </div>
+
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="p-2 rounded-xl text-slate-400 hover:text-sky-900 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+            title={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+            aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="w-5 h-5" />
+            ) : (
+              <PanelLeftClose className="w-5 h-5" />
+            )}
+          </button>
         </div>
 
-        {/* Action Button */}
+        {/* Action Button: Tạo đơn mới */}
         <button
           type="button"
           onClick={onOpenCreateOrder}
-          className="w-full bg-sky-900 hover:bg-sky-950 text-white py-3.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer"
+          className={`bg-sky-900 hover:bg-sky-950 text-white font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer ${
+            sidebarCollapsed
+              ? "w-11 h-11 mx-auto rounded-xl p-0"
+              : "w-full py-3.5 px-4 rounded-xl"
+          }`}
+          title="Tạo đơn mới"
         >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span>Tạo đơn mới</span>
+          <Plus className="w-5 h-5 stroke-[2.5] flex-shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Tạo đơn mới</span>}
         </button>
 
         {/* Menu Items */}
-        <nav className="space-y-1.5 text-sm font-semibold">
+        <nav className="space-y-1.5 text-sm font-semibold flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -82,18 +117,27 @@ export const Sidebar = ({
                 key={item.id}
                 type="button"
                 onClick={() => onTabChange(item.id)}
-                className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition text-left cursor-pointer ${
+                className={`w-full flex items-center rounded-xl transition cursor-pointer ${
+                  sidebarCollapsed
+                    ? "justify-center p-3 h-11"
+                    : "gap-3.5 px-3.5 py-3 text-left"
+                } ${
                   isActive
                     ? "text-sky-950 bg-sky-100/80 font-bold shadow-xs"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
+                title={sidebarCollapsed ? item.label : undefined}
               >
                 <Icon
-                  className={`w-5 h-5 ${
+                  className={`w-5 h-5 flex-shrink-0 ${
                     isActive ? "text-sky-900" : "text-slate-400"
                   }`}
                 />
-                <span>{item.label}</span>
+                {!sidebarCollapsed && (
+                  <span className="truncate animate-in fade-in duration-150">
+                    {item.label}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -101,24 +145,34 @@ export const Sidebar = ({
       </div>
 
       {/* Footer */}
-      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold">
+      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold flex-shrink-0">
         <button
           type="button"
           onClick={() => alert("Cài đặt hệ thống đang được phát triển.")}
-          className="w-full flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition text-left cursor-pointer"
+          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-slate-50 cursor-pointer ${
+            sidebarCollapsed
+              ? "justify-center p-3 h-11"
+              : "gap-3.5 px-3.5 py-3 text-left"
+          }`}
+          title={sidebarCollapsed ? "Cài đặt hệ thống" : undefined}
         >
-          <Settings className="w-5 h-5 text-slate-400" />
-          <span>Cài đặt hệ thống</span>
+          <Settings className="w-5 h-5 text-slate-400 flex-shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Cài đặt hệ thống</span>}
         </button>
 
         {/* Logout */}
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-xl transition cursor-pointer"
+          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-red-50 hover:text-red-600 cursor-pointer ${
+            sidebarCollapsed
+              ? "justify-center p-3 h-11"
+              : "gap-3.5 px-3.5 py-3 text-left"
+          }`}
+          title={sidebarCollapsed ? "Đăng xuất" : undefined}
         >
-          <LogOut className="w-5 h-5" />
-          <span>Đăng xuất</span>
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Đăng xuất</span>}
         </button>
       </div>
     </aside>

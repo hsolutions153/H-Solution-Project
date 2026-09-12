@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { TaskTabs } from "./components/TaskTabs";
 import { TaskCard } from "./components/TaskCard";
 import { NewAssignmentModal } from "./components/NewAssignmentModal";
@@ -11,6 +11,7 @@ import { CreateTaskScreen } from "./components/CreateTaskScreen";
 import { MOCK_TASKS } from "@/constants/mockTasks";
 import { Task, TaskStatus, HistoryTask } from "@/types/task";
 import { Plus } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface TaskListScreenProps {
   onCompleteRepair?: (completedTask: HistoryTask) => void;
@@ -20,6 +21,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   onCompleteRepair,
 }) => {
   const [activeTab, setActiveTab] = useState("today");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const savedTasks = sessionStorage.getItem("tasksList");
@@ -280,6 +286,36 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     });
   };
 
+  const filteredTasks = useMemo(() => {
+    switch (activeTab) {
+      case "new":
+        return tasks.filter(
+          (t) => t.status === "WAITING_ACCEPT" || t.status === "PENDING"
+        );
+      case "doing":
+        return tasks.filter(
+          (t) =>
+            t.status === "IN_PROGRESS" ||
+            t.status === "WAITING_MOVE" ||
+            t.status === "MOVING" ||
+            t.status === "ARRIVED" ||
+            t.status === "WAITING_CONFIRM"
+        );
+      case "done":
+        return tasks.filter((t) => t.status === "COMPLETED");
+      case "today":
+      default:
+        return tasks.filter((t) => t.status !== "CANCELLED");
+    }
+  }, [tasks, activeTab]);
+
+  const TAB_TITLES: Record<string, string> = {
+    today: "Công việc hôm nay",
+    new: "Việc mới",
+    doing: "Đang làm",
+    done: "Đã hoàn tất",
+  };
+
   if (currentView === "create") {
     return (
       <CreateTaskScreen
@@ -339,29 +375,52 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       <TaskTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <h1 className="text-sm font-bold text-slate-900 mb-3 px-4 mt-2">
-        Công việc hôm nay ({tasks.length})
+        {TAB_TITLES[activeTab] || TAB_TITLES.today} ({filteredTasks.length})
       </h1>
 
       <div className="space-y-3 px-4">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onClick={() => handleCardClick(task)}
-            onDetailClick={handleOpenDetail}
-          />
-        ))}
+        {filteredTasks.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-xs font-medium">
+            Không có công việc nào trong mục này
+          </div>
+        ) : (
+          filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onClick={() => handleCardClick(task)}
+              onDetailClick={handleOpenDetail}
+            />
+          ))
+        )}
       </div>
 
-      <button
-        onClick={() => {
-          sessionStorage.setItem("currentView", "create");
-          setCurrentView("create");
-        }}
-        className="fixed bottom-20 right-197.5 w-12 h-12 bg-sky-700 hover:bg-sky-800 rounded-2xl shadow-xl flex items-center justify-center z-30 transition-all cursor-pointer active:scale-95"
-      >
-        <Plus className="w-6 h-6 text-sky-200" strokeWidth={2.5} />
-      </button>
+      {isClient && typeof document !== "undefined" && document.getElementById("fab-container") ? (
+        createPortal(
+          <button
+            onClick={() => {
+              sessionStorage.setItem("currentView", "create");
+              setCurrentView("create");
+            }}
+            className="w-12 h-12 bg-sky-700 hover:bg-sky-800 rounded-2xl shadow-xl flex items-center justify-center transition-all cursor-pointer active:scale-95 text-sky-200"
+            title="Tạo công việc mới"
+          >
+            <Plus className="w-6 h-6 text-sky-200" strokeWidth={2.5} />
+          </button>,
+          document.getElementById("fab-container")!
+        )
+      ) : (
+        <button
+          onClick={() => {
+            sessionStorage.setItem("currentView", "create");
+            setCurrentView("create");
+          }}
+          className="absolute bottom-20 right-4 w-12 h-12 bg-sky-700 hover:bg-sky-800 rounded-2xl shadow-xl flex items-center justify-center z-30 transition-all cursor-pointer active:scale-95 text-sky-200"
+          title="Tạo công việc mới"
+        >
+          <Plus className="w-6 h-6 text-sky-200" strokeWidth={2.5} />
+        </button>
+      )}
 
       <NewAssignmentModal
         isOpen={isModalOpen}
