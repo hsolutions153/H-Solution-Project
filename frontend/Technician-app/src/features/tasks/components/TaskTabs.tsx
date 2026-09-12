@@ -21,7 +21,7 @@ export const TaskTabs = ({ activeTab, setActiveTab }: TaskTabsProps) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 ${
+            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 whitespace-nowrap ${
               isActive
                 ? 'border-sky-700 text-sky-800 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'

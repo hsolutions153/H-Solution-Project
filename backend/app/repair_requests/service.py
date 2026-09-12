@@ -2,9 +2,11 @@ import secrets
 import uuid
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+VN_TZ = timezone(timedelta(hours=7))
 
 from fastapi import UploadFile
 
@@ -341,6 +343,37 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
     return reassigned_count
 
 
+def _validate_booking_schedule(booking_date: str | None, booking_slot: str | None):
+    if not booking_date:
+        return
+
+    now_vn = datetime.now(VN_TZ)
+    date_map = {
+        "TODAY": now_vn.date(),
+        "TOMORROW": now_vn.date() + timedelta(days=1),
+    }
+    try:
+        booking_day = date_map.get(booking_date) or datetime.strptime(booking_date, "%Y-%m-%d").date()
+    except ValueError:
+        # Unrecognized format: leave it to be stored as a free-text note, not our job to block it here.
+        return
+
+    slot_time = None
+    if booking_slot:
+        try:
+            slot_time = datetime.strptime(booking_slot, "%H:%M").time()
+        except ValueError:
+            slot_time = None
+
+    # Without a specific slot, only reject when the whole day has already passed.
+    scheduled_at = datetime.combine(booking_day, slot_time or time(23, 59), tzinfo=VN_TZ)
+    if scheduled_at < now_vn:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message="Thời gian đặt lịch đã ở trong quá khứ, vui lòng chọn lại ngày/giờ khác",
+        )
+
+
 def create_request(current_user: dict, data):
     if not _is_role(current_user, CUSTOMER_ROLE_CODE):
         raise AppException(ErrorCode.FORBIDDEN)
@@ -372,6 +405,7 @@ def create_request(current_user: dict, data):
 
     booking_date = payload.get("booking_date") or payload.get("appointment_date")
     booking_slot = payload.get("booking_slot") or payload.get("appointment_slot")
+    _validate_booking_schedule(booking_date, booking_slot)
     if booking_date or booking_slot:
         date_str = "Hôm nay" if booking_date == "TODAY" else ("Ngày mai" if booking_date == "TOMORROW" else (booking_date or ""))
         slot_str = booking_slot or ""

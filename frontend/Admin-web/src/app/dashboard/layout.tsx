@@ -39,7 +39,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
@@ -48,15 +48,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Sidebar with dynamic active tab */}
+      {/* Sidebar with dynamic active tab (Fixed & Collapsible) */}
       <Sidebar
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as AdminTab)}
         onOpenCreateOrder={openCreateOrder}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Content Area (Scrolls independently) */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Header title={TAB_TITLES[activeTab] || "Bảng điều khiển"} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>

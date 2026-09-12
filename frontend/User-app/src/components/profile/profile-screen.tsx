@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import { VIETNAM_PHONE_PATTERN } from "@/utils/auth-validation";
 export type UserProfile = {
   id: string;
   name: string;
@@ -169,8 +170,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
     setNotice(null);
+
+    const phone = profile.phone.trim();
+    if (phone && !VIETNAM_PHONE_PATTERN.test(phone)) {
+      setNotice({ type: "error", message: "Số điện thoại không đúng định dạng (VD: 0912345678)." });
+      return;
+    }
+
+    setIsSaving(true);
     try {
       const saved = await saveChanges({
         name: profile.name,

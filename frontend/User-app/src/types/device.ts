@@ -1,6 +1,8 @@
 export interface Device {
   id: string;
   nickname: string;
+  deviceType?: string;
+  manufacturer?: string;
   model: string;
   serialNumber: string;
   purchaseDate?: string;

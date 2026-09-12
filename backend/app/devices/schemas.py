@@ -13,6 +13,7 @@ class DeviceCreate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=1000)
     purchase_date: date | None = None
+    is_default: bool | None = None
 
 
 class DeviceUpdate(BaseModel):
@@ -24,6 +25,11 @@ class DeviceUpdate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=1000)
     purchase_date: date | None = None
+    is_default: bool | None = None
+
+
+class DeviceImageResponse(BaseModel):
+    image_url: str
 
 
 class DeviceResponse(BaseModel):
@@ -37,6 +43,7 @@ class DeviceResponse(BaseModel):
     image_url: str | None = None
     notes: str | None = None
     purchase_date: date | None = None
+    is_default: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

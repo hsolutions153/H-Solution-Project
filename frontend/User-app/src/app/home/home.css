@@ -4554,6 +4554,21 @@
   box-shadow: 0 4px 12px rgba(8, 125, 173, 0.2);
 }
 
+.booking-time-grid button:disabled {
+  border-color: #edf1f4;
+  background: #f4f6f8;
+  color: #b1bcc4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.booking-time-empty {
+  margin: 4px 0 10px;
+  color: #b3541e;
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .booking-summary {
   display: flex;
   gap: 12px;

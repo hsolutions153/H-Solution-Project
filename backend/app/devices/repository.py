@@ -42,6 +42,13 @@ def insert_device(data: dict):
     return response.data[0] if response and response.data else None
 
 
+def clear_default_device(customer_id: str, exclude_device_id: str | None = None):
+    query = supabase.table(DEVICES_TABLE).update({"is_default": False}).eq("customer_id", customer_id).eq("is_default", True)
+    if exclude_device_id:
+        query = query.neq("id", exclude_device_id)
+    query.execute()
+
+
 def update_device_in_db(device_id: str, data: dict):
     response = supabase.table(DEVICES_TABLE).update(data).eq("id", device_id).execute()
     return response.data[0] if response and response.data else None

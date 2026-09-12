@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
-from app.devices.schemas import DeviceCreate, DeviceResponse, DeviceUpdate
+from app.devices.schemas import DeviceCreate, DeviceImageResponse, DeviceResponse, DeviceUpdate
 from app.devices.service import (
     create_device,
     delete_device,
@@ -9,9 +9,18 @@ from app.devices.service import (
     fetch_device_by_id,
     fetch_devices_by_customer,
     update_device,
+    upload_device_image,
 )
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
+
+
+@router.post("/images", response_model=DeviceImageResponse, status_code=status.HTTP_201_CREATED)
+def upload_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return {"image_url": upload_device_image(file, current_user)}
 
 
 @router.get("", response_model=list[DeviceResponse])

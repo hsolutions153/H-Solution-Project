@@ -43,6 +43,12 @@
 .device-form small { display: block; margin-top: 6px; color: #8a9a9f; font-size: 10px; }
 .device-upload { width: 100%; min-height: 110px; margin: 2px 0 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1.5px dashed #bfd9e0; border-radius: 12px; color: #26809a; background: #f9fcfd; cursor: pointer; }
 .device-upload span { color: #91a0a5; font-size: 10px; }
+.device-upload-preview { position: relative; width: 80px; height: 80px; overflow: hidden; border-radius: 10px; background: #edf3f5; }
+.device-upload-preview img { object-fit: cover; }
+.device-file-input { display: none; }
+.device-upload-spinner { animation: device-upload-spin 800ms linear infinite; }
+.device-upload:disabled { cursor: not-allowed; opacity: .75; }
+@keyframes device-upload-spin { to { transform: rotate(360deg); } }
 .device-save-button { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; color: white; background: linear-gradient(135deg, #0783a7, #056487); font-weight: 800; cursor: pointer; }
 .device-save-button:disabled { opacity: .6; }
 .round-plus { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; line-height: 1; }
@@ -64,10 +70,18 @@
 .device-detail-back { margin-bottom: 18px; }
 .device-detail-back a { display: inline-flex; align-items: center; gap: 7px; color: #55737e; text-decoration: none; font-size: 12px; font-weight: 700; }
 .device-hero { position: relative; height: clamp(240px, 36vw, 390px); overflow: hidden; border-radius: 22px; background: linear-gradient(140deg, #f7faf9, #e7f0f1); }
-.device-hero img { object-fit: contain; padding: 24px; mix-blend-mode: multiply; }
-.device-detail-actions { display: flex; gap: 10px; margin: 16px 0; }
-.device-detail-actions .device-primary-button { flex: 1; }
+.device-detail-actions { display: flex; gap: 10px; margin: 16px 0; align-items: center; flex-wrap: wrap; }
+.device-detail-actions .device-primary-button { flex: 1; min-width: 140px; }
+.device-danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 0 18px; border: 1px solid #f3d4d7; border-radius: 10px; color: #c0394b; background: #fff5f6; font-size: 12px; font-weight: 800; cursor: pointer; transition: background .15s, border-color .15s; }
+.device-danger-button:hover { background: #ffebee; border-color: #e5a4ab; }
+.device-danger-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .device-default-note { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; color: #0b7795; font-size: 11px; font-weight: 800; }
+.device-upload-container { margin-bottom: 22px; }
+.device-upload-label { display: block; margin-bottom: 7px; color: #315765; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.device-upload-active { display: flex; align-items: center; gap: 14px; }
+.device-upload-info { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.device-upload-info strong { font-size: 13px; color: #196177; }
+.device-upload-info span { font-size: 11px; color: #799198; margin-top: 2px; }
 .device-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0 32px; }
 .device-stats > div { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid #e0eaed; border-radius: 13px; color: #15809c; background: white; }
 .device-stats span { min-width: 0; }

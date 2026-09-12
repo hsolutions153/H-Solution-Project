@@ -16,16 +16,36 @@ export default function DevicesPage() {
       const { fetchApi } = await import("@/lib/api-client");
       const list = await fetchApi<any[]>("/devices");
       if (Array.isArray(list) && list.length > 0) {
-        const formatted: Device[] = list.map((item) => ({
-          id: item.id,
-          nickname: item.name || item.nickname || "Xe lăn thông minh",
-          model: item.model || "Standard Model",
-          serialNumber: item.serial_number || item.serialNumber || item.id,
-          purchaseDate: item.purchase_date || item.purchaseDate || "",
-          macAddress: item.notes || "AA:BB:CC:DD:EE:FF",
-          image: "/wheelchair.png",
-          isDefault: false,
-        }));
+        const formatted: Device[] = list.map((item) => {
+          const hasCustomNotes = item.notes && !item.notes.includes(":") && item.notes.length < 50;
+          const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
+          const modelName = item.model_name || item.model || "";
+
+          // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
+          let displayName = item.nickname || item.name || (hasCustomNotes ? item.notes : "");
+          if (!displayName) {
+            displayName = item.device_type === "SCOOTER" ? "Xe scooter điện" : "Xe lăn điện";
+          }
+
+          let formattedDate = item.purchase_date || item.purchaseDate || "";
+          if (formattedDate && /^\d{4}-\d{2}-\d{2}$/.test(formattedDate)) {
+            const [y, m, d] = formattedDate.split("-");
+            formattedDate = `${d}/${m}/${y}`;
+          }
+
+          return {
+            id: item.id,
+            nickname: displayName,
+            deviceType: item.device_type || "WHEELCHAIR",
+            manufacturer: item.manufacturer || "",
+            model: modelName || (item.device_type === "SCOOTER" ? "Scooter" : "Xe lăn"),
+            serialNumber: item.serial_number || item.serialNumber || item.id,
+            purchaseDate: formattedDate,
+            macAddress: item.notes || "AA:BB:CC:DD:EE:FF",
+            image: item.image_url || "/wheelchair.png",
+            isDefault: Boolean(item.is_default),
+          };
+        });
         setDevices(formatted);
       } else {
         setDevices([
@@ -65,9 +85,17 @@ export default function DevicesPage() {
   }, [loadDevices]);
 
   const makeDefault = async (id: string) => {
-    setDevices((current) =>
-      current.map((d) => ({ ...d, isDefault: d.id === id })),
-    );
+    const previous = devices;
+    setDevices((current) => current.map((d) => ({ ...d, isDefault: d.id === id })));
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi<any>(`/devices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_default: true }),
+      });
+    } catch {
+      setDevices(previous);
+    }
   };
 
   return (
@@ -90,7 +118,7 @@ export default function DevicesPage() {
               <article className="device-card" key={device.id}>
                 <Link href={`/home/device/${device.id}`} className="device-image-wrap">
                   {device.isDefault && <span className="device-badge">Mặc định</span>}
-                  <Image src={device.image} alt={device.nickname} fill sizes="(max-width: 720px) 100vw, 380px" className="device-image" />
+                  <Image src={device.image} alt={device.nickname} fill sizes="(max-width: 720px) 100vw, 380px" className="device-image" unoptimized />
                 </Link>
                 <div className="device-card-body">
                   <div className="device-card-title-row">
