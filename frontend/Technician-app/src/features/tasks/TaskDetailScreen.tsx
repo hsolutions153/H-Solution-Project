@@ -115,6 +115,7 @@ export const TaskDetailScreen = ({
       return (
         <QuoteStatusScreen
           task={task}
+          isApproved={task.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
           onBack={() => setSubStep("QUOTE")}
           onViewDetailQuote={() => setSubStep("QUOTE")}
           onContinueRepair={() => setSubStep("REPAIR")}
@@ -161,7 +162,6 @@ export const TaskDetailScreen = ({
 
   return (
     <div className="p-4 pb-28 space-y-4">
-      {/* Hàng 1: Nút Quay lại - Trạng thái - ID */}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -181,7 +181,6 @@ export const TaskDetailScreen = ({
         </span>
       </div>
 
-      {/* Khách hàng */}
       <div className="bg-white rounded-2xl p-4 shadow-xs border border-gray-100 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -209,8 +208,7 @@ export const TaskDetailScreen = ({
         </a>
       </div>
 
-      {/* Khung giờ đặt lịch */}
-      <div className="bg-gradient-to-r from-sky-50 to-blue-50/60 rounded-2xl p-3.5 border border-sky-100 flex items-center gap-3">
+      <div className="bg-linear-to-r from-sky-50 to-blue-50/60 rounded-2xl p-3.5 border border-sky-100 flex items-center gap-3">
         <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-sky-800 shadow-xs border border-sky-100 shrink-0">
           <Calendar className="w-4 h-4" />
         </div>
@@ -227,7 +225,6 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      {/* Thiết bị */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -283,13 +280,12 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      {/* Bản đồ */}
       <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 relative shadow-xs">
         <div className="relative h-36 w-full overflow-hidden bg-slate-100">
           <div className="absolute inset-0 w-full h-full pointer-events-none scale-105">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1862.2937046228108!2d105.82894155000001!3d21.00916975!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ac8008dbd905%3A0x100650bea845689e!2zMTIgUC4gQ2jDuWEgQuG7mWMsIEtpbSBMacOqbiwgSMOgIE7hu5lpLCBWaeG7h3QgTmFt!5e0!3m2!1svi!2s!4v1784825224350!5m2!1svi!2s"
-              className="w-full h-[150%] -top-[25%] relative border-0"
+              className="w-full h-[150%] top-[-25%] relative border-0"
               loading="lazy"
               referrerPolicy="strict-origin-when-cross-origin"
             />
@@ -320,7 +316,6 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      {/* Nút hành động tương ứng theo từng loại đơn và trạng thái */}
       {!task.isEmergency ? (
         // ==================== ĐƠN ĐẶT LỊCH HẸN TRƯỚC ====================
         task.status === "WAITING_ACCEPT" ? (

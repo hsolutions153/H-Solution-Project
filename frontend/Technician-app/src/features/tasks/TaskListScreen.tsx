@@ -97,9 +97,27 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             } else if (item.status === "ACCEPTED") {
               status = "PENDING";
               statusText = "Chưa bắt đầu";
-            } else if (item.status === "EN_ROUTE" || item.status === "ARRIVED" || item.status === "DIAGNOSING" || item.status === "REPAIRING") {
+            } else if (item.status === "EN_ROUTE") {
+              status = "MOVING";
+              statusText = "Đang di chuyển";
+            } else if (item.status === "ARRIVED") {
+              status = "ARRIVED";
+              statusText = "Đã đến nơi";
+            } else if (item.status === "DIAGNOSING") {
               status = "IN_PROGRESS";
-              statusText = "Đang xử lý";
+              statusText = "Đang chẩn đoán";
+            } else if (item.status === "WAITING_FOR_APPROVAL" || item.status === "ESTIMATE_SUBMITTED") {
+              status = "IN_PROGRESS";
+              statusText = "Chờ khách duyệt báo giá";
+            } else if (item.status === "ESTIMATE_APPROVED") {
+              status = "IN_PROGRESS";
+              statusText = "Báo giá đã duyệt";
+            } else if (item.status === "ESTIMATE_REJECTED") {
+              status = "IN_PROGRESS";
+              statusText = "Báo giá bị từ chối";
+            } else if (item.status === "REPAIRING") {
+              status = "IN_PROGRESS";
+              statusText = "Đang sửa chữa";
             } else if (item.status === "COMPLETED") {
               status = "COMPLETED";
               statusText = "Hoàn thành";

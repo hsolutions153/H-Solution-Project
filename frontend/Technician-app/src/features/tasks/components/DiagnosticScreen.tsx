@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Task } from "@/types/task";
-import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X, FileText, Sparkles } from "lucide-react";
+import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X, FileText, Sparkles, AlertCircle } from "lucide-react";
 
 interface DiagnosticScreenProps {
   task: Task;
@@ -17,6 +17,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
   onSubmitDiagnostic,
 }) => {
   const [note, setNote] = useState("");
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [repairType, setRepairType] = useState<"FIX_NOW" | "BRING_TO_WORKSHOP" | "CANT_FIX">("FIX_NOW");
   
   // Quản lý danh sách ảnh (khởi tạo có sẵn 1 ảnh mẫu)
@@ -42,7 +43,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
 
   return (
     <div className="p-4 pb-28 space-y-4 relative">
-      {/* Input ẩn cho Camera trực tiếp */}
       <input
         type="file"
         id="cameraInput"
@@ -52,7 +52,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* Input ẩn cho Thư viện ảnh */}
       <input
         type="file"
         id="galleryInput"
@@ -61,7 +60,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* Tiêu đề trang */}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -72,7 +70,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </button>
       </div>
 
-      {/* Thông tin đơn hàng */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
         <p className="text-[10px] text-slate-400 font-medium">
           MA ĐƠN: {task.code || `#JOB-2904`}
@@ -85,11 +82,10 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </p>
       </div>
 
-      {/* Nội dung chẩn đoán */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800 flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800 shrink-0">
               <FileText className="w-4 h-4" />
             </div>
             <div>
@@ -108,9 +104,11 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => setNote("")}
-                className="text-[10px] text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 hover:bg-red-50 rounded cursor-pointer transition"
-                title="Xóa nội dung"
+                onClick={() => {
+                  setNote("");
+                  setNoteError(null);
+                }}
+                className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
               >
                 Xóa
               </button>
@@ -118,18 +116,31 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           )}
         </div>
 
-        {/* Textarea hiển thị độ tương phản cao, chữ rõ nét */}
         <div className="relative">
           <textarea
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value);
+              if (noteError && e.target.value.trim()) {
+                setNoteError(null);
+              }
+            }}
             placeholder="Nhập chi tiết lỗi kiểm tra được và các vấn đề phát sinh (ví dụ: Bình ắc quy bị chai phồng, sụt áp nhanh; cần thay cụm bình mới)..."
             rows={4}
-            className="w-full p-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-sky-800 focus:bg-white focus:ring-3 focus:ring-sky-800/10 transition-all resize-none leading-relaxed"
+            className={`w-full p-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 ${
+              noteError
+                ? "border-red-500 bg-red-50/20"
+                : "border-slate-200 focus:border-sky-800 focus:bg-white"
+            } rounded-xl focus:outline-none focus:ring-3 focus:ring-sky-800/10 transition-all resize-none leading-relaxed`}
           />
+          {noteError && (
+            <p className="text-[11px] text-red-600 font-semibold mt-1 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {noteError}
+            </p>
+          )}
         </div>
 
-        {/* Gợi ý chẩn đoán nhanh */}
         <div className="space-y-1.5 pt-0.5">
           <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -164,11 +175,9 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </div>
       </div>
 
-      {/* Đánh giá khả năng sửa chữa */}
       <div className="space-y-2">
         <p className="text-xs font-bold text-slate-800">Đánh giá khả năng sửa chữa</p>
 
-        {/* Option 1 */}
         <div
           onClick={() => setRepairType("FIX_NOW")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
@@ -183,7 +192,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           <span className="text-xs font-bold">Sửa được ngay</span>
         </div>
 
-        {/* Option 2 */}
         <div
           onClick={() => setRepairType("BRING_TO_WORKSHOP")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
@@ -198,7 +206,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           <span className="text-xs font-bold">Cần mang về xưởng</span>
         </div>
 
-        {/* Option 3 */}
         <div
           onClick={() => setRepairType("CANT_FIX")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
@@ -214,14 +221,12 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </div>
       </div>
 
-      {/* Chụp ảnh hiện trạng */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-800">Chụp ảnh hiện trạng</p>
             <p className="text-[10px] text-slate-400">Trước khi thực hiện sửa chữa</p>
           </div>
-          {/* Nút chụp ảnh nhanh bằng Camera trực tiếp */}
           <button
             type="button"
             onClick={() => document.getElementById("cameraInput")?.click()}
@@ -232,7 +237,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           </button>
         </div>
 
-        {/* Danh sách ảnh hiển thị */}
         <div className="grid grid-cols-2 gap-2">
           {images.map((imgSrc, index) => (
             <div key={index} className="rounded-xl overflow-hidden h-20 border border-gray-100 relative group">
@@ -254,7 +258,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
             </div>
           ))}
 
-          {/* Ô Thêm ảnh: Bấm vào sẽ mở Popup lựa chọn */}
           <div
             onClick={() => setShowImagePickerModal(true)}
             className="rounded-xl border-2 border-dashed border-gray-200 h-20 flex flex-col items-center justify-center text-slate-400 hover:border-sky-800 hover:text-sky-800 cursor-pointer transition bg-gray-50/50"
@@ -265,7 +268,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </div>
       </div>
 
-      {/* Ghi chú phụ */}
       <div className="bg-slate-100 rounded-2xl p-3 flex items-start gap-2 text-slate-600">
         <Info className="w-4 h-4 text-sky-800 shrink-0 mt-0.5" />
         <p className="text-[11px] leading-relaxed">
@@ -273,7 +275,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </p>
       </div>
 
-      {/* Buttons hành động dưới cùng */}
       <div className="flex gap-2 pt-2">
         <button
           type="button"
@@ -284,14 +285,19 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => onSubmitDiagnostic({ note, repairType, images })}
+          onClick={() => {
+            if (!note.trim()) {
+              setNoteError("Vui lòng nhập nội dung chẩn đoán trước khi tiếp tục.");
+              return;
+            }
+            onSubmitDiagnostic({ note, repairType, images });
+          }}
           className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm"
         >
           Lưu & Tiếp tục báo giá ➔
         </button>
       </div>
 
-      {/* POPUP TÙY CHỌN KHI BẤM "+ THÊM ẢNH" */}
       {showImagePickerModal && (
         <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 animate-fade-in">
           <div className="bg-white w-full max-w-xs rounded-3xl p-4 shadow-xl space-y-3 animate-slide-up">
@@ -307,7 +313,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
             </div>
 
             <div className="space-y-2">
-              {/* Lựa chọn 1: Bật Camera */}
               <button
                 type="button"
                 onClick={() => {
@@ -320,7 +325,6 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
                 Bật Camera chụp trực tiếp
               </button>
 
-              {/* Lựa chọn 2: Chọn từ Thư viện */}
               <button
                 type="button"
                 onClick={() => {
