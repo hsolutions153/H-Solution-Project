@@ -15,16 +15,24 @@ interface TaskCardProps {
 }
 
 export const TaskCard = ({ task, onClick, onDetailClick }: TaskCardProps) => {
-  const statusStyles = {
+  const statusStyles: Record<string, string> = {
     WAITING_ACCEPT: "bg-amber-100 text-amber-700",
     IN_PROGRESS: "bg-sky-200 text-sky-800",
     PENDING: "bg-gray-200 text-slate-600",
     WAITING_CONFIRM: "bg-gray-200 text-slate-600",
+    ASSIGNED: "bg-amber-100 text-amber-700",
+    ACCEPTED: "bg-blue-100 text-blue-700",
+    EN_ROUTE: "bg-blue-100 text-blue-700",
+    ARRIVED: "bg-purple-100 text-purple-700",
+    DIAGNOSING: "bg-indigo-100 text-indigo-700",
+    WAITING_FOR_APPROVAL: "bg-amber-100 text-amber-700",
+    ESTIMATE_APPROVED: "bg-emerald-100 text-emerald-700",
+    ESTIMATE_REJECTED: "bg-red-100 text-red-700",
+    REPAIRING: "bg-sky-200 text-sky-800",
     COMPLETED: "bg-emerald-100 text-emerald-700",
     CANCELLED: "bg-red-100 text-red-700",
     WAITING_MOVE: "bg-amber-100 text-amber-700",
     MOVING: "bg-blue-100 text-blue-700",
-    ARRIVED: "bg-purple-100 text-purple-700",
   };
 
   const isHighlighted = task.status === "IN_PROGRESS";

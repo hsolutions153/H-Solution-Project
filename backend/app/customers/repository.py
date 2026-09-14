@@ -53,3 +53,25 @@ def update_customer(customer_id: str, role_id: str, data: dict):
 def delete_customer(customer_id: str, role_id: str):
     response = supabase.table(USERS_TABLE).delete().eq("id", customer_id).eq("role_id", role_id).execute()
     return response.data[0] if response and response.data else None
+
+
+def get_device_counts_by_customer_ids(customer_ids: list[str]) -> dict[str, int]:
+    if not customer_ids:
+        return {}
+    try:
+        response = (
+            supabase.table("customer_devices")
+            .select("customer_id")
+            .in_("customer_id", customer_ids)
+            .execute()
+        )
+        counts: dict[str, int] = {}
+        if response and response.data:
+            for d in response.data:
+                cid = d.get("customer_id")
+                if cid:
+                    counts[cid] = counts.get(cid, 0) + 1
+        return counts
+    except Exception:
+        return {}
+

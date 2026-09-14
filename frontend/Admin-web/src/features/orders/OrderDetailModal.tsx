@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   X,
   User,
@@ -13,24 +14,113 @@ import {
   CheckCircle2,
   XCircle,
   UserCheck,
-  Calendar,
   Image as ImageIcon,
-  DollarSign,
   FileText,
   Receipt,
   Settings,
   CreditCard,
   ZoomIn,
   ExternalLink,
-  ShieldCheck,
-  Tag,
-  Hash,
 } from "lucide-react";
 import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 
+export interface OrderItem {
+  id?: string;
+  item_name?: string;
+  item_type?: string;
+  part_id?: string;
+  quantity?: number;
+  unit_price?: number;
+  subtotal?: number;
+}
+
+export interface QuoteDetail {
+  id?: string;
+  estimated_price?: number;
+  total_amount?: number;
+  labor_fee?: number;
+  laborCost?: number;
+  parts_cost?: number;
+  partsCost?: number;
+  notes?: string;
+  diagnosis_note?: string;
+  status?: string;
+  items?: OrderItem[];
+}
+
+export interface TechnicianItem {
+  id?: string;
+  user_id?: string;
+  full_name?: string;
+  name?: string;
+  phone?: string;
+  specialization?: string;
+  is_online?: boolean;
+  user?: {
+    full_name?: string;
+  };
+}
+
+export interface OrderImageItem {
+  id?: string;
+  url?: string;
+  image_url?: string;
+  imageUrl?: string;
+  stage?: string;
+  image_type?: string;
+  imageType?: string;
+  description?: string;
+}
+
+export interface OrderCustomer {
+  full_name?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface OrderDevice {
+  model_name?: string;
+  device_type?: string;
+  manufacturer?: string;
+  serial_number?: string;
+}
+
+export interface OrderTechnician {
+  name?: string;
+  full_name?: string;
+  phone?: string;
+}
+
+export interface OrderRecord {
+  id?: string;
+  request_code?: string;
+  code?: string;
+  customer?: OrderCustomer;
+  customer_name?: string;
+  customer_phone?: string;
+  phone?: string;
+  device?: OrderDevice | string;
+  location_address?: string;
+  address_detail?: string;
+  issue_type?: string;
+  issue_description?: string;
+  description?: string;
+  status?: string;
+  is_sos?: boolean;
+  total_amount?: number;
+  actual_cost?: number;
+  technician_id?: string;
+  technician?: OrderTechnician;
+  created_at?: string;
+  images?: (OrderImageItem | string)[];
+  quote?: QuoteDetail;
+  payment_method?: string;
+  [key: string]: unknown;
+}
+
 export interface OrderDetailProps {
-  order: any;
-  technicians: any[];
+  order: OrderRecord;
+  technicians: TechnicianItem[];
   onClose: () => void;
   onRefresh: () => void;
   onToast: (msg: string) => void;
@@ -43,8 +133,8 @@ export const OrderDetailModal = ({
   onRefresh,
   onToast,
 }: OrderDetailProps) => {
-  const [orderDetail, setOrderDetail] = useState<any>(order);
-  const [images, setImages] = useState<any[]>(
+  const [orderDetail, setOrderDetail] = useState<OrderRecord>(order);
+  const [images, setImages] = useState<(OrderImageItem | string)[]>(
     Array.isArray(order?.images) ? order.images : []
   );
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -55,28 +145,26 @@ export const OrderDetailModal = ({
   const [selectedPresetReason, setSelectedPresetReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customReasonNote, setCustomReasonNote] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [quoteData, setQuoteData] = useState<any>(order?.quote || null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [quoteData, setQuoteData] = useState<QuoteDetail | null>(order?.quote || null);
 
   // Fetch full details (images, quote, device, customer) on mount
   useEffect(() => {
     let isMounted = true;
     if (order?.id) {
-      setLoadingDetail(true);
       import("@/lib/api-client")
         .then(async ({ fetchApi }) => {
           const [orderRes, quoteRes] = await Promise.allSettled([
-            fetchApi<any>(`/orders/${order.id}`).catch(() =>
-              fetchApi<any>(`/repair-requests/${order.id}`)
+            fetchApi<OrderRecord>(`/orders/${order.id}`).catch(() =>
+              fetchApi<OrderRecord>(`/repair-requests/${order.id}`)
             ),
-            fetchApi<any[]>(`/repair-requests/${order.id}/quotes`),
+            fetchApi<QuoteDetail[]>(`/repair-requests/${order.id}/quotes`),
           ]);
 
           if (!isMounted) return;
 
           if (orderRes.status === "fulfilled" && orderRes.value) {
             const data = orderRes.value;
-            setOrderDetail((prev: any) => ({ ...prev, ...data }));
+            setOrderDetail((prev: OrderRecord) => ({ ...prev, ...data }));
             if (Array.isArray(data.images) && data.images.length > 0) {
               setImages(data.images);
             }
@@ -93,10 +181,7 @@ export const OrderDetailModal = ({
             setQuoteData(quoteRes.value[0]);
           }
         })
-        .catch((err) => console.warn("Error fetching full order detail:", err))
-        .finally(() => {
-          if (isMounted) setLoadingDetail(false);
-        });
+        .catch((err) => console.warn("Error fetching full order detail:", err));
     }
     return () => {
       isMounted = false;
@@ -124,9 +209,9 @@ export const OrderDetailModal = ({
     setIsCancelModalOpen(false);
   };
 
-  const badge = getStatusBadge(orderDetail.status || order.status);
+  const badge = getStatusBadge(orderDetail.status || order.status || "");
   const issueLabel =
-    ISSUE_TYPE_LABELS[orderDetail.issue_type] ||
+    (orderDetail.issue_type ? ISSUE_TYPE_LABELS[orderDetail.issue_type] : undefined) ||
     orderDetail.issue_type ||
     "Sự cố kỹ thuật";
 
@@ -145,8 +230,9 @@ export const OrderDetailModal = ({
       onToast("Phân công kỹ thuật viên thành công!");
       onRefresh();
       onClose();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi phân công kỹ thuật viên");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi phân công kỹ thuật viên";
+      alert(msg);
     } finally {
       setActionLoading(false);
     }
@@ -166,8 +252,9 @@ export const OrderDetailModal = ({
       onToast(`Cập nhật trạng thái sang "${newStatus}" thành công!`);
       onRefresh();
       onClose();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi cập nhật trạng thái");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái";
+      alert(msg);
     } finally {
       setActionLoading(false);
     }
@@ -175,12 +262,10 @@ export const OrderDetailModal = ({
 
   return (
     <>
-      {/* Modal Container */}
       <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
         <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
           
-          {/* Header */}
-          <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white flex justify-between items-start flex-shrink-0">
+          <div className="px-6 py-5 bg-linear-to-r from-slate-900 via-sky-950 to-slate-900 text-white flex justify-between items-start shrink-0">
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="text-[11px] font-black tracking-wider text-sky-300 uppercase bg-sky-900/60 px-2.5 py-0.5 rounded-full border border-sky-400/30">
@@ -215,20 +300,15 @@ export const OrderDetailModal = ({
 
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition cursor-pointer flex-shrink-0"
+              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition cursor-pointer shrink-0"
               title="Đóng modal"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Modal Body */}
           <div className="p-6 space-y-6 overflow-y-auto flex-1 bg-slate-50/40">
-            
-            {/* 1. Customer & Device Information Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Customer Box */}
               <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
@@ -266,7 +346,6 @@ export const OrderDetailModal = ({
                 </div>
               </div>
 
-              {/* Device Box */}
               <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
@@ -280,34 +359,43 @@ export const OrderDetailModal = ({
                   </span>
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="font-extrabold text-slate-900 text-base truncate">
-                    {orderDetail.device?.model_name ||
-                      orderDetail.device?.device_type ||
-                      orderDetail.device ||
-                      "Thiết bị di chuyển"}
-                  </div>
-                  <div className="text-xs text-slate-600 flex items-center gap-1.5">
-                    <span className="text-slate-400 font-medium">Hãng sản xuất:</span>
-                    <span className="font-bold text-slate-800">
-                      {orderDetail.device?.manufacturer || "Chưa xác định"}
-                    </span>
-                  </div>
-                  {orderDetail.device?.serial_number && (
-                    <div className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <span className="text-slate-400 font-medium">Số Sê-ri / ID:</span>
-                      <span className="font-mono font-bold text-slate-700">
-                        {orderDetail.device.serial_number}
-                      </span>
+                {(() => {
+                  const deviceObj =
+                    typeof orderDetail.device === "object" && orderDetail.device !== null
+                      ? orderDetail.device
+                      : null;
+                  const deviceName =
+                    deviceObj?.model_name ||
+                    deviceObj?.device_type ||
+                    (typeof orderDetail.device === "string" ? orderDetail.device : "") ||
+                    "Thiết bị di chuyển";
+
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="font-extrabold text-slate-900 text-base truncate">
+                        {deviceName}
+                      </div>
+                      <div className="text-xs text-slate-600 flex items-center gap-1.5">
+                        <span className="text-slate-400 font-medium">Hãng sản xuất:</span>
+                        <span className="font-bold text-slate-800">
+                          {deviceObj?.manufacturer || "Chưa xác định"}
+                        </span>
+                      </div>
+                      {deviceObj?.serial_number && (
+                        <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                          <span className="text-slate-400 font-medium">Số Sê-ri / ID:</span>
+                          <span className="font-mono font-bold text-slate-700">
+                            {deviceObj.serial_number}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* 2. Incident Location & Description */}
             <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3.5">
-              {/* Location */}
               <div>
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase mb-1">
                   <MapPin className="w-3.5 h-3.5 text-rose-500" />
@@ -320,7 +408,6 @@ export const OrderDetailModal = ({
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase mb-1">
                   <FileText className="w-3.5 h-3.5 text-sky-800" />
@@ -334,7 +421,6 @@ export const OrderDetailModal = ({
               </div>
             </div>
 
-            {/* 3. Photo Gallery (Hình ảnh sự cố & Hiện trường) */}
             <div className="p-4.5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
@@ -348,61 +434,82 @@ export const OrderDetailModal = ({
                 </span>
               </div>
 
-              {images.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1">
-                  {images.map((img: any, idx: number) => {
-                    const imgUrl =
-                      typeof img === "string" ? img : img.image_url || img.url || "";
-                    const imgType =
-                      typeof img === "object" && img.image_type === "AFTER_REPAIR"
-                        ? "Sau sửa"
-                        : "Trước sửa";
+              {(() => {
+                const beforeImages = images.filter(
+                  (img: OrderImageItem | string) =>
+                    typeof img === "string" ||
+                    !("image_type" in img) ||
+                    !img.image_type ||
+                    img.image_type === "BEFORE_REPAIR"
+                );
+                const afterImages = images.filter(
+                  (img: OrderImageItem | string): img is OrderImageItem =>
+                    typeof img === "object" &&
+                    img !== null &&
+                    "image_type" in img &&
+                    img.image_type === "AFTER_REPAIR"
+                );
 
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => setPreviewImageUrl(imgUrl)}
-                        className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-100 cursor-pointer shadow-2xs hover:shadow-md hover:border-sky-400 transition-all"
-                      >
-                        <img
-                          src={imgUrl}
-                          alt={`Ảnh sự cố ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          onError={(e) => {
-                            // Fallback to sample photo if broken URL
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/images/s1.jpg";
-                          }}
-                        />
-
-                        {/* Tag */}
-                        <span className="absolute top-2 left-2 bg-black/65 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                          {imgType}
-                        </span>
-
-                        {/* Zoom Overlay */}
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs">
-                          <ZoomIn className="w-4 h-4" />
-                          <span>Xem ảnh</span>
-                        </div>
+                const renderImageGrid = (imgList: (OrderImageItem | string)[], label: string) => (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-700"></span>
+                      {label} ({imgList.length})
+                    </p>
+                    {imgList.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {imgList.map((img: OrderImageItem | string, idx: number) => {
+                          const imgUrl =
+                            typeof img === "string" ? img : img.image_url || img.url || "";
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => setPreviewImageUrl(imgUrl)}
+                              className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-100 cursor-pointer shadow-2xs hover:shadow-md hover:border-sky-400 transition-all"
+                            >
+                              <Image
+                                src={imgUrl || "/images/s1.jpg"}
+                                alt={`${label} ${idx + 1}`}
+                                fill
+                                unoptimized
+                                className="object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white font-bold text-xs">
+                                <ZoomIn className="w-4 h-4" />
+                                <span>Xem ảnh</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-1 bg-slate-50/50">
-                  <ImageIcon className="w-6 h-6 mx-auto text-slate-300 mb-1" />
-                  <p className="font-semibold text-slate-600">
-                    Không có hình ảnh đính kèm cho đơn này
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    Khách hàng không đính kèm ảnh khi tạo yêu cầu.
-                  </p>
-                </div>
-              )}
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic py-1">
+                        Chưa có ảnh cho mục này.
+                      </p>
+                    )}
+                  </div>
+                );
+
+                if (images.length === 0) {
+                  return (
+                    <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-1 bg-slate-50/50">
+                      <ImageIcon className="w-6 h-6 mx-auto text-slate-300 mb-1" />
+                      <p className="font-semibold text-slate-600">
+                        Không có hình ảnh đính kèm cho đơn này
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4 pt-1">
+                    {renderImageGrid(beforeImages, "Ảnh trước khi sửa (Hiện trạng lỗi)")}
+                    {renderImageGrid(afterImages, "Ảnh sau khi sửa (Kết quả nghiệm thu)")}
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* 4. Quote Breakdown (Bảng kê Báo giá & Chi phí) */}
             {(() => {
               const effectiveTotal = Number(
                 quoteData?.estimated_price ||
@@ -422,7 +529,7 @@ export const OrderDetailModal = ({
 
               if (parsedItems.length > 0) {
                 const laborItem = parsedItems.find(
-                  (it: any) =>
+                  (it: OrderItem) =>
                     it.item_name?.toLowerCase().includes("tiền công") ||
                     it.item_name?.toLowerCase().includes("công sửa") ||
                     it.item_name?.toLowerCase().includes("công kỹ thuật")
@@ -433,14 +540,14 @@ export const OrderDetailModal = ({
                   );
                 }
                 const partsList = parsedItems.filter(
-                  (it: any) =>
+                  (it: OrderItem) =>
                     !it.item_name?.toLowerCase().includes("tiền công") &&
                     !it.item_name?.toLowerCase().includes("công sửa") &&
                     !it.item_name?.toLowerCase().includes("công kỹ thuật")
                 );
                 parsedPartsCost = partsList.reduce(
-                  (sum: number, it: any) =>
-                    sum + Number(it.subtotal || it.unit_price * it.quantity || 0),
+                  (sum: number, it: OrderItem) =>
+                    sum + Number(it.subtotal || (it.unit_price || 0) * (it.quantity || 1) || 0),
                   0
                 );
               } else if (effectiveTotal > 0) {
@@ -510,7 +617,7 @@ export const OrderDetailModal = ({
               }
 
               const partsOnlyList = parsedItems.filter(
-                (it: any) =>
+                (it: OrderItem) =>
                   !it.item_name?.toLowerCase().includes("tiền công") &&
                   !it.item_name?.toLowerCase().includes("công sửa") &&
                   !it.item_name?.toLowerCase().includes("công kỹ thuật")
@@ -557,7 +664,7 @@ export const OrderDetailModal = ({
                             Tiền phụ tùng thay thế (
                             {partsOnlyList.length > 0
                               ? `${partsOnlyList.length} loại: ${partsOnlyList
-                                  .map((p: any) => `${p.item_name} x${p.quantity}`)
+                                  .map((p: OrderItem) => `${p.item_name} x${p.quantity}`)
                                   .join(", ")}`
                               : "Không có"}
                             ):
@@ -573,16 +680,39 @@ export const OrderDetailModal = ({
                             Phương thức thanh toán:
                           </span>
                           <span className="font-bold text-slate-800">
-                            {orderDetail.payment_method === "Cash"
-                              ? "Tiền mặt"
-                              : "Chuyển khoản ngân hàng"}
+                            {(() => {
+                              const pm = String(
+                                orderDetail.payment_method ||
+                                  order.payment_method ||
+                                  ""
+                              ).toUpperCase();
+                              if (pm === "CASH") return "Tiền mặt";
+                              if (pm.includes("TRANSFER") || pm.includes("BANK"))
+                                return "Chuyển khoản ngân hàng";
+                              if (pm.includes("MOMO")) return "Ví MoMo";
+                              if (pm.includes("VNPAY")) return "Cổng VNPAY";
+                              if (pm.includes("CARD")) return "Thẻ ngân hàng";
+                              return orderDetail.payment_method || "Tiền mặt";
+                            })()}
                           </span>
                         </div>
+
+                        {quoteData?.estimated_price && (
+                          <div className="flex justify-between items-center text-slate-600 pt-0.5 pb-1 border-b border-dashed border-slate-100">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <Receipt className="w-3.5 h-3.5 text-slate-400" />
+                              Báo giá KTV dự tính ban đầu:
+                            </span>
+                            <span className="font-semibold text-slate-700">
+                              {Number(quoteData.estimated_price).toLocaleString("vi-VN")} đ
+                            </span>
+                          </div>
+                        )}
 
                         <div className="bg-amber-100/80 p-3.5 rounded-xl flex justify-between items-center mt-2 border border-amber-300">
                           <div>
                             <span className="text-[11px] font-black uppercase text-amber-950 block">
-                              Tổng cộng thanh toán
+                              Tổng chi phí thanh toán thực tế
                             </span>
                             <span className="text-[10px] text-amber-900 italic font-medium">
                               * Đã gồm tiền công ({parsedLaborFee.toLocaleString("vi-VN")} đ) + linh kiện ({parsedPartsCost.toLocaleString("vi-VN")} đ)
@@ -612,7 +742,6 @@ export const OrderDetailModal = ({
               );
             })()}
 
-            {/* 5. Technician Assignment Box */}
             <div className="p-4.5 rounded-2xl border border-sky-200/90 bg-sky-50/50 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-sky-950 uppercase">
@@ -636,7 +765,7 @@ export const OrderDetailModal = ({
                   onChange={(e) => setSelectedTechId(e.target.value)}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-semibold focus:ring-2 focus:ring-sky-800 outline-none disabled:opacity-50 disabled:bg-slate-100 cursor-pointer"
                 >
-                  {technicians.map((t: any) => (
+                  {technicians.map((t: TechnicianItem) => (
                     <option key={t.user_id || t.id} value={t.user_id || t.id}>
                       {t.full_name || t.user?.full_name || t.name || t.user_id} -{" "}
                       {t.specialization || "Chung"} (
@@ -648,7 +777,7 @@ export const OrderDetailModal = ({
                 <button
                   onClick={handleAssign}
                   disabled={actionLoading || isFinished}
-                  className="bg-sky-900 hover:bg-sky-950 text-white px-4.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  className="bg-sky-900 hover:bg-sky-950 text-white px-4.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>{orderDetail.technician_id ? "Đổi thợ" : "Phân công"}</span>
@@ -657,8 +786,7 @@ export const OrderDetailModal = ({
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+          <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
             <div>
               {!isFinished && (
                 <button
@@ -697,7 +825,6 @@ export const OrderDetailModal = ({
         </div>
       </div>
 
-      {/* Lightbox: Xem ảnh phóng to (Zoom Modal) */}
       {previewImageUrl && (
         <div
           className="fixed inset-0 z-70 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
@@ -707,14 +834,14 @@ export const OrderDetailModal = ({
             className="relative max-w-4xl max-h-[88vh] flex flex-col items-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <img
+            <Image
               src={previewImageUrl}
               alt="Ảnh phóng to"
+              width={1200}
+              height={900}
+              unoptimized
               className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain border border-white/20"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = "/images/s1.jpg";
-              }}
+              style={{ width: "auto", height: "auto", maxHeight: "80vh" }}
             />
             
             <div className="flex items-center gap-3 mt-3">
@@ -739,12 +866,11 @@ export const OrderDetailModal = ({
         </div>
       )}
 
-      {/* Pop-up Xác nhận Hủy Đơn */}
       {isCancelModalOpen && (
         <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-100 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center flex-shrink-0 text-red-600">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0 text-red-600">
                 <XCircle className="w-6 h-6" />
               </div>
               <div>
@@ -757,7 +883,6 @@ export const OrderDetailModal = ({
               </div>
             </div>
 
-            {/* Presets */}
             <div className="space-y-2">
               <label className="block text-[11px] font-bold text-slate-600 uppercase">
                 Chọn lý do hủy
@@ -780,7 +905,6 @@ export const OrderDetailModal = ({
               </div>
             </div>
 
-            {/* Note input */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold text-slate-600 uppercase">
                 Ghi chú thêm (tùy chọn)
@@ -794,7 +918,6 @@ export const OrderDetailModal = ({
               />
             </div>
 
-            {/* Actions */}
             <div className="flex gap-2 pt-2">
               <button
                 type="button"

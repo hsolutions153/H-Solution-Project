@@ -1,5 +1,21 @@
-export type TaskStatus = 'IN_PROGRESS' | 'PENDING' | 'WAITING_CONFIRM' | 'WAITING_ACCEPT' |
-  'COMPLETED' | "CANCELLED" | 'WAITING_MOVE' | 'MOVING' | 'ARRIVED';
+export type TaskStatus =
+  | "IN_PROGRESS"
+  | "PENDING"
+  | "WAITING_CONFIRM"
+  | "WAITING_ACCEPT"
+  | "ASSIGNED"
+  | "ACCEPTED"
+  | "EN_ROUTE"
+  | "ARRIVED"
+  | "DIAGNOSING"
+  | "WAITING_FOR_APPROVAL"
+  | "ESTIMATE_APPROVED"
+  | "ESTIMATE_REJECTED"
+  | "REPAIRING"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "WAITING_MOVE"
+  | "MOVING";
 
 export interface Task {
   id: string;

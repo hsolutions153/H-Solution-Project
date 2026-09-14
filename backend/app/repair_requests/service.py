@@ -611,8 +611,8 @@ def update_request_status(request_id: str, current_user: dict, data):
         )
     elif is_customer:
         allowed = (
-            (request["status"] in {"REQUESTED", "PENDING", "CONFIRMED", "ASSIGNED"} and new_status == "CANCELLED")
-            or (request["status"] in {"ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "DIAGNOSED"} and new_status in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED", "CANCELLED"})
+            (request["status"] in {"REQUESTED", "CONFIRMED", "ASSIGNED"} and new_status == "CANCELLED")
+            or (request["status"] in {"ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"} and new_status in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED", "CANCELLED"})
         )
     elif is_technician:
         allowed = new_status in TECHNICIAN_TRANSITIONS.get(request["status"], set())
@@ -703,11 +703,28 @@ def update_request_status(request_id: str, current_user: dict, data):
             update_data["accepted_at"] = now
         elif new_status in {"ARRIVED", "EN_ROUTE"}:
             update_data["arrived_at"] = now
-        elif new_status in {"DIAGNOSED", "DIAGNOSING", "ESTIMATE_SUBMITTED"}:
+        elif new_status in {"DIAGNOSING", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"}:
             update_data["diagnosed_at"] = now
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
+            total_amt = payload.get("total_amount") if payload.get("total_amount") is not None else payload.get("totalCost")
+            try:
+                quotes = repository.get_quotes_by_repair_id(request_id)
+                if quotes:
+                    latest_quote = quotes[0]
+                    est_price = float(latest_quote.get("estimated_price") or 0)
+                    final_cost = float(total_amt) if total_amt is not None else float(request.get("total_amount") or 0)
+                    if est_price > 0 and final_cost > est_price:
+                        raise AppException(
+                            ErrorCode.VALIDATION_ERROR,
+                            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá ban đầu ({est_price:,.0f} đ). Vui lòng xác nhận trước khi hoàn tất.",
+                        )
+            except AppException:
+                raise
+            except Exception as check_err:
+                logger.warning(f"Error checking quote vs final cost: {check_err}")
+
             update_data["completed_at"] = now
         elif new_status == "CANCELLED":
             update_data["cancelled_at"] = now
@@ -780,6 +797,12 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
+    if request.get("status") not in {"DIAGNOSING", "ARRIVED"}:
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message="Yêu cầu phải ở trạng thái Đang chẩn đoán (DIAGNOSING) để tạo báo giá.",
+        )
+
     items = data.get("items") or []
     diagnosis_note = data.get("diagnosis_note") or "Báo giá sửa chữa"
     severity = data.get("severity") or "MINOR"
@@ -848,11 +871,11 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         else:
             created_items.append(item_rec)
 
-    # Transition request status to DIAGNOSED
+    # Transition request status to WAITING_FOR_APPROVAL
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
         repository.update_repair_request(request_id, {
-            "status": "DIAGNOSED",
+            "status": "WAITING_FOR_APPROVAL",
             "diagnosed_at": now_iso,
             "total_amount": total,
             "updated_by": current_user["sub"],
@@ -860,9 +883,9 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         repository.add_status_history({
             "id": _request_id(),
             "repair_id": request_id,
-            "status": "DIAGNOSED",
+            "status": "WAITING_FOR_APPROVAL",
             "changed_by": current_user["sub"],
-            "note": f"Kỹ thuật viên đã lập báo giá (Tổng: {total:,.0f} đ)",
+            "note": f"Kỹ thuật viên đã lập báo giá (Tổng: {total:,.0f} đ), chờ khách hàng duyệt",
         })
     except Exception as stat_err:
         logger.warning(f"Failed to update repair status on quote create: {stat_err}")

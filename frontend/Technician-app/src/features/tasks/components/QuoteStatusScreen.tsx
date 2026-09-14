@@ -9,6 +9,7 @@ interface QuoteStatusScreenProps {
   onBack: () => void;
   onViewDetailQuote?: () => void;
   onContinueRepair: () => void;
+  isApproved?: boolean;
 }
 
 export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
@@ -16,6 +17,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   onBack,
   onViewDetailQuote,
   onContinueRepair,
+  isApproved = false,
 }) => {
   const savedQuote = typeof window !== "undefined" ? sessionStorage.getItem("quoteData") : null;
   let quoteObj: any = null;
@@ -117,7 +119,10 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           </button>
 
           <button
+            type="button"
+            disabled={!isApproved}
             onClick={() => {
+              if (!isApproved) return;
               if (task?.id) {
                 import("@/lib/api-client").then(({ fetchApi }) => {
                   fetchApi(`/repair-requests/${task.id}/status`, {
@@ -128,13 +133,20 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
               }
               onContinueRepair();
             }}
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+            className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm ${
+              isApproved
+                ? "bg-sky-800 hover:bg-sky-900 text-white cursor-pointer"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            }`}
           >
             Bắt đầu sửa chữa
           </button>
-          <p className="text-[11px] text-slate-400 text-center">
-            {/* Nút sẽ tự động kích hoạt khi khách hàng nhấn Đồng ý */}
-            Đang mô phỏng khách hàng đã đồng ý báo giá
+          <p className="text-[11px] text-center font-medium">
+            {isApproved ? (
+              <span className="text-emerald-600">Khách hàng đã đồng ý báo giá. Có thể bắt đầu sửa chữa.</span>
+            ) : (
+              <span className="text-slate-400">Đang chờ khách hàng xác nhận báo giá...</span>
+            )}
           </p>
         </div>
       </div>

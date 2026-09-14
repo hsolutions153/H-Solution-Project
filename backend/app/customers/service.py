@@ -49,6 +49,11 @@ def _generate_customer_id() -> str:
 def fetch_customers(search: str | None, page: int, limit: int):
     role_id = _customer_role_id()
     customers, total = repository.get_customers(role_id, search=search, page=page, limit=limit)
+    if customers:
+        customer_ids = [c["id"] for c in customers if c.get("id")]
+        device_counts = repository.get_device_counts_by_customer_ids(customer_ids)
+        for c in customers:
+            c["device_count"] = device_counts.get(c.get("id"), 0)
     return {"items": customers, "total": total, "page": page, "limit": limit}
 
 
@@ -56,6 +61,8 @@ def fetch_customer(customer_id: str):
     customer = repository.get_customer_by_id(customer_id, _customer_role_id())
     if not customer:
         raise AppException(ErrorCode.USER_NOT_FOUND)
+    device_counts = repository.get_device_counts_by_customer_ids([customer_id])
+    customer["device_count"] = device_counts.get(customer_id, 0)
     return customer
 
 

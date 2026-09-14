@@ -32,6 +32,7 @@ class CustomerResponse(BaseModel):
     email: EmailStr
     address: str | None = None
     is_active: bool
+    device_count: int = 0
     created_at: datetime
     updated_at: datetime
 

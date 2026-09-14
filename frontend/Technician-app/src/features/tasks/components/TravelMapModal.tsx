@@ -167,7 +167,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
           {status === "ARRIVED" && (
             <button
               onClick={() => {
-                onStatusChange(task.id, "IN_PROGRESS", "Đang thực hiện");
+                onStatusChange(task.id, "DIAGNOSING", "Đang chẩn đoán");
                 onClose();
               }}
               className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
