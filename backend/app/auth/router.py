@@ -22,7 +22,7 @@ def signup(payload: SignupRequest):
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
-    return authenticate_user(str(payload.email), payload.password)
+    return authenticate_user(payload.phone, payload.password)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

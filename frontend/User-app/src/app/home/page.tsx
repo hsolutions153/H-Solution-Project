@@ -65,7 +65,7 @@ export default function HomePage() {
         {/* My Chair Card */}
         <section className="chair-card">
           <div className="chair-card-image">
-            <Image src="/wheelchair.png" alt="Xe lăn của tôi" width={1024} height={1024} />
+            <Image src="/wheelchair.png" alt="Xe lăn của tôi" width={1024} height={1024} priority />
             <div className="chair-label">
               <span className="chair-name">Xe của tôi</span>
               <span className="chair-model">Model X-200</span>

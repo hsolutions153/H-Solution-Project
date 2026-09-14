@@ -43,6 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
+      suppressHydrationWarning
       className={`${beVietnamPro.variable} h-full antialiased`}
     >
       <head>
@@ -54,7 +55,10 @@ export default function RootLayout({
         />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50"
+      >
         {children}
       </body>
     </html>

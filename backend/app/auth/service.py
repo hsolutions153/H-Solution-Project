@@ -16,8 +16,8 @@ def _generate_user_id() -> str:
     return secrets.token_hex(5).upper()
 
 
-def authenticate_user(email: str, password: str):
-    user = repository.get_user_by_email(email)
+def authenticate_user(phone: str, password: str):
+    user = repository.get_user_by_phone(phone)
     
     if not user or (isinstance(user, list) and len(user) == 0):
         raise AppException(ErrorCode.INVALID_CREDENTIALS, headers={"WWW-Authenticate": "Bearer"})
