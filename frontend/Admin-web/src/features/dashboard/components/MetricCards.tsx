@@ -10,6 +10,22 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+interface DashboardMetricsResponse {
+  total_orders?: number;
+  [key: string]: unknown;
+}
+
+interface OrderItemSummary {
+  id?: string;
+  status?: string;
+  technician_id?: string | null;
+}
+
+interface OrdersResponse {
+  items?: OrderItemSummary[];
+  total?: number;
+}
+
 export const MetricCards = () => {
   const [metricsData, setMetricsData] = useState<{
     total: number;
@@ -33,11 +49,11 @@ export const MetricCards = () => {
       try {
         const { fetchApi } = await import("@/lib/api-client");
         const [metricRes, ordersRes] = await Promise.all([
-          fetchApi<any>("/dashboard/metrics").catch(() => null),
-          fetchApi<any>("/orders").catch(() => null),
+          fetchApi<DashboardMetricsResponse>("/dashboard/metrics").catch(() => null),
+          fetchApi<OrdersResponse>("/orders").catch(() => null),
         ]);
 
-        const items: any[] = Array.isArray(ordersRes?.items)
+        const items: OrderItemSummary[] = Array.isArray(ordersRes?.items)
           ? ordersRes.items
           : [];
 
@@ -54,15 +70,15 @@ export const MetricCards = () => {
             "ARRIVED",
             "DIAGNOSING",
             "REPAIRING",
-          ].includes(o.status)
+          ].includes(o.status || "")
         ).length;
 
         const waiting = items.filter((o) =>
-          ["ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"].includes(o.status)
+          ["ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"].includes(o.status || "")
         ).length;
 
         const comp = items.filter((o) => o.status === "COMPLETED").length;
-        const req = items.filter((o) => ["REQUESTED", "PENDING"].includes(o.status)).length;
+        const req = items.filter((o) => ["REQUESTED", "PENDING"].includes(o.status || "")).length;
 
         setMetricsData({
           total: metricRes?.total_orders || items.length,
@@ -80,7 +96,10 @@ export const MetricCards = () => {
     };
 
     fetchMetrics();
-    const timer = setInterval(fetchMetrics, 10000);
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchMetrics();
+    }, 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -131,7 +150,6 @@ export const MetricCards = () => {
           key={index}
           className={`bg-white p-4 rounded-xl border border-slate-200 border-l-4 ${item.color} shadow-xs flex flex-col justify-between`}
         >
-          {/* Top section: Icon + Status/Change */}
           <div className="flex justify-between items-center mb-3">
             <div
               className={`w-10 h-10 rounded-xl ${item.iconBg} flex items-center justify-center`}
@@ -154,7 +172,6 @@ export const MetricCards = () => {
             )}
           </div>
 
-          {/* Bottom section */}
           <div className="text-center">
             <div className="text-xs text-slate-500 font-bold mb-1">
               {item.label}

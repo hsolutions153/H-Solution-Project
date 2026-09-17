@@ -24,7 +24,10 @@ export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => 
       }
     };
     fetchTechs();
-    const interval = setInterval(fetchTechs, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchTechs();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

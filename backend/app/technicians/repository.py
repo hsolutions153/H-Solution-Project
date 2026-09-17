@@ -2,7 +2,7 @@ from app.db.database import supabase
 from app.technicians.models import TECHNICIAN_PROFILES_TABLE
 
 PROFILE_SELECT = (
-    "*,user:users!technician_profiles_user_id_fkey("
+    "*,user:users!fk_technician_user("
     "id,full_name,email,phone,is_active)"
 )
 
@@ -15,8 +15,8 @@ def get_all_technicians(kyc_status: str | None = None):
         response = query.execute()
         if response and response.data is not None:
             return response.data
-    except Exception as e:
-        print("PROFILE_SELECT FK join failed, falling back to manual join:", e)
+    except Exception:
+        pass
 
     query = supabase.table(TECHNICIAN_PROFILES_TABLE).select("*").order("created_at", desc=True)
     if kyc_status:

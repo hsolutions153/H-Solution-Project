@@ -2,8 +2,10 @@ from app.db.database import supabase
 from app.orders.models import ORDERS_TABLE, STATUS_HISTORY_TABLE, TECHNICIAN_PROFILES_TABLE
 
 ORDER_SELECT = (
-    "*,customer:users!repair_requests_customer_id_fkey(id,full_name,phone),"
-    "technician:users!repair_requests_technician_id_fkey(id,full_name,phone)"
+    "*,customer:users!fk_repair_customer(id,full_name,phone),"
+    "technician:technician_profiles!fk_repair_technician(user_id,user:users!fk_technician_user(id,full_name,phone)),"
+    "device:customer_devices!fk_repair_device(id,device_type,manufacturer,model_name,serial_number),"
+    "images:repair_requests_images!fk_repair_images_repair(id,image_url,image_type,description)"
 )
 
 
@@ -15,6 +17,15 @@ def _enrich_orders(data: list[dict]):
     user_ids = set()
     device_ids = set()
     for item in data:
+        # Unwrap nested technician_profile -> user if present from PostgREST FK join
+        if isinstance(item.get("technician"), dict) and "user" in item["technician"]:
+            user_data = item["technician"].get("user") or {}
+            item["technician"] = {
+                "id": item["technician"].get("user_id") or user_data.get("id"),
+                "full_name": user_data.get("full_name"),
+                "phone": user_data.get("phone"),
+            }
+
         if item.get("customer_id") and ("customer" not in item or not item["customer"]):
             user_ids.add(item["customer_id"])
         if item.get("technician_id") and ("technician" not in item or not item["technician"]):
@@ -70,7 +81,8 @@ def _enrich_orders(data: list[dict]):
             item["technician"] = users_map.get(item.get("technician_id"))
         if "device" not in item or not item["device"]:
             item["device"] = devices_map.get(item.get("device_id"))
-        item["images"] = images_map.get(item["id"], [])
+        if not item.get("images"):
+            item["images"] = images_map.get(item["id"], [])
 
     return data
 
@@ -86,8 +98,8 @@ def get_orders(*, order_status: str | None, page: int, limit: int):
         if response and response.data is not None:
             data = response.data
             count = response.count or len(data)
-    except Exception as e:
-        print("ORDER_SELECT FK join failed, falling back to manual join:", e)
+    except Exception:
+        pass
 
     if not data:
         query = supabase.table(ORDERS_TABLE).select("*", count="exact")

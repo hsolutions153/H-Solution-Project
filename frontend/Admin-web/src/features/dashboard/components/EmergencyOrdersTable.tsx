@@ -59,7 +59,10 @@ export const EmergencyOrdersTable = ({
 
   useEffect(() => {
     fetchOrdersAndTechs();
-    const interval = setInterval(fetchOrdersAndTechs, 8000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchOrdersAndTechs();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
