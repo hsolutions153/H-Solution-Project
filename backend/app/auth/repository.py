@@ -24,9 +24,17 @@ def update_user_password(user_id: str, password_hash: str):
     return response.data[0] if response and response.data else None
 
 
+_ROLE_CACHE: dict[str, dict] = {}
+
+
 def get_role_by_code(code: str):
+    if code in _ROLE_CACHE:
+        return _ROLE_CACHE[code]
     response = supabase.table(ROLES_TABLE).select("id,code,name").eq("code", code).maybe_single().execute()
-    return response.data if response and hasattr(response, "data") else None
+    data = response.data if response and hasattr(response, "data") else None
+    if data:
+        _ROLE_CACHE[code] = data
+    return data
 
 
 def create_user(data: dict):

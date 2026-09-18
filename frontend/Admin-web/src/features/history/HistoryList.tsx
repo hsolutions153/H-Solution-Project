@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 import { OrderDetailModal } from "../orders/OrderDetailModal";
+import { Pagination } from "@/components/common/Pagination";
 
 export const HistoryList = () => {
   const [historyOrders, setHistoryOrders] = useState<any[]>([]);
@@ -20,6 +21,15 @@ export const HistoryList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+  // State phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -60,6 +70,14 @@ export const HistoryList = () => {
     const query = searchTerm.toLowerCase();
     return code.includes(query) || cust.includes(query);
   });
+
+  // Cắt lát dữ liệu cho phân trang
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedHistory = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -120,14 +138,14 @@ export const HistoryList = () => {
                     Đang tải lịch sử...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : paginatedHistory.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
                     Chưa có lịch sử đơn hoàn thành nào.
                   </td>
                 </tr>
               ) : (
-                filtered.map((o) => {
+                paginatedHistory.map((o) => {
                   const badge = getStatusBadge(o.status);
                   return (
                     <tr key={o.id} className="hover:bg-slate-50/80 transition">
@@ -178,6 +196,21 @@ export const HistoryList = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Gắn Component Pagination ngay sau bảng */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 20, 50]}
+          totalItems={totalItems}
+          itemUnitText="đơn sửa chữa"
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+        />
       </div>
 
       {selectedOrder && (

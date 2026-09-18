@@ -23,7 +23,21 @@ import {
   Wrench,
   ChevronRight,
   FileText,
+  Table,
+  LayoutGrid,
+  Plus,
+  UserPlus,
+  Eye,
+  Pencil,
+  Trash2,
+  Mail,
+  User,
 } from "lucide-react";
+import { Pagination } from "@/components/common/Pagination";
+import { ViewTechnicianModal } from "./ViewTechnicianModal";
+import { EditTechnicianModal } from "./EditTechnicianModal";
+import { CreateTechnicianModal } from "./CreateTechnicianModal";
+import { DeleteTechnicianModal } from "./DeleteTechnicianModal";
 
 type TimeRange = "TODAY" | "MONTH" | "YEAR" | "ALL";
 
@@ -36,17 +50,47 @@ export const TechniciansList = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("MONTH");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // KYC Modal State
+  // View Mode: 'table' (dạng bảng) hoặc 'grid' (dạng lưới)
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+
+  // Phân trang cho Dạng Bảng (10 bản ghi 1 trang)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Modals Quản lý KTV ở Dạng Bảng
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewingTech, setViewingTech] = useState<any | null>(null);
+  const [editingTech, setEditingTech] = useState<any | null>(null);
+  const [deletingTech, setDeletingTech] = useState<any | null>(null);
+  const [togglingOnlineId, setTogglingOnlineId] = useState<string | null>(null);
+
+  // KYC Review Modal State
   const [selectedKycTech, setSelectedKycTech] = useState<any | null>(null);
   const [kycLoading, setKycLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Stats Detail Modal State
+  // Stats Detail Modal State (Dạng lưới)
   const [detailStatsTech, setDetailStatsTech] = useState<any | null>(null);
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("admin_technicians_view_mode");
+      if (saved === "grid" || saved === "table") {
+        setViewMode(saved);
+      }
+    } catch {}
+  }, []);
+
+  const handleViewModeChange = (mode: "table" | "grid") => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("admin_technicians_view_mode", mode);
+    } catch {}
+  };
 
   const fetchTechniciansAndOrders = async () => {
     setLoading(true);
@@ -54,17 +98,24 @@ export const TechniciansList = () => {
       const { fetchApi } = await import("@/lib/api-client");
       const [techRes, ordersRes] = await Promise.allSettled([
         fetchApi<any>("/technicians"),
-        fetchApi<any>("/repair-requests?limit=200"),
+        fetchApi<any>("/orders?limit=200")
+          .catch(() => fetchApi<any>("/orders?limit=100"))
+          .catch(() => fetchApi<any>("/repair-requests?limit=100")),
       ]);
 
       const techList =
-        techRes.status === "fulfilled" && Array.isArray(techRes.value)
-          ? techRes.value
+        techRes.status === "fulfilled"
+          ? Array.isArray(techRes.value)
+            ? techRes.value
+            : techRes.value?.items || []
           : [];
-      const ordersList =
-        ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value)
-          ? ordersRes.value
-          : [];
+
+      const rawOrders = ordersRes.status === "fulfilled" ? ordersRes.value : null;
+      const ordersList = Array.isArray(rawOrders?.items)
+        ? rawOrders.items
+        : Array.isArray(rawOrders)
+        ? rawOrders
+        : [];
 
       setTechnicians(techList);
       setAllOrders(ordersList);
@@ -79,9 +130,38 @@ export const TechniciansList = () => {
     fetchTechniciansAndOrders();
   }, []);
 
+  // Reset trang về 1 khi lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
   const handleShowToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleToggleOnline = async (tech: any) => {
+    const techId = tech.user_id || tech.id;
+    if (togglingOnlineId === techId) return;
+    const nextStatus = !tech.is_online;
+    setTogglingOnlineId(techId);
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi(`/technicians/${techId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_online: nextStatus }),
+      });
+      handleShowToast(
+        `Đã chuyển trạng thái KTV ${tech.full_name || tech.user?.full_name || "thợ"} sang ${
+          nextStatus ? "Online (Nhận đơn)" : "Offline"
+        }!`
+      );
+      fetchTechniciansAndOrders();
+    } catch (err: any) {
+      alert(err.message || "Lỗi khi cập nhật trạng thái");
+    } finally {
+      setTogglingOnlineId(null);
+    }
   };
 
   const handleReviewKyc = async (
@@ -112,6 +192,38 @@ export const TechniciansList = () => {
     }
   };
 
+  // Helper so sánh mốc thời gian ngày / tháng / năm
+  const isSameDay = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const t = new Date();
+    return (
+      d.getDate() === t.getDate() &&
+      d.getMonth() === t.getMonth() &&
+      d.getFullYear() === t.getFullYear()
+    );
+  };
+
+  const isSameMonth = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const t = new Date();
+    return (
+      d.getMonth() === t.getMonth() &&
+      d.getFullYear() === t.getFullYear()
+    );
+  };
+
+  const isSameYear = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const t = new Date();
+    return d.getFullYear() === t.getFullYear();
+  };
+
   // Tính toán số liệu thống kê Ngày / Tháng / Năm cho từng KTV
   const techStatsMap = useMemo(() => {
     const map: Record<
@@ -129,110 +241,54 @@ export const TechniciansList = () => {
       }
     > = {};
 
-    const isSameDay = (dateStr?: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      const t = new Date();
-      return (
-        d.getDate() === t.getDate() &&
-        d.getMonth() === t.getMonth() &&
-        d.getFullYear() === t.getFullYear()
-      );
-    };
-
-    const isSameMonth = (dateStr?: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      const t = new Date();
-      return (
-        d.getMonth() === t.getMonth() &&
-        d.getFullYear() === t.getFullYear()
-      );
-    };
-
-    const isSameYear = (dateStr?: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      const t = new Date();
-      return d.getFullYear() === t.getFullYear();
-    };
-
-    // Helper tìm key trong map cho bất kỳ order nào
-    const findMatchingTechKey = (ord: any): string | null => {
-      const tid = ord.technician_id || ord.technician?.id;
-      if (!tid) return technicians[0]?.user_id || technicians[0]?.id || null;
-
-      for (const t of technicians) {
-        const primaryKey = t.user_id || t.id;
-        if (
-          t.user_id === tid ||
-          t.id === tid ||
-          t.technician_id === tid ||
-          (t.phone && ord.technician_phone && t.phone === ord.technician_phone) ||
-          (t.full_name && ord.technician_name && t.full_name === ord.technician_name)
-        ) {
-          return primaryKey;
-        }
-      }
-      return technicians[0]?.user_id || technicians[0]?.id || null;
-    };
-
-    // Seed sẵn cấu trúc thống kê cho từng KTV
-    technicians.forEach((t, idx) => {
-      const id = t.user_id || t.id;
-      const baseOrders = (t.experience_years || 2) * 12 + 10;
-      const baseRev = baseOrders * 650000;
-
-      // Mặc định hôm nay có 1-2 đơn hoàn thành/đang sửa nếu KTV online
-      const defaultTodayOrders = t.is_online ? (idx % 2 === 0 ? 2 : 1) : 0;
-      const defaultTodayRev = defaultTodayOrders > 0 ? (defaultTodayOrders === 2 ? 3600000 : 1800000) : 0;
-
-      map[id] = {
-        todayOrders: defaultTodayOrders,
-        todayRevenue: defaultTodayRev,
-        monthOrders: Math.max(4, Math.floor(baseOrders * 0.2)),
-        monthRevenue: Math.max(4, Math.floor(baseOrders * 0.2)) * 850000,
-        yearOrders: baseOrders,
-        yearRevenue: baseRev,
-        allOrders: baseOrders * 2 + 15,
-        allRevenue: baseRev * 2.1 + 10000000,
-        orderList: [],
+    technicians.forEach((tech) => {
+      const statsObj = {
+        todayOrders: 0,
+        todayRevenue: 0,
+        monthOrders: 0,
+        monthRevenue: 0,
+        yearOrders: 0,
+        yearRevenue: 0,
+        allOrders: 0,
+        allRevenue: 0,
+        orderList: [] as any[],
       };
+      if (tech.user_id) map[tech.user_id] = statsObj;
+      if (tech.id && !map[tech.id]) map[tech.id] = statsObj;
     });
 
-    // Cộng dồn từ danh sách đơn hàng thực tế từ database
-    allOrders.forEach((ord) => {
-      const matchKey = findMatchingTechKey(ord);
-      if (!matchKey || !map[matchKey]) return;
+    allOrders.forEach((order) => {
+      const tId = order.technician_id || order.technician?.id || order.technician?.user_id;
+      if (!tId || !map[tId]) return;
 
-      map[matchKey].orderList.push(ord);
+      map[tId].orderList.push(order);
 
-      const statusUpper = (ord.status || "").toUpperCase();
-      const isCompletedOrActive = ["COMPLETED", "REPAIRING", "DIAGNOSED", "ARRIVED", "ACCEPTED", "WAITING_FOR_APPROVAL"].includes(statusUpper);
-      const amt = Number(ord.total_amount || ord.quote?.estimated_price || 1800000);
-      const dateCheck = ord.created_at || ord.diagnosed_at || ord.accepted_at;
+      const isCompleted =
+        order.status === "COMPLETED" ||
+        order.status === "DONE" ||
+        order.status === "PAID";
+      if (!isCompleted) return;
 
-      if (isCompletedOrActive) {
-        map[matchKey].allOrders += 1;
-        map[matchKey].allRevenue += amt;
+      const cost =
+        Number(order.total_amount || order.actual_cost || order.estimated_cost || 0) ||
+        350000;
 
-        if (isSameYear(dateCheck)) {
-          map[matchKey].yearOrders += 1;
-          map[matchKey].yearRevenue += amt;
-        }
+      const dateStr = order.completed_at || order.updated_at || order.created_at;
 
-        if (isSameMonth(dateCheck)) {
-          map[matchKey].monthOrders += 1;
-          map[matchKey].monthRevenue += amt;
-        }
+      map[tId].allOrders += 1;
+      map[tId].allRevenue += cost;
 
-        if (isSameDay(dateCheck) || isSameDay(ord.updated_at)) {
-          map[matchKey].todayOrders += 1;
-          map[matchKey].todayRevenue += amt;
-        }
+      if (isSameDay(dateStr)) {
+        map[tId].todayOrders += 1;
+        map[tId].todayRevenue += cost;
+      }
+      if (isSameMonth(dateStr)) {
+        map[tId].monthOrders += 1;
+        map[tId].monthRevenue += cost;
+      }
+      if (isSameYear(dateStr)) {
+        map[tId].yearOrders += 1;
+        map[tId].yearRevenue += cost;
       }
     });
 
@@ -244,33 +300,54 @@ export const TechniciansList = () => {
     let totalRev = 0;
     let totalOrd = 0;
 
-    Object.values(techStatsMap).forEach((st) => {
+    allOrders.forEach((order) => {
+      const isCompleted =
+        order.status === "COMPLETED" ||
+        order.status === "DONE" ||
+        order.status === "PAID";
+      if (!isCompleted) return;
+
+      const cost =
+        Number(order.total_amount || order.actual_cost || order.estimated_cost || 0) ||
+        350000;
+      const dateStr = order.completed_at || order.updated_at || order.created_at;
+
       if (timeRange === "TODAY") {
-        totalRev += st.todayRevenue;
-        totalOrd += st.todayOrders;
+        if (isSameDay(dateStr)) {
+          totalRev += cost;
+          totalOrd += 1;
+        }
       } else if (timeRange === "MONTH") {
-        totalRev += st.monthRevenue;
-        totalOrd += st.monthOrders;
+        if (isSameMonth(dateStr)) {
+          totalRev += cost;
+          totalOrd += 1;
+        }
       } else if (timeRange === "YEAR") {
-        totalRev += st.yearRevenue;
-        totalOrd += st.yearOrders;
+        if (isSameYear(dateStr)) {
+          totalRev += cost;
+          totalOrd += 1;
+        }
       } else {
-        totalRev += st.allRevenue;
-        totalOrd += st.allOrders;
+        totalRev += cost;
+        totalOrd += 1;
       }
     });
 
     return { totalRev, totalOrd };
-  }, [techStatsMap, timeRange]);
+  }, [allOrders, timeRange]);
 
   const filteredTechs = technicians.filter((t) => {
     const name = (t.full_name || t.user?.full_name || t.name || "").toLowerCase();
     const phone = (t.phone || t.user?.phone || "").toLowerCase();
+    const email = (t.email || t.user?.email || "").toLowerCase();
     const spec = (t.specialization || "").toLowerCase();
     const query = searchTerm.toLowerCase();
 
     const matchesSearch =
-      name.includes(query) || phone.includes(query) || spec.includes(query);
+      name.includes(query) ||
+      phone.includes(query) ||
+      email.includes(query) ||
+      spec.includes(query);
 
     const matchesFilter =
       statusFilter === "ALL" ||
@@ -281,9 +358,17 @@ export const TechniciansList = () => {
     return matchesSearch && matchesFilter;
   });
 
+  // Phân trang dữ liệu dạng bảng
+  const totalItems = filteredTechs.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedTechs = filteredTechs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Toast */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -291,511 +376,872 @@ export const TechniciansList = () => {
         </div>
       )}
 
-      {/* Header & Refresh */}
+      {/* Header & Thanh trượt Dạng Bảng / Dạng Lưới */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Quản lý Đội ngũ Kỹ thuật viên & Doanh số
+            Quản lý Đội ngũ Kỹ thuật viên
           </h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            Theo dõi tổng hợp đơn hoàn thành, doanh thu tích lũy theo Ngày, Tháng và Năm
+            {viewMode === "grid"
+              ? "Theo dõi tổng hợp đơn hoàn thành, doanh thu tích lũy theo Ngày, Tháng và Năm"
+              : `Quản lý danh sách, hồ sơ và phân quyền của ${technicians.length} kỹ thuật viên`}
           </p>
         </div>
 
-        <button
-          onClick={fetchTechniciansAndOrders}
-          disabled={loading}
-          className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition cursor-pointer shadow-2xs flex items-center gap-1.5 text-xs font-bold"
-          title="Làm mới dữ liệu"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-sky-800" : ""}`} />
-          <span>Cập nhật số liệu</span>
-        </button>
-      </div>
-
-      {/* TOP KPI CARDS: TỔNG HỢP THEO NGÀY / THÁNG / NĂM */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-sky-50 text-sky-900 rounded-xl font-bold">
-              <BarChart3 className="w-5 h-5" />
-            </span>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                Bảng Tổng Hợp Doanh Thu & Năng Suất Kỹ Thuật Viên
-              </h3>
-              <p className="text-xs text-slate-500">
-                Xem số liệu tổng hợp toàn đội ngũ theo chu kỳ thời gian
-              </p>
-            </div>
-          </div>
-
-          {/* Mốc thời gian Tabs */}
-          <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
-            <button
-              onClick={() => setTimeRange("TODAY")}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                timeRange === "TODAY"
-                  ? "bg-white text-blue-700 shadow-xs font-black"
-                  : "text-slate-600 hover:text-slate-900"
+        <div className="flex items-center gap-3">
+          {/* Thanh trượt hiển thị Dạng Bảng / Dạng Lưới */}
+          <div className="relative flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 select-none">
+            <div
+              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-xs transition-all duration-200 ease-out pointer-events-none ${
+                viewMode === "grid" ? "left-[calc(50%+2px)]" : "left-1"
               }`}
+            />
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("table")}
+              className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
+                viewMode === "table" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="Chuyển sang hiển thị dạng bảng thông tin"
             >
-              <Clock className="w-3.5 h-3.5" />
-              Hôm nay (Ngày)
+              <Table className="w-3.5 h-3.5" />
+              <span>Dạng bảng</span>
             </button>
             <button
-              onClick={() => setTimeRange("MONTH")}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                timeRange === "MONTH"
-                  ? "bg-white text-blue-700 shadow-xs font-black"
-                  : "text-slate-600 hover:text-slate-900"
+              type="button"
+              onClick={() => handleViewModeChange("grid")}
+              className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
+                viewMode === "grid" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
               }`}
+              title="Chuyển sang hiển thị dạng lưới & doanh số"
             >
-              <Calendar className="w-3.5 h-3.5" />
-              Tháng {currentMonth}/{currentYear}
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Dạng lưới</span>
             </button>
+          </div>
+
+          <button
+            onClick={fetchTechniciansAndOrders}
+            disabled={loading}
+            className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition cursor-pointer shadow-2xs flex items-center gap-1.5 text-xs font-bold"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-sky-800" : ""}`} />
+            <span className="hidden sm:inline">Cập nhật</span>
+          </button>
+
+          {/* Nút Thêm KTV mới (ở chế độ Dạng bảng) */}
+          {viewMode === "table" && (
             <button
-              onClick={() => setTimeRange("YEAR")}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                timeRange === "YEAR"
-                  ? "bg-white text-blue-700 shadow-xs font-black"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              onClick={() => setShowCreateModal(true)}
+              className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
             >
-              <TrendingUp className="w-3.5 h-3.5" />
-              Năm {currentYear}
+              <UserPlus className="w-4 h-4 stroke-[2.5]" />
+              <span>Thêm kỹ thuật viên</span>
             </button>
-            <button
-              onClick={() => setTimeRange("ALL")}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                timeRange === "ALL"
-                  ? "bg-white text-blue-700 shadow-xs font-black"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Tất cả thời gian
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Metric Boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 border border-blue-100 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold uppercase text-blue-900/70 block tracking-wider">
-                Tổng Doanh Thu (
-                {timeRange === "TODAY"
-                  ? "Hôm nay"
-                  : timeRange === "MONTH"
-                  ? `Tháng ${currentMonth}`
-                  : timeRange === "YEAR"
-                  ? `Năm ${currentYear}`
-                  : "Toàn bộ"}
-                )
-              </span>
-              <span className="text-xl font-black text-blue-950">
-                {overallTotals.totalRev.toLocaleString("vi-VN")} đ
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border border-emerald-100 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-              <Wrench className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold uppercase text-emerald-900/70 block tracking-wider">
-                Đơn Hoàn Thành
-              </span>
-              <span className="text-xl font-black text-emerald-950">
-                {overallTotals.totalOrd} đơn
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/80 to-pink-50/40 border border-purple-100 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-sm">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold uppercase text-purple-900/70 block tracking-wider">
-                Đang Hoạt Động (Online)
-              </span>
-              <span className="text-xl font-black text-purple-950">
-                {technicians.filter((t) => t.is_online).length} / {technicians.length} thợ
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-yellow-50/40 border border-amber-100 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
-              <Star className="w-6 h-6 fill-white" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold uppercase text-amber-900/70 block tracking-wider">
-                Đánh Giá Trung Bình
-              </span>
-              <span className="text-xl font-black text-amber-950">
-                5.0 ⭐ (Xuất sắc)
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="relative flex-1 min-w-[260px]">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
-          />
-        </div>
+      {/* ========================================================================= */}
+      {/* 1. CHẾ ĐỘ DẠNG BẢNG (TABLE VIEW - QUẢN LÝ THÔNG TIN KỸ THUẬT VIÊN)       */}
+      {/* ========================================================================= */}
+      {viewMode === "table" ? (
+        <div className="space-y-6">
+          {/* Search & Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div className="relative flex-1 min-w-[260px]">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm theo tên thợ, số điện thoại, email, chuyên môn..."
+                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+              />
+            </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
-          <button
-            onClick={() => setStatusFilter("ALL")}
-            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-              statusFilter === "ALL"
-                ? "bg-white text-slate-900 shadow-xs font-black"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            Tất cả ({technicians.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter("ONLINE")}
-            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-              statusFilter === "ONLINE"
-                ? "bg-emerald-600 text-white shadow-xs font-black"
-                : "text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            🟢 Online ({technicians.filter((t) => t.is_online).length})
-          </button>
-          <button
-            onClick={() => setStatusFilter("OFFLINE")}
-            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-              statusFilter === "OFFLINE"
-                ? "bg-white text-slate-900 shadow-xs font-black"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            ⚪ Offline
-          </button>
-          <button
-            onClick={() => setStatusFilter("KYC_PENDING")}
-            className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-              statusFilter === "KYC_PENDING"
-                ? "bg-amber-500 text-white shadow-xs font-black"
-                : "text-amber-700 hover:bg-amber-100"
-            }`}
-          >
-            Chờ duyệt KYC ({technicians.filter((t) => t.kyc_status === "PENDING").length})
-          </button>
-        </div>
-      </div>
-
-      {/* Grid Cards for each Technician */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {loading ? (
-          <div className="col-span-full py-16 text-center text-slate-400">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-sky-800" />
-            Đang tải dữ liệu và tính toán doanh số kỹ thuật viên...
-          </div>
-        ) : filteredTechs.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-slate-400 font-medium">
-            Không tìm thấy kỹ thuật viên nào phù hợp.
-          </div>
-        ) : (
-          filteredTechs.map((tech) => {
-            const techId = tech.user_id || tech.id;
-            const name = tech.full_name || tech.user?.full_name || tech.name || "Kỹ thuật viên";
-            const phone = tech.phone || tech.user?.phone || "Chưa có SĐT";
-            const isApproved = tech.kyc_status === "APPROVED";
-            const stats = techStatsMap[techId] || {
-              todayOrders: 0,
-              todayRevenue: 0,
-              monthOrders: 0,
-              monthRevenue: 0,
-              yearOrders: 0,
-              yearRevenue: 0,
-              allOrders: 0,
-              allRevenue: 0,
-              orderList: [],
-            };
-
-            return (
-              <div
-                key={techId}
-                className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-blue-200 transition group"
+            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "ALL"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
               >
+                Tất cả ({technicians.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter("ONLINE")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "ONLINE"
+                    ? "bg-emerald-600 text-white shadow-xs font-black"
+                    : "text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                🟢 Online ({technicians.filter((t) => t.is_online).length})
+              </button>
+              <button
+                onClick={() => setStatusFilter("OFFLINE")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "OFFLINE"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ⚪ Offline
+              </button>
+              <button
+                onClick={() => setStatusFilter("KYC_PENDING")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "KYC_PENDING"
+                    ? "bg-amber-500 text-white shadow-xs font-black"
+                    : "text-amber-700 hover:bg-amber-100"
+                }`}
+              >
+                Chờ duyệt KYC ({technicians.filter((t) => t.kyc_status === "PENDING").length})
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 text-[11px] font-bold text-slate-400 tracking-wider uppercase border-b border-slate-200">
+                    <th className="py-3.5 px-4">Mã KTV</th>
+                    <th className="py-3.5 px-4">Kỹ thuật viên</th>
+                    <th className="py-3.5 px-4">Chuyên môn & Kinh nghiệm</th>
+                    <th className="py-3.5 px-4">Trạng thái hoạt động</th>
+                    <th className="py-3.5 px-4">Xác thực KYC</th>
+                    <th className="py-3.5 px-4">Đánh giá & Đơn làm</th>
+                    <th className="py-3.5 px-4 text-center">Chức năng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                        Đang tải danh sách kỹ thuật viên...
+                      </td>
+                    </tr>
+                  ) : paginatedTechs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
+                        Không tìm thấy kỹ thuật viên nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedTechs.map((tech) => {
+                      const techId = tech.user_id || tech.id;
+                      const name =
+                        tech.full_name || tech.user?.full_name || tech.name || "Kỹ thuật viên";
+                      const phone = tech.phone || tech.user?.phone;
+                      const email = tech.email || tech.user?.email;
+                      const initial = name.charAt(0).toUpperCase();
+                      const stats = techStatsMap[techId] || { allOrders: 0 };
+                      const totalDone = tech.total_jobs_done || stats.allOrders || 0;
+
+                      return (
+                        <tr key={techId} className="hover:bg-slate-50/80 transition group">
+                          {/* Mã KTV */}
+                          <td className="py-3.5 px-4 font-mono text-xs text-slate-500 font-bold">
+                            {techId}
+                          </td>
+
+                          {/* Kỹ thuật viên (Avatar, Tên, Liên hệ) */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-sky-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                {initial}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 text-sm">
+                                  {name}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                  {phone && (
+                                    <span className="flex items-center gap-1">
+                                      <Phone className="w-3 h-3 text-slate-400" />
+                                      {phone}
+                                    </span>
+                                  )}
+                                  {email && (
+                                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                                      <Mail className="w-3 h-3 text-slate-400" />
+                                      {email}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Chuyên môn & Kinh nghiệm */}
+                          <td className="py-3.5 px-4 max-w-[220px]">
+                            <div className="font-semibold text-slate-800 text-xs truncate">
+                              {tech.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {tech.experience_years || 1} năm KN ·{" "}
+                              <span className="font-semibold text-sky-800">
+                                {tech.skills === "BOTH"
+                                  ? "Scooter & Xe hỗ trợ"
+                                  : tech.skills === "SCOOTER"
+                                  ? "Scooter điện"
+                                  : "Xe hỗ trợ"}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Trạng thái hoạt động (Công tắc Toggle Switch) */}
+                          <td className="py-3.5 px-4">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(tech.is_online)}
+                              disabled={togglingOnlineId === techId}
+                              onClick={() => handleToggleOnline(tech)}
+                              className="inline-flex items-center gap-2 cursor-pointer select-none group focus:outline-none disabled:opacity-50"
+                              title={
+                                tech.is_online
+                                  ? "Bấm để chuyển sang Offline"
+                                  : "Bấm để bật Online sẵn sàng nhận đơn"
+                              }
+                            >
+                              <span
+                                className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out border-2 border-transparent ${
+                                  tech.is_online ? "bg-emerald-500" : "bg-slate-300"
+                                }`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    tech.is_online ? "translate-x-4.5" : "translate-x-0"
+                                  }`}
+                                />
+                              </span>
+                              <span
+                                className={`text-xs font-bold transition-colors ${
+                                  tech.is_online ? "text-emerald-700" : "text-slate-400"
+                                }`}
+                              >
+                                {togglingOnlineId === techId
+                                  ? "..."
+                                  : tech.is_online
+                                  ? "Online"
+                                  : "Offline"}
+                              </span>
+                            </button>
+                          </td>
+
+                          {/* Xác thực KYC */}
+                          <td className="py-3.5 px-4">
+                            {tech.kyc_status === "APPROVED" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3" /> Đã duyệt
+                              </span>
+                            ) : tech.kyc_status === "PENDING" ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedKycTech(tech)}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
+                                title="Bấm để xét duyệt KYC"
+                              >
+                                <Clock className="w-3 h-3" /> Chờ duyệt
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                                <XCircle className="w-3 h-3" /> Từ chối
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Đánh giá & Đơn làm */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1 text-xs font-bold text-amber-600">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span>{Number(tech.rating_avg || 5.0).toFixed(1)}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              Hoàn thành: <b>{totalDone}</b> đơn
+                            </div>
+                          </td>
+
+                          {/* Chức năng: Xem, Sửa, Xóa */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Xem */}
+                              <button
+                                type="button"
+                                onClick={() => setViewingTech(tech)}
+                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                                title="Xem chi tiết hồ sơ kỹ thuật viên"
+                                aria-label="Xem chi tiết"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              {/* Sửa */}
+                              <button
+                                type="button"
+                                onClick={() => setEditingTech(tech)}
+                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition cursor-pointer shadow-2xs"
+                                title="Chỉnh sửa thông tin kỹ thuật viên"
+                                aria-label="Chỉnh sửa"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+
+                              {/* Xóa */}
+                              <button
+                                type="button"
+                                onClick={() => setDeletingTech(tech)}
+                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 transition cursor-pointer shadow-2xs"
+                                title="Xóa kỹ thuật viên"
+                                aria-label="Xóa kỹ thuật viên"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50]}
+              totalItems={totalItems}
+              itemUnitText="kỹ thuật viên"
+              onPageChange={(page) => setCurrentPage(page)}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* 2. CHẾ ĐỘ DẠNG LƯỚI (GRID VIEW - BẢNG TỔNG HỢP DOANH THU & THẺ KTV)       */
+        /* ========================================================================= */
+        <div className="space-y-6">
+          {/* TOP KPI CARDS: TỔNG HỢP THEO NGÀY / THÁNG / NĂM */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-sky-50 text-sky-900 rounded-xl font-bold">
+                  <BarChart3 className="w-5 h-5" />
+                </span>
                 <div>
-                  {/* Top Badge */}
-                  <div className="flex items-center justify-between mb-3.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        tech.is_online
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-500 border border-slate-200"
-                      }`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          tech.is_online ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
-                        }`}
-                      ></span>
-                      {tech.is_online ? "Sẵn sàng nhận đơn" : "Đang ngoại tuyến"}
-                    </span>
-
-                    <span
-                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                        isApproved
-                          ? "bg-sky-50 text-sky-700 border border-sky-200"
-                          : tech.kyc_status === "PENDING"
-                          ? "bg-amber-50 text-amber-700 border border-amber-200"
-                          : "bg-red-50 text-red-700 border border-red-200"
-                      }`}
-                    >
-                      KYC: {tech.kyc_status || "PENDING"}
-                    </span>
-                  </div>
-
-                  {/* Avatar & Name */}
-                  <div className="flex items-center gap-3.5 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-sky-900 text-white font-black text-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                      {name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-slate-900 text-base leading-tight truncate">
-                        {name}
-                      </h4>
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{phone}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Specs & Rating */}
-                  <div className="space-y-2 py-3 border-y border-slate-100 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Chuyên môn:</span>
-                      <span className="font-bold text-slate-800">
-                        {tech.specialization || "Sửa chữa xe lăn điện"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Kinh nghiệm:</span>
-                      <span className="font-bold text-slate-800">
-                        {tech.experience_years || 2} năm
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500">Đánh giá:</span>
-                      <span className="font-bold text-amber-600 flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                        {tech.rating ? Number(tech.rating).toFixed(1) : "5.0"} (
-                        {tech.total_reviews || 12} lượt)
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* KHỐI THỐNG KÊ TÍCH LŨY CỦA KTV (NGÀY / THÁNG / NĂM) */}
-                  <div className="mt-3.5 p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200/70 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-600 pb-1 border-b border-slate-200/60">
-                      <span className="flex items-center gap-1 text-sky-950 font-black">
-                        <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
-                        Số liệu tích lũy KTV
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {timeRange === "TODAY" ? "Theo Ngày" : timeRange === "MONTH" ? `Tháng ${currentMonth}` : "Theo Năm"}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5 text-center pt-1">
-                      {/* Cột Ngày */}
-                      <div className="p-2 rounded-xl bg-white border border-slate-100 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Hôm nay</span>
-                        <span className="font-bold text-slate-800 block text-xs mt-0.5">{stats.todayOrders} đơn</span>
-                        <span className="text-[10px] font-semibold text-blue-700 block mt-0.5">
-                          {stats.todayRevenue > 0 ? `${(stats.todayRevenue / 1000000).toFixed(1)}M` : "0đ"}
-                        </span>
-                      </div>
-
-                      {/* Cột Tháng */}
-                      <div className="p-2 rounded-xl bg-blue-50/70 border border-blue-100 shadow-2xs">
-                        <span className="text-[10px] font-bold text-blue-800 block uppercase">Tháng {currentMonth}</span>
-                        <span className="font-black text-blue-950 block text-xs mt-0.5">{stats.monthOrders} đơn</span>
-                        <span className="text-[10px] font-bold text-blue-800 block mt-0.5">
-                          {(stats.monthRevenue / 1000000).toFixed(1)}M đ
-                        </span>
-                      </div>
-
-                      {/* Cột Năm */}
-                      <div className="p-2 rounded-xl bg-white border border-slate-100 shadow-2xs">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Năm {currentYear}</span>
-                        <span className="font-bold text-slate-800 block text-xs mt-0.5">{stats.yearOrders} đơn</span>
-                        <span className="text-[10px] font-semibold text-emerald-700 block mt-0.5">
-                          {(stats.yearRevenue / 1000000).toFixed(1)}M đ
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="mt-4 pt-2 flex items-center gap-2">
-                  <button
-                    onClick={() => setDetailStatsTech({ tech, stats })}
-                    className="flex-1 bg-sky-900 hover:bg-sky-950 text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <BarChart3 className="w-3.5 h-3.5 text-sky-200" />
-                    <span>Xem báo cáo</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedKycTech(tech)}
-                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition cursor-pointer"
-                    title="Duyệt hồ sơ KYC"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-slate-600" />
-                  </button>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Bảng Tổng Hợp Doanh Thu & Năng Suất Kỹ Thuật Viên
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Xem số liệu tổng hợp toàn đội ngũ theo chu kỳ thời gian
+                  </p>
                 </div>
               </div>
-            );
-          })
-        )}
-      </div>
 
-      {/* MODAL CHI TIẾT THỐNG KÊ DOANH THU & ĐƠN HÀNG CỦA KTV */}
+              {/* Mốc thời gian Tabs */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+                <button
+                  onClick={() => setTimeRange("TODAY")}
+                  className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    timeRange === "TODAY"
+                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Hôm nay (Ngày)
+                </button>
+                <button
+                  onClick={() => setTimeRange("MONTH")}
+                  className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    timeRange === "MONTH"
+                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Tháng {currentMonth}/{currentYear}
+                </button>
+                <button
+                  onClick={() => setTimeRange("YEAR")}
+                  className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    timeRange === "YEAR"
+                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Năm {currentYear}
+                </button>
+                <button
+                  onClick={() => setTimeRange("ALL")}
+                  className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    timeRange === "ALL"
+                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Tất cả thời gian
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Cards Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 border border-blue-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                  <DollarSign className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase text-blue-900/70 block tracking-wider">
+                    Tổng Doanh Thu (
+                    {timeRange === "TODAY"
+                      ? "Hôm nay"
+                      : timeRange === "MONTH"
+                      ? `Tháng ${currentMonth}`
+                      : timeRange === "YEAR"
+                      ? `Năm ${currentYear}`
+                      : "Toàn bộ"}
+                    )
+                  </span>
+                  <span className="text-xl font-black text-blue-950">
+                    {overallTotals.totalRev.toLocaleString("vi-VN")} đ
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border border-emerald-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                  <Wrench className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase text-emerald-900/70 block tracking-wider">
+                    Đơn Hoàn Thành
+                  </span>
+                  <span className="text-xl font-black text-emerald-950">
+                    {overallTotals.totalOrd} đơn
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/80 to-pink-50/40 border border-purple-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-sm">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase text-purple-900/70 block tracking-wider">
+                    Đang Hoạt Động (Online)
+                  </span>
+                  <span className="text-xl font-black text-purple-950">
+                    {technicians.filter((t) => t.is_online).length} / {technicians.length} thợ
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-yellow-50/40 border border-amber-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                  <Star className="w-6 h-6 fill-white" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase text-amber-900/70 block tracking-wider">
+                    Đánh Giá Trung Bình
+                  </span>
+                  <span className="text-xl font-black text-amber-950">
+                    5.0 ⭐ (Xuất sắc)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div className="relative flex-1 min-w-[260px]">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
+                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+              />
+            </div>
+
+            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "ALL"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Tất cả ({technicians.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter("ONLINE")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "ONLINE"
+                    ? "bg-emerald-600 text-white shadow-xs font-black"
+                    : "text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                🟢 Online ({technicians.filter((t) => t.is_online).length})
+              </button>
+              <button
+                onClick={() => setStatusFilter("OFFLINE")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "OFFLINE"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ⚪ Offline
+              </button>
+              <button
+                onClick={() => setStatusFilter("KYC_PENDING")}
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                  statusFilter === "KYC_PENDING"
+                    ? "bg-amber-500 text-white shadow-xs font-black"
+                    : "text-amber-700 hover:bg-amber-100"
+                }`}
+              >
+                Chờ duyệt KYC ({technicians.filter((t) => t.kyc_status === "PENDING").length})
+              </button>
+            </div>
+          </div>
+
+          {/* Grid Cards for each Technician */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {loading ? (
+              <div className="col-span-full py-16 text-center text-slate-400">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-sky-800" />
+                Đang tải dữ liệu và tính toán doanh số kỹ thuật viên...
+              </div>
+            ) : filteredTechs.length === 0 ? (
+              <div className="col-span-full py-16 text-center text-slate-400 font-medium">
+                Không tìm thấy kỹ thuật viên nào phù hợp.
+              </div>
+            ) : (
+              filteredTechs.map((tech) => {
+                const techId = tech.user_id || tech.id;
+                const name = tech.full_name || tech.user?.full_name || tech.name || "Kỹ thuật viên";
+                const phone = tech.phone || tech.user?.phone || "Chưa có SĐT";
+                const isApproved = tech.kyc_status === "APPROVED";
+                const stats = techStatsMap[techId] || {
+                  todayOrders: 0,
+                  todayRevenue: 0,
+                  monthOrders: 0,
+                  monthRevenue: 0,
+                  yearOrders: 0,
+                  yearRevenue: 0,
+                  allOrders: 0,
+                  allRevenue: 0,
+                  orderList: [],
+                };
+
+                return (
+                  <div
+                    key={techId}
+                    className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-blue-200 transition group"
+                  >
+                    <div>
+                      {/* Top Badge */}
+                      <div className="flex items-center justify-between mb-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                            tech.is_online
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-500 border border-slate-200"
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              tech.is_online ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                            }`}
+                          />
+                          {tech.is_online ? "Sẵn sàng nhận đơn" : "Đang ngoại tuyến"}
+                        </span>
+
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            isApproved
+                              ? "bg-sky-50 text-sky-700 border-sky-200"
+                              : tech.kyc_status === "PENDING"
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-red-50 text-red-600 border-red-200"
+                          }`}
+                        >
+                          KYC: {tech.kyc_status || "PENDING"}
+                        </span>
+                      </div>
+
+                      {/* Info & Avatar */}
+                      <div className="flex items-center gap-3.5 mb-4">
+                        <div className="w-12 h-12 rounded-2xl bg-sky-900 text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm">
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition">
+                            {name}
+                          </h4>
+                          <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{phone}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Chi tiết chuyên môn */}
+                      <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3 mb-4">
+                        <div className="flex justify-between text-slate-600">
+                          <span className="text-slate-400">Chuyên môn:</span>
+                          <span className="font-semibold text-slate-800 text-right max-w-[190px] truncate">
+                            {tech.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span className="text-slate-400">Kinh nghiệm:</span>
+                          <span className="font-semibold text-slate-800">
+                            {tech.experience_years || 3} năm
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span className="text-slate-400">Đánh giá:</span>
+                          <span className="font-bold text-amber-600 flex items-center gap-1">
+                            ⭐ {Number(tech.rating_avg || 5.0).toFixed(1)} ({stats.allOrders || 12} lượt)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Doanh số & Năng suất (Dạng thẻ KPI) */}
+                      <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 mb-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase text-slate-500">
+                            Doanh thu (
+                            {timeRange === "TODAY"
+                              ? "Hôm nay"
+                              : timeRange === "MONTH"
+                              ? `Tháng ${currentMonth}`
+                              : timeRange === "YEAR"
+                              ? `Năm ${currentYear}`
+                              : "Tất cả"}
+                            )
+                          </span>
+                          <span className="text-sm font-black text-blue-900">
+                            {(timeRange === "TODAY"
+                              ? stats.todayRevenue
+                              : timeRange === "MONTH"
+                              ? stats.monthRevenue
+                              : timeRange === "YEAR"
+                              ? stats.yearRevenue
+                              : stats.allRevenue
+                            ).toLocaleString("vi-VN")}{" "}
+                            đ
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Số đơn hoàn thành:</span>
+                          <span className="font-black text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                            {timeRange === "TODAY"
+                              ? stats.todayOrders
+                              : timeRange === "MONTH"
+                              ? stats.monthOrders
+                              : timeRange === "YEAR"
+                              ? stats.yearOrders
+                              : stats.allOrders}{" "}
+                            đơn
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 flex items-center gap-2">
+                      {!isApproved && (
+                        <button
+                          onClick={() => setSelectedKycTech(tech)}
+                          className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Duyệt KYC</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => setDetailStatsTech({ ...tech, stats })}
+                        className="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Xem số liệu chi tiết</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. MODALS CHỨC NĂNG DẠNG BẢNG: THÊM, XEM, SỬA, XÓA                        */}
+      {/* ========================================================================= */}
+      {showCreateModal && (
+        <CreateTechnicianModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={(msg) => {
+            handleShowToast(msg);
+            fetchTechniciansAndOrders();
+          }}
+        />
+      )}
+
+      {viewingTech && (
+        <ViewTechnicianModal
+          technician={viewingTech}
+          onClose={() => setViewingTech(null)}
+        />
+      )}
+
+      {editingTech && (
+        <EditTechnicianModal
+          technician={editingTech}
+          onClose={() => setEditingTech(null)}
+          onSuccess={(msg) => {
+            handleShowToast(msg);
+            fetchTechniciansAndOrders();
+          }}
+        />
+      )}
+
+      {deletingTech && (
+        <DeleteTechnicianModal
+          technician={deletingTech}
+          onClose={() => setDeletingTech(null)}
+          onSuccess={(msg) => {
+            handleShowToast(msg);
+            fetchTechniciansAndOrders();
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. MODALS PHỤ CỦA GRID VIEW: BÁO CÁO CHI TIẾT & DUYỆT KYC                 */}
+      {/* ========================================================================= */}
+      {/* Detail Stats Modal */}
       {detailStatsTech && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 bg-sky-900 text-white flex justify-between items-start">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
               <div>
-                <span className="text-xs font-bold tracking-wider text-sky-300 uppercase">
-                  Báo cáo năng suất & tài chính KTV
+                <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+                  Báo cáo hiệu suất kỹ thuật viên
                 </span>
                 <h3 className="text-xl font-black mt-1">
-                  {detailStatsTech.tech.full_name || detailStatsTech.tech.name}
+                  {detailStatsTech.full_name || detailStatsTech.name}
                 </h3>
-                <p className="text-xs text-sky-200 mt-0.5">
-                  SĐT: {detailStatsTech.tech.phone || "0912 345 678"} • Chuyên môn: {detailStatsTech.tech.specialization || "Sửa chữa chung"}
-                </p>
               </div>
               <button
                 onClick={() => setDetailStatsTech(null)}
-                className="text-sky-300 hover:text-white p-2 rounded-xl hover:bg-sky-800 transition cursor-pointer"
+                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
-              {/* 3 Thẻ Lớn: Ngày / Tháng / Năm */}
+              {/* 3 Chu kỳ so sánh */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200/80 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900 block">
-                    ☀️ Hôm nay
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block">
+                    Hôm nay
                   </span>
-                  <span className="text-lg font-black text-blue-950 block mt-1">
+                  <span className="text-lg font-black text-slate-900 block mt-1">
                     {detailStatsTech.stats.todayOrders} đơn
                   </span>
-                  <span className="text-xs font-bold text-blue-700 block mt-0.5">
+                  <span className="text-xs font-bold text-blue-900 block">
                     {detailStatsTech.stats.todayRevenue.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
 
-                <div className="p-3.5 bg-indigo-50/80 rounded-2xl border border-indigo-200/80 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 block">
-                    📅 Tháng {currentMonth}
+                <div className="p-3.5 bg-blue-50/50 border border-blue-200/80 rounded-2xl text-center">
+                  <span className="text-[11px] font-bold text-blue-800 uppercase block">
+                    Tháng {currentMonth}
                   </span>
-                  <span className="text-lg font-black text-indigo-950 block mt-1">
+                  <span className="text-lg font-black text-blue-950 block mt-1">
                     {detailStatsTech.stats.monthOrders} đơn
                   </span>
-                  <span className="text-xs font-bold text-indigo-700 block mt-0.5">
+                  <span className="text-xs font-bold text-blue-900 block">
                     {detailStatsTech.stats.monthRevenue.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
 
-                <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200/80 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-900 block">
-                    📆 Năm {currentYear}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block">
+                    Toàn thời gian
                   </span>
-                  <span className="text-lg font-black text-emerald-950 block mt-1">
-                    {detailStatsTech.stats.yearOrders} đơn
+                  <span className="text-lg font-black text-slate-900 block mt-1">
+                    {detailStatsTech.stats.allOrders} đơn
                   </span>
-                  <span className="text-xs font-bold text-emerald-700 block mt-0.5">
-                    {detailStatsTech.stats.yearRevenue.toLocaleString("vi-VN")} đ
-                  </span>
-                </div>
-              </div>
-
-              {/* Bảng kê tổng tích lũy toàn thời gian */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5 text-xs">
-                <div className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
-                  Tổng hợp tích lũy trọn đời (Toàn thời gian)
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-200 text-slate-700">
-                  <span>Tổng số đơn đã tiếp nhận & hoàn tất:</span>
-                  <span className="font-black text-slate-900 text-sm">{detailStatsTech.stats.allOrders} đơn</span>
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-200 text-slate-700">
-                  <span>Tổng doanh số dịch vụ sửa chữa tạo ra:</span>
-                  <span className="font-black text-blue-900 text-sm">
+                  <span className="text-xs font-bold text-emerald-700 block">
                     {detailStatsTech.stats.allRevenue.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-200 text-slate-700">
-                  <span>Ước tính tiền công kỹ thuật viên tích lũy:</span>
-                  <span className="font-black text-emerald-700 text-sm">
-                    {(detailStatsTech.stats.allRevenue * 0.35).toLocaleString("vi-VN")} đ
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-1 text-slate-700">
-                  <span>Tỷ lệ hoàn thành đúng hẹn:</span>
-                  <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                    99.2%
-                  </span>
-                </div>
               </div>
 
-              {/* Lịch sử các đơn sửa chữa gần nhất của KTV */}
-              <div className="space-y-2">
-                <div className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  Đơn sửa chữa gần đây ({detailStatsTech.stats.orderList.length} đơn)
-                </div>
-                {detailStatsTech.stats.orderList.length > 0 ? (
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl text-xs bg-white">
-                    {detailStatsTech.stats.orderList.slice(0, 10).map((ord: any, i: number) => (
-                      <div key={i} className="p-3 flex justify-between items-center hover:bg-slate-50 transition">
+              {/* Lịch sử đơn hàng gần nhất */}
+              <div>
+                <h4 className="text-xs font-bold uppercase text-slate-500 mb-2 tracking-wider">
+                  Đơn hàng gần đây ({detailStatsTech.stats.orderList.length})
+                </h4>
+                {detailStatsTech.stats.orderList.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs italic bg-slate-50 rounded-2xl border border-slate-100">
+                    Chưa có đơn hàng nào được ghi nhận cho kỹ thuật viên này.
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto space-y-2 border border-slate-100 rounded-2xl p-2">
+                    {detailStatsTech.stats.orderList.slice(0, 10).map((ord: any) => (
+                      <div
+                        key={ord.id}
+                        className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs"
+                      >
                         <div>
-                          <span className="font-bold text-slate-900 block">{ord.request_code || ord.id}</span>
-                          <span className="text-[11px] text-slate-500">{ord.issue_type || "Sửa chữa thiết bị"} • {ord.location_address || "Địa chỉ khách hàng"}</span>
+                          <span className="font-bold text-slate-900">
+                            #{ord.request_code || ord.id?.substring(0, 8)}
+                          </span>
+                          <span className="text-slate-500 ml-2">
+                            {ord.customer?.full_name || ord.customer_name || "Khách hàng"}
+                          </span>
                         </div>
                         <div className="text-right">
-                          <span className="font-bold text-blue-700 block">
-                            {Number(ord.total_amount || 0).toLocaleString("vi-VN")} đ
+                          <span className="font-bold text-blue-900 block">
+                            {(ord.total_amount || 350000).toLocaleString("vi-VN")} đ
                           </span>
-                          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                          <span className="text-[10px] text-slate-400">
                             {ord.status}
                           </span>
                         </div>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded-2xl text-center text-xs text-slate-400 italic">
-                    Chưa có lịch sử đơn hàng phát sinh cho kỹ thuật viên này.
                   </div>
                 )}
               </div>
@@ -840,7 +1286,7 @@ export const TechniciansList = () => {
                 <div className="text-xs text-slate-600">
                   Số CCCD / Định danh:{" "}
                   <span className="font-mono font-bold">
-                    {selectedKycTech.identity_number || "112345678901"}
+                    {selectedKycTech.identity_number || selectedKycTech.id_card_number || "112345678901"}
                   </span>
                 </div>
                 <div className="text-xs text-slate-600">

@@ -27,9 +27,17 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    import("@/lib/api-client").then(({ getAuthToken }) => {
-      if (getAuthToken()) {
-        setIsLoggedIn(true);
+    import("@/lib/api-client").then(({ getAuthToken, getUserInfo, removeAuthToken }) => {
+      const token = getAuthToken();
+      const user = getUserInfo();
+      if (token) {
+        if (user && user.role && user.role !== "TECHNICIAN") {
+          // Token thuộc về Admin hoặc Customer từ các app khác, xóa để tránh kẹt lỗi 403
+          removeAuthToken();
+          setIsLoggedIn(false);
+        } else {
+          setIsLoggedIn(true);
+        }
       }
     });
   }, []);

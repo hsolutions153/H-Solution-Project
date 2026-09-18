@@ -123,14 +123,6 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
             disabled={!isApproved}
             onClick={() => {
               if (!isApproved) return;
-              if (task?.id) {
-                import("@/lib/api-client").then(({ fetchApi }) => {
-                  fetchApi(`/repair-requests/${task.id}/status`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ status: "REPAIRING" }),
-                  }).catch((err) => console.error("Error starting repair:", err));
-                });
-              }
               onContinueRepair();
             }}
             className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm ${

@@ -26,6 +26,7 @@ interface TaskDetailScreenProps {
     taskId: string,
     status: TaskStatus,
     statusText: string,
+    explicitBackendStatus?: string
   ) => void;
 }
 
@@ -36,7 +37,7 @@ export const TaskDetailScreen = ({
 }: TaskDetailScreenProps) => {
   const [isTravelModalOpen, setIsTravelModalOpen] = useState(false);
 
-  // Quản lý các bước con khi ở trạng thái IN_PROGRESS
+  // Quản lý các bước con khi ở trạng thái IN_PROGRESS / DIAGNOSING / QUOTE
   const [subStep, setSubStep] = useState<"DIAGNOSTIC" | "QUOTE" | "QUOTE_STATUS" | "REPAIR">(() => {
     return (
       (sessionStorage.getItem("subStep") as any) ||
@@ -77,16 +78,34 @@ export const TaskDetailScreen = ({
     taskId: string,
     status: TaskStatus,
     statusText: string,
+    explicitBackendStatus?: string
   ) => {
-    onUpdateStatus(taskId, status, statusText);
+    onUpdateStatus(taskId, status, statusText, explicitBackendStatus);
   };
 
   if (!task) return null;
 
-  // Khi đang ở trạng thái IN_PROGRESS, điều phối hiển thị các bước con
-  if (task.status === "IN_PROGRESS") {
-    // Với đơn đặt lịch hẹn (không phải SOS khẩn cấp), nếu chưa chọn bước nào khác thì mặc định vào màn hình Sửa chữa & Báo giá
-    const activeSubStep = !task.isEmergency && subStep === "DIAGNOSTIC" ? "REPAIR" : subStep;
+  // Khi đang ở trạng thái quy trình nghiệp vụ: DIAGNOSING, WAITING_FOR_APPROVAL, ESTIMATE_APPROVED, REPAIRING, IN_PROGRESS
+  const isProcessStep = [
+    "DIAGNOSING",
+    "WAITING_FOR_APPROVAL",
+    "ESTIMATE_APPROVED",
+    "ESTIMATE_REJECTED",
+    "REPAIRING",
+    "IN_PROGRESS",
+  ].includes(task.status);
+
+  if (isProcessStep) {
+    let activeSubStep = subStep;
+    if (task.status === "DIAGNOSING") {
+      activeSubStep = subStep === "QUOTE" ? "QUOTE" : "DIAGNOSTIC";
+    } else if (task.status === "WAITING_FOR_APPROVAL" || task.status === "ESTIMATE_REJECTED") {
+      activeSubStep = "QUOTE_STATUS";
+    } else if (task.status === "ESTIMATE_APPROVED") {
+      activeSubStep = subStep === "REPAIR" ? "REPAIR" : "QUOTE_STATUS";
+    } else if (task.status === "REPAIRING") {
+      activeSubStep = "REPAIR";
+    }
 
     // 1. Màn hình Tạo báo giá
     if (activeSubStep === "QUOTE") {
@@ -94,13 +113,13 @@ export const TaskDetailScreen = ({
         <CreateQuoteScreen
           task={task}
           diagnosticData={diagnosticData}
-          onBack={() => setSubStep(task.isEmergency ? "DIAGNOSTIC" : "REPAIR")}
+          onBack={() => setSubStep("DIAGNOSTIC")}
           onSubmitQuote={(data) => {
             console.log("Dữ liệu báo giá:", data);
             setQuoteData(data);
 
             if (data.status === "SENT") {
-              onUpdateStatus(task.id, "IN_PROGRESS", "Đã gửi báo giá");
+              onUpdateStatus(task.id, "WAITING_FOR_APPROVAL", "Đã gửi báo giá", "WAITING_FOR_APPROVAL");
               setSubStep("QUOTE_STATUS");
             } else {
               alert("Đã lưu nháp báo giá thành công!");
@@ -115,10 +134,13 @@ export const TaskDetailScreen = ({
       return (
         <QuoteStatusScreen
           task={task}
-          isApproved={task.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
+          isApproved={task.status === "ESTIMATE_APPROVED" || task.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
           onBack={() => setSubStep("QUOTE")}
           onViewDetailQuote={() => setSubStep("QUOTE")}
-          onContinueRepair={() => setSubStep("REPAIR")}
+          onContinueRepair={() => {
+            onUpdateStatus(task.id, "REPAIRING", "Đang sửa chữa", "REPAIRING");
+            setSubStep("REPAIR");
+          }}
         />
       );
     }
@@ -129,14 +151,10 @@ export const TaskDetailScreen = ({
         <RepairScreen
           task={task}
           onBack={() => {
-            if (task.isEmergency) {
-              setSubStep("QUOTE_STATUS");
-            } else {
-              onBack();
-            }
+            setSubStep("QUOTE_STATUS");
           }}
           onComplete={() => {
-            onUpdateStatus(task.id, "COMPLETED", "Hoàn thành");
+            onUpdateStatus(task.id, "COMPLETED", "Hoàn thành", "COMPLETED");
             sessionStorage.removeItem("subStep");
             onBack();
           }}
@@ -144,12 +162,12 @@ export const TaskDetailScreen = ({
       );
     }
 
-    // Mặc định: Màn hình Chẩn đoán (cho đơn SOS)
+    // Mặc định: Màn hình Chẩn đoán
     return (
       <DiagnosticScreen
         task={task}
         onBack={() => {
-          onUpdateStatus(task.id, "ARRIVED", "Đã đến nơi");
+          onUpdateStatus(task.id, "ARRIVED", "Đã đến nơi", "ARRIVED");
         }}
         onSubmitDiagnostic={(data) => {
           console.log("Dữ liệu chẩn đoán đã lưu:", data);
@@ -316,108 +334,74 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      {!task.isEmergency ? (
-        // ==================== ĐƠN ĐẶT LỊCH HẸN TRƯỚC ====================
-        task.status === "WAITING_ACCEPT" ? (
+      <div className="space-y-2">
+        {task.status === "WAITING_ACCEPT" && (
           <button
             onClick={() => {
-              onUpdateStatus(task.id, "PENDING", "Đã xác nhận lịch");
-              import("@/lib/api-client").then(({ fetchApi }) => {
-                fetchApi(`/repair-requests/${task.id}/status`, {
-                  method: "PATCH",
-                  body: JSON.stringify({ status: "ACCEPTED" }),
-                }).catch(() => {});
-              });
+              onUpdateStatus(task.id, "PENDING", task.isEmergency ? "Tiếp nhận đơn" : "Đã xác nhận lịch", "ACCEPTED");
             }}
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Xác nhận lịch hẹn
+            {task.isEmergency ? "Tiếp nhận đơn cứu hộ" : "Xác nhận lịch hẹn"}
           </button>
-        ) : task.status !== "COMPLETED" && task.status !== "CANCELLED" ? (
+        )}
+
+        {task.status === "PENDING" && (
           <button
             onClick={() => {
-              onUpdateStatus(task.id, "IN_PROGRESS", "Đang sửa chữa");
-              setSubStep("REPAIR");
-              import("@/lib/api-client").then(({ fetchApi }) => {
-                fetchApi(`/repair-requests/${task.id}/status`, {
-                  method: "PATCH",
-                  body: JSON.stringify({ status: "REPAIRING" }),
-                }).catch(() => {});
-              });
+              onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển", "EN_ROUTE");
+              setIsTravelModalOpen(true);
             }}
-            className="w-full py-3 bg-[#005288] hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
           >
-            <CheckCircle2 className="w-4 h-4" />
-            Đến nơi & Bắt đầu sửa chữa (Báo giá)
+            <Bike className="w-4 h-4" />
+            Xác nhận di chuyển
           </button>
-        ) : null
-      ) : (
-        // ==================== ĐƠN CỨU HỘ KHẨN CẤP (SOS) ====================
-        <>
-          {task.status === "WAITING_ACCEPT" && (
-            <button
-              onClick={() => {
-                onUpdateStatus(task.id, "PENDING", "Tiếp nhận đơn");
-                import("@/lib/api-client").then(({ fetchApi }) => {
-                  fetchApi(`/repair-requests/${task.id}/status`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ status: "ACCEPTED" }),
-                  }).catch(() => {});
-                });
-              }}
-              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Tiếp nhận đơn cứu hộ
-            </button>
-          )}
+        )}
 
-          {task.status === "PENDING" && (
-            <button
-              onClick={() => {
-                onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển");
-                setIsTravelModalOpen(true);
-              }}
-              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <Bike className="w-4 h-4" />
-              Xác nhận di chuyển
-            </button>
-          )}
-
-          {(task.status === "WAITING_MOVE" || task.status === "MOVING") && (
+        {(task.status === "WAITING_MOVE" || task.status === "MOVING") && (
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setIsTravelModalOpen(true)}
-              className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              className="py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
             >
               <Bike className="w-4 h-4" />
-              {task.status === "WAITING_MOVE" ? "Tiếp tục di chuyển" : "Tiếp tục hành trình"}
+              {task.status === "WAITING_MOVE" ? "Bản đồ di chuyển" : "Tiếp tục hành trình"}
             </button>
-          )}
-
-          {task.status === "ARRIVED" && (
             <button
               onClick={() => {
-                onUpdateStatus(task.id, "IN_PROGRESS", "Đang thực hiện");
-                setSubStep("DIAGNOSTIC");
+                onUpdateStatus(task.id, "ARRIVED", "Đã đến nơi", "ARRIVED");
               }}
-              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              className="py-3 bg-emerald-700 hover:bg-emerald-800 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
             >
               <CheckCircle2 className="w-4 h-4" />
-              Bắt đầu công việc
+              Đã đến nơi
             </button>
-          )}
+          </div>
+        )}
 
-          {isTravelModalOpen && (
-            <TravelMapModal
-              task={task}
-              onClose={() => setIsTravelModalOpen(false)}
-              onStatusChange={handleStatusChange}
-            />
-          )}
-        </>
-      )}
+        {task.status === "ARRIVED" && (
+          <button
+            onClick={() => {
+              onUpdateStatus(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
+              setSubStep("DIAGNOSTIC");
+            }}
+            className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Bắt đầu kiểm tra & Chẩn đoán
+          </button>
+        )}
+
+        {isTravelModalOpen && (
+          <TravelMapModal
+            task={task}
+            onClose={() => setIsTravelModalOpen(false)}
+            onStatusChange={handleStatusChange}
+          />
+        )}
+      </div>
     </div>
   );
 };

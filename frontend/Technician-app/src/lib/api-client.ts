@@ -108,8 +108,19 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       `Yêu cầu thất bại (${response.status})`;
     const errorCode = data?.detail?.code || data?.code;
 
-    if (response.status === 401 && typeof window !== "undefined") {
-      removeAuthToken();
+    if ((response.status === 401 || response.status === 403) && typeof window !== "undefined") {
+      const rawUser = localStorage.getItem("user_info");
+      if (rawUser) {
+        try {
+          const u = JSON.parse(rawUser);
+          if (u.role && u.role !== "TECHNICIAN") {
+            removeAuthToken();
+          }
+        } catch {}
+      }
+      if (response.status === 401) {
+        removeAuthToken();
+      }
     }
 
     throw new ApiError(errorMsg, response.status, errorCode);

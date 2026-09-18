@@ -268,6 +268,10 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
     reassigned_count = 0
 
     for req in assigned_requests:
+        # Chỉ áp dụng auto timeout 2 phút cho đơn cứu hộ khẩn cấp (SOS)
+        if not req.get("is_sos"):
+            continue
+
         raw_ts = req.get("assigned_at") or req.get("updated_at") or req.get("created_at")
         if not raw_ts:
             continue
@@ -602,6 +606,17 @@ def update_request_status(request_id: str, current_user: dict, data):
 
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
     is_customer = _is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"]
+
+    # Nếu trạng thái không thay đổi, coi như thành công ngay lập tức (Idempotent)
+    if new_status == request["status"]:
+        return fetch_request(request_id, current_user)
+
+    if _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") != current_user["sub"]:
+        raise AppException(
+            ErrorCode.FORBIDDEN,
+            message="Bạn không phải là kỹ thuật viên phụ trách đơn này hoặc đơn đã được chuyển giao cho thợ khác."
+        )
+
     is_technician = _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]
 
     if is_admin:
@@ -797,7 +812,7 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    if request.get("status") not in {"DIAGNOSING", "ARRIVED"}:
+    if request.get("status") not in {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED"}:
         raise AppException(
             ErrorCode.INVALID_STATUS_TRANSITION,
             message="Yêu cầu phải ở trạng thái Đang chẩn đoán (DIAGNOSING) để tạo báo giá.",

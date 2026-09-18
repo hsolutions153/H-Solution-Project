@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Task, HistoryTask } from "@/types/task";
+import { fetchApi } from "@/lib/api-client";
 import {
   ArrowLeft,
   Play,
@@ -263,34 +264,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const handleFinishRepair = async () => {
     if (task?.id) {
       try {
-        const { fetchApi } = await import("@/lib/api-client");
-        // 1. Lưu chi tiết báo giá và các hạng mục linh kiện
-        await fetchApi(`/repair-requests/${task.id}/quotes`, {
-          method: "POST",
-          body: JSON.stringify({
-            items: [
-              ...components.map((it) => ({
-                item_name: it.name,
-                quantity: it.quantity,
-                unit_price: it.price,
-                subtotal: it.price * it.quantity,
-              })),
-              {
-                item_name: "Tiền công kỹ thuật viên",
-                quantity: 1,
-                unit_price: laborCost,
-                subtotal: laborCost,
-              },
-            ],
-            parts_cost: partsCost,
-            labor_fee: laborCost,
-            estimated_price: totalCost,
-            total_amount: totalCost,
-            diagnosis_note: note || "Hoàn tất sửa chữa thiết bị theo lịch hẹn",
-          }),
-        }).catch((err) => console.warn("Lưu báo giá:", err));
-
-        // 2. Cập nhật trạng thái hoàn thành với tổng tiền
+        // Báo giá đã được tạo và khách duyệt ở bước trước. Khi xong việc chỉ cần cập nhật trạng thái COMPLETED.
+        // Cập nhật trạng thái hoàn thành với tổng tiền
         await fetchApi(`/repair-requests/${task.id}/status`, {
           method: "PATCH",
           body: JSON.stringify({

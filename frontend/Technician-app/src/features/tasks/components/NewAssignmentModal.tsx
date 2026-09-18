@@ -30,11 +30,12 @@ export const NewAssignmentModal = ({
   onTimeout,
 }: NewAssignmentModalProps) => {
   const [timeLeft, setTimeLeft] = useState(120); // 2 phút đếm ngược
+  const taskId = task?.id;
 
   useEffect(() => {
-    if (!isOpen || !task) return;
+    if (!isOpen || !taskId) return;
 
-    // Reset về 2 phút (120 giây) mỗi lần nhận phân công mới
+    // Reset về 2 phút (120 giây) mỗi lần nhận phân công mới (theo taskId)
     setTimeLeft(120);
 
     const timer = setInterval(() => {
@@ -42,9 +43,9 @@ export const NewAssignmentModal = ({
         if (prev <= 1) {
           clearInterval(timer);
           if (onTimeout) {
-            onTimeout(task.id);
+            onTimeout(taskId);
           } else {
-            onReject(task.id);
+            onReject(taskId);
           }
           return 0;
         }
@@ -53,7 +54,7 @@ export const NewAssignmentModal = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, task, onReject, onTimeout]);
+  }, [isOpen, taskId, onReject, onTimeout]);
 
   if (!isOpen || !task) return null;
 

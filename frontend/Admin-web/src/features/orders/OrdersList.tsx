@@ -41,6 +41,7 @@ export const OrdersList = () => {
   const [typeFilter, setTypeFilter] = useState<"ALL" | "SOS" | "NORMAL">("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [techFilter, setTechFilter] = useState("ALL");
 
   // Pagination state (10 bản ghi 1 trang)
   const [currentPage, setCurrentPage] = useState(1);
@@ -115,7 +116,7 @@ export const OrdersList = () => {
   // Reset về trang 1 khi lọc hoặc tìm kiếm
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, typeFilter, dateFrom, dateTo]);
+  }, [searchTerm, statusFilter, typeFilter, dateFrom, dateTo, techFilter]);
 
   // Filtered orders
   const filteredOrders = orders.filter((order) => {
@@ -149,7 +150,29 @@ export const OrdersList = () => {
     const dateFromMatch = !dateFrom || (orderDateKey && orderDateKey >= dateFrom);
     const dateToMatch = !dateTo || (orderDateKey && orderDateKey <= dateTo);
 
-    return searchMatch && statusMatch && typeMatch && dateFromMatch && dateToMatch;
+    // Lọc theo Kỹ thuật viên
+    const currentTechId =
+      order.technician_id ||
+      order.technician?.id ||
+      order.technician?.user_id ||
+      order.technician?.user?.id;
+
+    const techMatch = (() => {
+      if (techFilter === "ALL") return true;
+      if (techFilter === "UNASSIGNED") {
+        return !currentTechId && !order.technician;
+      }
+      return currentTechId === techFilter;
+    })();
+
+    return (
+      searchMatch &&
+      statusMatch &&
+      typeMatch &&
+      dateFromMatch &&
+      dateToMatch &&
+      techMatch
+    );
   });
 
   // Phân trang 10 bản ghi 1 trang
@@ -402,6 +425,40 @@ export const OrdersList = () => {
               </button>
             )}
           </div>
+
+          {/* Technician Filter */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={techFilter}
+              onChange={(e) => setTechFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer max-w-[200px]"
+              title="Lọc theo kỹ thuật viên"
+            >
+              <option value="ALL">Tất cả kỹ thuật viên</option>
+              <option value="UNASSIGNED">Chưa phân công</option>
+              {technicians.map((t) => {
+                const techId = t.user_id || t.id;
+                const name =
+                  t.user?.full_name || t.full_name || t.name || t.user_id || "Kỹ thuật viên";
+                return (
+                  <option key={techId} value={techId}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+            {techFilter !== "ALL" && (
+              <button
+                type="button"
+                onClick={() => setTechFilter("ALL")}
+                className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
+                title="Hủy lọc kỹ thuật viên"
+              >
+                <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Hủy</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -516,7 +573,7 @@ export const OrdersList = () => {
                           <div className="flex items-center gap-1.5 min-w-0">
                             {order.technician ? (
                               <span className="bg-sky-50 text-sky-900 font-bold px-2 py-0.5 rounded border border-sky-100 truncate text-[11px]">
-                                KTV: {order.technician.name || order.technician.full_name}
+                                KTV: {order.technician.user?.full_name || order.technician.name || order.technician.full_name}
                               </span>
                             ) : (
                               <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-[11px]">
@@ -715,7 +772,7 @@ export const OrdersList = () => {
                         <td className="py-3.5 px-4">
                           {order.technician ? (
                             <div className="text-xs font-bold text-slate-800">
-                              {order.technician.name || order.technician.full_name}
+                              {order.technician.user?.full_name || order.technician.name || order.technician.full_name}
                             </div>
                           ) : (
                             <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded">
@@ -891,11 +948,18 @@ export const OrdersList = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer"
                 >
                   <option value="">-- Chọn kỹ thuật viên --</option>
-                  {technicians.map((t) => (
-                    <option key={t.user_id || t.id} value={t.user_id || t.id}>
-                      {t.name || t.full_name} ({t.phone || "KTV"})
-                    </option>
-                  ))}
+                  {technicians.map((t) => {
+                    const name =
+                      t.user?.full_name || t.full_name || t.name || t.user_id || "Kỹ thuật viên";
+                    const phone = t.user?.phone || t.phone;
+                    const spec = t.specialization ? ` - ${t.specialization}` : "";
+                    const status = t.is_online ? "🟢 Online" : "⚪ Offline";
+                    return (
+                      <option key={t.user_id || t.id} value={t.user_id || t.id}>
+                        {name} ({phone || "KTV"}){spec} ({status})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

@@ -13,19 +13,23 @@ class TechnicianUser(BaseModel):
 
 
 class TechnicianCreate(BaseModel):
-    """Creates a profile for an existing user whose role is technician."""
-
-    user_id: str = Field(min_length=1, max_length=10)
-    id_card_number: str = Field(min_length=12, max_length=12)
-    id_card_front_url: str = Field(min_length=1, max_length=500)
-    id_card_back_url: str = Field(min_length=1, max_length=500)
-    certificate_url: str = Field(min_length=1, max_length=500)
+    user_id: str | None = None
+    full_name: str = Field(min_length=1, max_length=100)
+    phone: str | None = None
+    email: str | None = None
+    password: str | None = None
+    id_card_number: str | None = None
+    id_card_front_url: str | None = None
+    id_card_back_url: str | None = None
+    certificate_url: str | None = None
     skills: str = "BOTH"
     specialization: str | None = Field(default=None, max_length=255)
     experience_years: int = Field(default=0, ge=0)
 
 
 class TechnicianUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
     id_card_front_url: str | None = Field(default=None, max_length=500)
     id_card_back_url: str | None = Field(default=None, max_length=500)
     certificate_url: str | None = Field(default=None, max_length=500)

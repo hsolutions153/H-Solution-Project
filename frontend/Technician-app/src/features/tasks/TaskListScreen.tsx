@@ -96,7 +96,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
               statusText = "Chờ phản hồi";
             } else if (item.status === "ACCEPTED") {
               status = "PENDING";
-              statusText = "Chưa bắt đầu";
+              statusText = "Chờ di chuyển";
             } else if (item.status === "EN_ROUTE") {
               status = "MOVING";
               statusText = "Đang di chuyển";
@@ -104,19 +104,19 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
               status = "ARRIVED";
               statusText = "Đã đến nơi";
             } else if (item.status === "DIAGNOSING") {
-              status = "IN_PROGRESS";
+              status = "DIAGNOSING";
               statusText = "Đang chẩn đoán";
             } else if (item.status === "WAITING_FOR_APPROVAL" || item.status === "ESTIMATE_SUBMITTED") {
-              status = "IN_PROGRESS";
+              status = "WAITING_FOR_APPROVAL";
               statusText = "Chờ khách duyệt báo giá";
             } else if (item.status === "ESTIMATE_APPROVED") {
-              status = "IN_PROGRESS";
+              status = "ESTIMATE_APPROVED";
               statusText = "Báo giá đã duyệt";
             } else if (item.status === "ESTIMATE_REJECTED") {
-              status = "IN_PROGRESS";
+              status = "ESTIMATE_REJECTED";
               statusText = "Báo giá bị từ chối";
             } else if (item.status === "REPAIRING") {
-              status = "IN_PROGRESS";
+              status = "REPAIRING";
               statusText = "Đang sửa chữa";
             } else if (item.status === "COMPLETED") {
               status = "COMPLETED";
@@ -170,13 +170,27 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           });
 
           if (isMounted) {
-            setTasks(apiTasks);
+            setTasks((prev) => {
+              const isSame =
+                prev.length === apiTasks.length &&
+                prev.every((pt, idx) => {
+                  const nt = apiTasks[idx];
+                  return (
+                    pt.id === nt.id &&
+                    pt.status === nt.status &&
+                    pt.statusText === nt.statusText &&
+                    pt.quote?.status === nt.quote?.status &&
+                    pt.totalAmount === nt.totalAmount
+                  );
+                });
+              return isSame ? prev : apiTasks;
+            });
 
-            // Tự động bật Modal tiếp nhận đơn mới cho KTV được chỉ định
+            // Tự động bật Modal tiếp nhận đơn mới cho KTV được chỉ định nếu chưa xử lý
             const incomingTask = apiTasks.find((t) => t.status === "WAITING_ACCEPT");
             if (incomingTask) {
               setSelectedTask((prev) => {
-                if (!prev || prev.id !== incomingTask.id || prev.status !== "WAITING_ACCEPT") {
+                if (!prev || (prev.id !== incomingTask.id && prev.status !== "WAITING_ACCEPT")) {
                   setIsModalOpen(true);
                   return incomingTask;
                 }
@@ -265,7 +279,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   const handleUpdateTaskStatus = (
     taskId: string,
     status: TaskStatus,
-    statusText: string
+    statusText: string,
+    explicitBackendStatus?: string
   ) => {
     setTasks((prev) =>
       prev.map((task) =>
@@ -279,29 +294,37 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       return updated;
     });
 
-    let backendStatus = "EN_ROUTE";
-    if (status === "WAITING_MOVE" || statusText === "Chờ di chuyển" || statusText === "Xác nhận di chuyển" || status === "MOVING" || statusText === "Đang di chuyển") {
-      backendStatus = "EN_ROUTE";
-    } else if (status === "ARRIVED" || statusText === "Đã đến nơi") {
-      backendStatus = "ARRIVED";
-    } else if (statusText === "Bắt đầu công việc" || statusText === "Chẩn đoán") {
-      backendStatus = "DIAGNOSING";
-    } else if (statusText === "Đã gửi báo giá") {
-      backendStatus = "WAITING_FOR_APPROVAL";
-    } else if (statusText === "Đang sửa chữa" || statusText === "Đang thực hiện" || status === "IN_PROGRESS") {
-      backendStatus = "REPAIRING";
-    } else if (status === "COMPLETED" || statusText === "Hoàn thành") {
-      backendStatus = "COMPLETED";
-    } else if (status === "CANCELLED" || (status as string) === "REJECTED") {
-      backendStatus = "CANCELLED";
+    let backendStatus = explicitBackendStatus;
+    if (!backendStatus) {
+      if (status === "ACCEPTED" || statusText === "Tiếp nhận đơn" || statusText === "Đã xác nhận lịch") {
+        backendStatus = "ACCEPTED";
+      } else if (status === "WAITING_MOVE" || statusText === "Chờ di chuyển" || statusText === "Xác nhận di chuyển" || status === "MOVING" || statusText === "Đang di chuyển") {
+        backendStatus = "EN_ROUTE";
+      } else if (status === "ARRIVED" || statusText === "Đã đến nơi") {
+        backendStatus = "ARRIVED";
+      } else if (status === "DIAGNOSING" || statusText === "Đang chẩn đoán" || statusText === "Bắt đầu công việc" || statusText === "Chẩn đoán" || statusText === "Chờ thực hiện") {
+        backendStatus = "DIAGNOSING";
+      } else if (status === "WAITING_FOR_APPROVAL" || statusText === "Đã gửi báo giá" || statusText === "Chờ khách duyệt báo giá") {
+        backendStatus = "WAITING_FOR_APPROVAL";
+      } else if (status === "ESTIMATE_APPROVED" || statusText === "Báo giá đã duyệt") {
+        backendStatus = "ESTIMATE_APPROVED";
+      } else if (status === "REPAIRING" || statusText === "Đang sửa chữa" || statusText === "Đang thực hiện" || status === "IN_PROGRESS") {
+        backendStatus = "REPAIRING";
+      } else if (status === "COMPLETED" || statusText === "Hoàn thành") {
+        backendStatus = "COMPLETED";
+      } else if (status === "CANCELLED" || (status as string) === "REJECTED") {
+        backendStatus = "CANCELLED";
+      }
     }
 
-    import("@/lib/api-client").then(({ fetchApi }) => {
-      fetchApi(`/repair-requests/${taskId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: backendStatus }),
-      }).catch((err) => console.error("Error syncing status to backend:", err));
-    });
+    if (backendStatus) {
+      import("@/lib/api-client").then(({ fetchApi }) => {
+        fetchApi(`/repair-requests/${taskId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: backendStatus }),
+        }).catch((err) => console.warn("Error syncing status to backend:", err));
+      });
+    }
   };
 
   const filteredTasks = useMemo(() => {
@@ -317,7 +340,12 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             t.status === "WAITING_MOVE" ||
             t.status === "MOVING" ||
             t.status === "ARRIVED" ||
-            t.status === "WAITING_CONFIRM"
+            t.status === "WAITING_CONFIRM" ||
+            t.status === "DIAGNOSING" ||
+            t.status === "WAITING_FOR_APPROVAL" ||
+            t.status === "ESTIMATE_APPROVED" ||
+            t.status === "ESTIMATE_REJECTED" ||
+            t.status === "REPAIRING"
         );
       case "done":
         return tasks.filter((t) => t.status === "COMPLETED");

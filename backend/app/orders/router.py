@@ -13,7 +13,7 @@ router = APIRouter(prefix="/orders", tags=["Orders"], dependencies=[Depends(requ
 def get_orders(
     status: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=500),
 ):
     return fetch_orders(status, page, limit)
 

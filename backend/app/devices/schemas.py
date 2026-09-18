@@ -32,9 +32,16 @@ class DeviceImageResponse(BaseModel):
     image_url: str
 
 
+class DeviceCustomer(BaseModel):
+    id: str
+    full_name: str | None = None
+    phone: str | None = None
+
+
 class DeviceResponse(BaseModel):
     id: str
     customer_id: str
+    customer: DeviceCustomer | None = None
     device_type: str
     manufacturer: str
     model_name: str

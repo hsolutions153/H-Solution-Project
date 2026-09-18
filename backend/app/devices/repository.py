@@ -3,7 +3,11 @@ from app.devices.models import DEVICES_TABLE
 
 
 def get_all_devices(customer_id: str | None = None):
-    query = supabase.table(DEVICES_TABLE).select("*").order("created_at", desc=True)
+    query = (
+        supabase.table(DEVICES_TABLE)
+        .select("*,customer:users!fk_customer_devices_customer(id,full_name,phone)")
+        .order("created_at", desc=True)
+    )
     if customer_id:
         query = query.eq("customer_id", customer_id)
     response = query.execute()
@@ -13,7 +17,7 @@ def get_all_devices(customer_id: str | None = None):
 def get_devices_by_customer_id(customer_id: str):
     response = (
         supabase.table(DEVICES_TABLE)
-        .select("*")
+        .select("*,customer:users!fk_customer_devices_customer(id,full_name,phone)")
         .eq("customer_id", customer_id)
         .order("created_at", desc=True)
         .execute()

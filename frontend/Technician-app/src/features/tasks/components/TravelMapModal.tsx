@@ -19,6 +19,7 @@ interface TravelModalProps {
     taskId: string,
     status: TaskStatus,
     statusText: string,
+    backendStatus?: string
   ) => void;
 }
 
@@ -37,17 +38,16 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
     if (status === "WAITING_MOVE") {
       const nextStatus: TaskStatus = "MOVING";
       setStatus(nextStatus);
-      onStatusChange(task.id, nextStatus, "Đang di chuyển");
+      onStatusChange(task.id, nextStatus, "Đang di chuyển", "EN_ROUTE");
     } else if (status === "MOVING") {
       const nextStatus: TaskStatus = "ARRIVED";
       setStatus(nextStatus);
-      onStatusChange(task.id, nextStatus, "Đã đến nơi");
+      onStatusChange(task.id, nextStatus, "Đã đến nơi", "ARRIVED");
     } else if (status === "ARRIVED") {
-      // Khi đã ở trạng thái ARRIVED và bấm "Bắt đầu công việc"
-      const nextStatus: TaskStatus = "PENDING";
+      const nextStatus: TaskStatus = "DIAGNOSING";
       setStatus(nextStatus);
-      onStatusChange(task.id, nextStatus, "Chờ thực hiện");
-      onClose(); // Đóng modal để thợ tiến hành làm việc ở màn hình chi tiết
+      onStatusChange(task.id, nextStatus, "Đang chẩn đoán", "DIAGNOSING");
+      onClose();
     }
   };
 
@@ -167,7 +167,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
           {status === "ARRIVED" && (
             <button
               onClick={() => {
-                onStatusChange(task.id, "DIAGNOSING", "Đang chẩn đoán");
+                onStatusChange(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
                 onClose();
               }}
               className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"

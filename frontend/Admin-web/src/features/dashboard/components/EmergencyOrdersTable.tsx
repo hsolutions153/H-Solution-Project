@@ -241,7 +241,7 @@ export const EmergencyOrdersTable = ({
                       <td className="py-3 px-2">
                         {order.technician ? (
                           <span className="text-xs font-bold text-slate-700">
-                            {order.technician.name || order.technician.full_name}
+                            {order.technician.user?.full_name || order.technician.name || order.technician.full_name}
                           </span>
                         ) : (
                           <button

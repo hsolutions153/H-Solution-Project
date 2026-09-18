@@ -89,6 +89,10 @@ export interface OrderTechnician {
   name?: string;
   full_name?: string;
   phone?: string;
+  user?: {
+    full_name?: string;
+    phone?: string;
+  };
 }
 
 export interface OrderRecord {
@@ -752,8 +756,8 @@ export const OrderDetailModal = ({
                 </div>
                 {orderDetail.technician && (
                   <span className="text-xs text-sky-900 font-bold bg-white px-2.5 py-1 rounded-lg border border-sky-200">
-                    {orderDetail.technician.name || orderDetail.technician.full_name} (
-                    {orderDetail.technician.phone || "---"})
+                    {orderDetail.technician.user?.full_name || orderDetail.technician.name || orderDetail.technician.full_name} (
+                    {orderDetail.technician.user?.phone || orderDetail.technician.phone || "---"})
                   </span>
                 )}
               </div>

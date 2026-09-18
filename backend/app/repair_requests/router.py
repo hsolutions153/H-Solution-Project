@@ -59,7 +59,7 @@ def get_repair_requests(
     customer_id: str | None = Query(default=None),
     technician_id: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=500),
     current_user: dict = Depends(get_current_user),
 ):
     return fetch_all_requests(current_user, status, customer_id, technician_id, page, limit)

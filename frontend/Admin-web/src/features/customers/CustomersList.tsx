@@ -12,8 +12,15 @@ import {
   Bike,
   Loader2,
   X,
+  Eye,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import { Pagination } from "@/components/common/Pagination";
 import { CreateCustomerModal } from "./CreateCustomerModal";
+import { ViewCustomerModal } from "./ViewCustomerModal";
+import { EditCustomerModal } from "./EditCustomerModal";
+import { DeleteCustomerModal } from "./DeleteCustomerModal";
 
 interface CustomerItem {
   id: string;
@@ -25,6 +32,8 @@ interface CustomerItem {
   device_count?: number;
   total_devices?: number;
   is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface CustomerApiResponse {
@@ -49,10 +58,23 @@ export const CustomersList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState<CustomerItem | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<CustomerItem | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedCustomerForDevices, setSelectedCustomerForDevices] = useState<CustomerItem | null>(null);
   const [customerDevices, setCustomerDevices] = useState<CustomerDeviceItem[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
+  
+  // State phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -117,7 +139,9 @@ export const CustomersList = () => {
   };
 
   const handleToggleStatus = async (customer: CustomerItem) => {
+    if (togglingId) return;
     const nextStatus = !customer.is_active;
+    setTogglingId(customer.id);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       await fetchApi(`/customers/${customer.id}/status`, {
@@ -132,6 +156,8 @@ export const CustomersList = () => {
       fetchCustomers();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái");
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -142,6 +168,14 @@ export const CustomersList = () => {
     const query = searchTerm.toLowerCase();
     return name.includes(query) || phone.includes(query) || email.includes(query);
   });
+
+  // Cắt lát dữ liệu cho phân trang
+  const totalItems = filteredCustomers.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -205,7 +239,7 @@ export const CustomersList = () => {
                 <th className="py-3.5 px-4">Địa chỉ</th>
                 <th className="py-3.5 px-4">Số thiết bị</th>
                 <th className="py-3.5 px-4">Trạng thái</th>
-                <th className="py-3.5 px-4 text-right">Thao tác</th>
+                <th className="py-3.5 px-4 text-center">Chức năng</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -216,14 +250,14 @@ export const CustomersList = () => {
                     Đang tải danh sách khách hàng...
                   </td>
                 </tr>
-              ) : filteredCustomers.length === 0 ? (
+              ) : paginatedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
                     Không tìm thấy khách hàng nào.
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((c) => (
+                paginatedCustomers.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3.5 px-4 font-mono text-xs text-slate-500 font-bold">
                       {c.id?.substring(0, 10)}
@@ -257,25 +291,85 @@ export const CustomersList = () => {
                         <span>{c.device_count || 0} thiết bị</span>
                       </button>
                     </td>
+
+                    {/* Trạng thái tài khoản (Thanh công tắc bật/tắt) */}
                     <td className="py-3.5 px-4">
-                      {c.is_active !== false ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" /> Hoạt động
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
-                          <XCircle className="w-3 h-3" /> Bị khóa
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
                       <button
+                        type="button"
+                        role="switch"
+                        aria-checked={c.is_active !== false}
+                        disabled={togglingId === c.id}
                         onClick={() => handleToggleStatus(c)}
-                        className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition text-xs font-bold cursor-pointer"
-                        title={c.is_active !== false ? "Khóa tài khoản" : "Mở khóa"}
+                        className="inline-flex items-center gap-2 cursor-pointer select-none group focus:outline-none disabled:opacity-50"
+                        title={
+                          c.is_active !== false
+                            ? "Nhấp để khóa tài khoản khách hàng này"
+                            : "Nhấp để kích hoạt tài khoản khách hàng này"
+                        }
                       >
-                        {c.is_active !== false ? "Khóa" : "Kích hoạt"}
+                        {/* Thanh trượt toggle */}
+                        <span
+                          className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out border-2 border-transparent ${
+                            c.is_active !== false ? "bg-emerald-500" : "bg-slate-300"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              c.is_active !== false ? "translate-x-4.5" : "translate-x-0"
+                            }`}
+                          />
+                        </span>
+                        {/* Nhãn chữ trạng thái */}
+                        <span
+                          className={`text-xs font-bold transition-colors ${
+                            c.is_active !== false ? "text-emerald-700" : "text-slate-400"
+                          }`}
+                        >
+                          {togglingId === c.id
+                            ? "Đang xử lý..."
+                            : c.is_active !== false
+                            ? "Hoạt động"
+                            : "Bị khóa"}
+                        </span>
                       </button>
+                    </td>
+
+                    {/* Cột Chức năng: Xem, Sửa, Xóa */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {/* Nút Xem chi tiết (bảng 2 cột tên trường & giá trị) */}
+                        <button
+                          type="button"
+                          onClick={() => setViewingCustomer(c)}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                          title="Xem chi tiết khách hàng"
+                          aria-label="Xem chi tiết"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        {/* Nút Sửa thông tin (không đổi được mã KH) */}
+                        <button
+                          type="button"
+                          onClick={() => setEditingCustomer(c)}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition cursor-pointer shadow-2xs"
+                          title="Chỉnh sửa thông tin khách hàng"
+                          aria-label="Chỉnh sửa"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+
+                        {/* Nút Xóa khách hàng (popup xác nhận) */}
+                        <button
+                          type="button"
+                          onClick={() => setDeletingCustomer(c)}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 transition cursor-pointer shadow-2xs"
+                          title="Xóa khách hàng"
+                          aria-label="Xóa khách hàng"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -283,6 +377,21 @@ export const CustomersList = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Gắn Component Pagination ngay sau thẻ đóng của bảng (hoặc trong khung chứa bảng) */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 20, 50]}
+          totalItems={totalItems}
+          itemUnitText="khách hàng"
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+        />
       </div>
 
       {showCreateModal && (
@@ -363,6 +472,38 @@ export const CustomersList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Xem chi tiết khách hàng (Bảng 2 cột: Tên trường và Giá trị) */}
+      {viewingCustomer && (
+        <ViewCustomerModal
+          customer={viewingCustomer}
+          onClose={() => setViewingCustomer(null)}
+        />
+      )}
+
+      {/* Modal Sửa khách hàng (Hiển thị lại thông tin, không sửa được mã KH) */}
+      {editingCustomer && (
+        <EditCustomerModal
+          customer={editingCustomer}
+          onClose={() => setEditingCustomer(null)}
+          onSuccess={(msg) => {
+            handleShowToast(msg);
+            fetchCustomers();
+          }}
+        />
+      )}
+
+      {/* Popup Xác nhận Xóa khách hàng */}
+      {deletingCustomer && (
+        <DeleteCustomerModal
+          customer={deletingCustomer}
+          onClose={() => setDeletingCustomer(null)}
+          onSuccess={(msg) => {
+            handleShowToast(msg);
+            fetchCustomers();
+          }}
+        />
       )}
     </div>
   );
