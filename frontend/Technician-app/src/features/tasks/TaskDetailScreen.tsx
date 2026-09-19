@@ -1,12 +1,10 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { Task, TaskStatus } from "@/types/task";
+import { useState, useEffect } from "react";
+import { Task, TaskStatus, HistoryTask } from "@/types/task";
 import { TravelMapModal } from "./components/TravelMapModal";
 import { DiagnosticScreen } from "./components/DiagnosticScreen";
 import { CreateQuoteScreen } from "./components/CreateQuoteScreen";
 import { QuoteStatusScreen } from "./components/QuoteStatusScreen";
-import { RepairScreen } from "./components/RepairScreen"; // <-- 1. Import RepairScreen tại đây
+import { RepairScreen } from "./components/RepairScreen";
 import {
   ArrowLeft,
   Users,
@@ -22,6 +20,7 @@ import {
 interface TaskDetailScreenProps {
   task: Task | null;
   onBack: () => void;
+  onCompleteRepair?: (completedTask: HistoryTask) => void;
   onUpdateStatus: (
     taskId: string,
     status: TaskStatus,
@@ -33,8 +32,15 @@ interface TaskDetailScreenProps {
 export const TaskDetailScreen = ({
   task,
   onBack,
+  onCompleteRepair,
   onUpdateStatus,
 }: TaskDetailScreenProps) => {
+  const [currentTask, setCurrentTask] = useState<Task | null>(task);
+
+  useEffect(() => {
+    if (task) setCurrentTask(task);
+  }, [task]);
+
   const [isTravelModalOpen, setIsTravelModalOpen] = useState(false);
 
   // Quản lý các bước con khi ở trạng thái IN_PROGRESS / DIAGNOSING / QUOTE
@@ -84,6 +90,7 @@ export const TaskDetailScreen = ({
   };
 
   if (!task) return null;
+  const activeTask: Task = currentTask ?? task;
 
   // Khi đang ở trạng thái quy trình nghiệp vụ: DIAGNOSING, WAITING_FOR_APPROVAL, ESTIMATE_APPROVED, REPAIRING, IN_PROGRESS
   const isProcessStep = [
@@ -100,26 +107,35 @@ export const TaskDetailScreen = ({
     if (task.status === "DIAGNOSING") {
       activeSubStep = subStep === "QUOTE" ? "QUOTE" : "DIAGNOSTIC";
     } else if (task.status === "WAITING_FOR_APPROVAL" || task.status === "ESTIMATE_REJECTED") {
-      activeSubStep = "QUOTE_STATUS";
+      activeSubStep = subStep === "QUOTE" ? "QUOTE" : "QUOTE_STATUS";
     } else if (task.status === "ESTIMATE_APPROVED") {
-      activeSubStep = subStep === "REPAIR" ? "REPAIR" : "QUOTE_STATUS";
+      activeSubStep = subStep === "REPAIR" ? "REPAIR" : subStep === "QUOTE" ? "QUOTE" : "QUOTE_STATUS";
     } else if (task.status === "REPAIRING") {
       activeSubStep = "REPAIR";
     }
 
-    // 1. Màn hình Tạo báo giá
     if (activeSubStep === "QUOTE") {
       return (
         <CreateQuoteScreen
-          task={task}
+          task={activeTask}
           diagnosticData={diagnosticData}
-          onBack={() => setSubStep("DIAGNOSTIC")}
+          onBack={() => {
+            if (
+              activeTask.status === "WAITING_FOR_APPROVAL" ||
+              activeTask.status === "ESTIMATE_APPROVED" ||
+              activeTask.status === "ESTIMATE_REJECTED"
+            ) {
+              setSubStep("QUOTE_STATUS");
+            } else {
+              setSubStep("DIAGNOSTIC");
+            }
+          }}
           onSubmitQuote={(data) => {
             console.log("Dữ liệu báo giá:", data);
             setQuoteData(data);
 
             if (data.status === "SENT") {
-              onUpdateStatus(task.id, "WAITING_FOR_APPROVAL", "Đã gửi báo giá", "WAITING_FOR_APPROVAL");
+              onUpdateStatus(activeTask.id, "WAITING_FOR_APPROVAL", "Đã gửi báo giá", "WAITING_FOR_APPROVAL");
               setSubStep("QUOTE_STATUS");
             } else {
               alert("Đã lưu nháp báo giá thành công!");
@@ -129,49 +145,54 @@ export const TaskDetailScreen = ({
       );
     }
 
-    // 2. Màn hình Trạng thái báo giá (Chờ khách duyệt & Bắt đầu sửa chữa)
     if (activeSubStep === "QUOTE_STATUS") {
       return (
         <QuoteStatusScreen
-          task={task}
-          isApproved={task.status === "ESTIMATE_APPROVED" || task.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
-          onBack={() => setSubStep("QUOTE")}
+          task={activeTask}
+          isApproved={activeTask.status === "ESTIMATE_APPROVED" || activeTask.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
+          onBack={onBack}
           onViewDetailQuote={() => setSubStep("QUOTE")}
           onContinueRepair={() => {
-            onUpdateStatus(task.id, "REPAIRING", "Đang sửa chữa", "REPAIRING");
+            onUpdateStatus(activeTask.id, "REPAIRING", "Đang sửa chữa", "REPAIRING");
             setSubStep("REPAIR");
           }}
         />
       );
     }
 
-    // 3. Màn hình Sửa chữa & Hoàn tất (RepairScreen)
     if (activeSubStep === "REPAIR") {
       return (
         <RepairScreen
-          task={task}
+          task={activeTask}
           onBack={() => {
-            setSubStep("QUOTE_STATUS");
+            if (activeTask.status === "ESTIMATE_APPROVED") {
+              setSubStep("QUOTE_STATUS");
+            } else {
+              onBack();
+            }
           }}
-          onComplete={() => {
-            onUpdateStatus(task.id, "COMPLETED", "Hoàn thành", "COMPLETED");
+          onComplete={(completedData) => {
+            onUpdateStatus(activeTask.id, "COMPLETED", "Hoàn thành", "COMPLETED");
             sessionStorage.removeItem("subStep");
+            if (onCompleteRepair) {
+              onCompleteRepair(completedData);
+            }
             onBack();
           }}
         />
       );
     }
 
-    // Mặc định: Màn hình Chẩn đoán
     return (
       <DiagnosticScreen
-        task={task}
-        onBack={() => {
-          onUpdateStatus(task.id, "ARRIVED", "Đã đến nơi", "ARRIVED");
-        }}
-        onSubmitDiagnostic={(data) => {
+        task={activeTask}
+        onBack={onBack}
+        onSubmitDiagnostic={(data, updatedTask) => {
           console.log("Dữ liệu chẩn đoán đã lưu:", data);
           setDiagnosticData(data);
+          if (updatedTask) {
+            setCurrentTask(updatedTask);
+          }
           setSubStep("QUOTE");
         }}
       />

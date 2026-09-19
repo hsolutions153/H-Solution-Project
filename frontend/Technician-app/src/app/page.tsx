@@ -70,24 +70,24 @@ export default function HomePage() {
           sessionStorage.removeItem("subStep");
         }}
       >
-        {/* Tab 1: Trang chủ / Danh sách công việc */}
+        
         {activeTab === "home" && (
           <TaskListScreen onCompleteRepair={handleCompleteRepair} />
         )}
 
-        {/* Tab 2: Lịch trình */}
+        
         {activeTab === "schedule" && (
           <div className="p-4 text-center text-xs text-slate-500 pt-10 font-medium">
             Màn hình Schedule (Lịch trình)
           </div>
         )}
 
-        {/* Tab 3: Lịch sử công việc */}
+        
         {activeTab === "history" && (
           <TaskHistoryScreen newCompletedTask={lastCompletedTask} />
         )}
 
-        {/* Tab 4: Trang cá nhân */}
+        
         {activeTab === "profile" && (
           <TechnicianProfileScreen />
         )}

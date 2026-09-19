@@ -63,7 +63,7 @@ export function TechnicianProfileScreen() {
 
   return (
     <div className="p-4 space-y-4 max-w-sm mx-auto">
-      {/* User Card */}
+      
       <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-center relative overflow-hidden">
         <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl mx-auto shadow-md mb-3">
           {(user.full_name || "K").charAt(0).toUpperCase()}
@@ -88,7 +88,7 @@ export function TechnicianProfileScreen() {
         </div>
       </div>
 
-      {/* Stats Summary */}
+      
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -111,7 +111,7 @@ export function TechnicianProfileScreen() {
         </div>
       </div>
 
-      {/* Detailed Info Card */}
+      
       <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3.5">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thông tin chi tiết</h3>
 

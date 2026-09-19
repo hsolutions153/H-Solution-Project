@@ -381,30 +381,12 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     return (
       <TaskDetailScreen
         task={selectedTask}
-        onBack={() => {
-          if (selectedTask?.status === "COMPLETED" && onCompleteRepair) {
-            // Đọc dữ liệu báo giá thực tế từ sessionStorage nếu có
-            const savedQuote = sessionStorage.getItem("quoteData");
-            const parsedQuote = savedQuote ? JSON.parse(savedQuote) : null;
-            const finalAmount = parsedQuote?.totalAmount || "1.200.000đ";
-
-            // Khởi tạo object map chính xác 100% với interface HistoryTask
-            const completedHistoryTask: HistoryTask = {
-              id: selectedTask.id,
-              code: selectedTask.code || `FS-290${selectedTask.id}`,
-              date: new Date().toLocaleDateString("vi-VN"), // Khắc phục thiếu date
-              time: selectedTask.time || "Hôm nay",         // Khắc phục thiếu time
-              serviceType: selectedTask.serviceName,         // Gán serviceName sang serviceType
-              customerName: selectedTask.customerName,
-              deviceInfo: selectedTask.serviceName,          // Khắc phục thiếu deviceInfo
-              address: selectedTask.address,
-              type: "repair",                                // Giá trị hợp lệ: "repair" hoặc "maintenance"
-              totalAmount: finalAmount,                      // Chấp nhận string hoặc number
-            };
-
+        onCompleteRepair={(completedHistoryTask) => {
+          if (onCompleteRepair) {
             onCompleteRepair(completedHistoryTask);
           }
-
+        }}
+        onBack={() => {
           sessionStorage.removeItem("selectedTask");
           sessionStorage.removeItem("currentView");
           sessionStorage.removeItem("subStep");

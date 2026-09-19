@@ -18,7 +18,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
-      {/* Tiêu đề & Mô tả */}
+      
       <div className="mb-5">
         <h2 className="text-base font-bold text-slate-800 mb-2">
           Quên mật khẩu
@@ -29,7 +29,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Input Số điện thoại hoặc Email */}
+        
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
             Số điện thoại hoặc Email
@@ -49,7 +49,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
           </div>
         </div>
 
-        {/* Nút Gửi mã xác thực */}
+        
         <button
           type="submit"
           className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"

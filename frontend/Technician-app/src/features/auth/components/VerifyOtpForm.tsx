@@ -72,7 +72,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
 
     return (
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6 text-center">
-        {/* Tiêu đề & Mô tả */}
+        
         <div className="mb-5">
           <h2 className="text-base font-bold text-slate-800 mb-2">
             Nhập mã xác thực
@@ -83,7 +83,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Khối 6 ô nhập OTP */}
+          
           <div className="flex justify-between gap-1.5 px-1">
             {otp.map((digit, index) => (
               <input
@@ -103,7 +103,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
             ))}
           </div>
 
-          {/* Link Gửi lại mã */}
+          
           <div>
             <button
               type="button"
@@ -114,7 +114,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
             </button>
           </div>
 
-          {/* Nút Xác nhận */}
+          
           <button
             type="submit"
             className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"

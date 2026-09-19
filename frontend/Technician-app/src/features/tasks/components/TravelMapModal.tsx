@@ -54,7 +54,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="relative h-full w-full max-w-sm bg-white overflow-hidden shadow-lg flex flex-col">
-        {/* 1. Map (chiếm không gian phía trên) */}
+        
         <div className="relative flex-1 overflow-hidden bg-gray-100">
           <Image
             src="/images/roadmap.jpg"
@@ -71,7 +71,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
             <X className="w-5 h-5 text-slate-700" />
           </button>
 
-          {/* Điểm định vị: Vị trí của thợ */}
+          
           <div className="absolute bottom-[25%] left-[57%] z-10 flex flex-col items-center -translate-x-1/2 translate-y-1/2 animate-bounce">
             <div className="bg-sky-800 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md mb-1 whitespace-nowrap">
               Vị trí của bạn
@@ -81,7 +81,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
             </div>
           </div>
 
-          {/* Điểm định vị: Vị trí của khách hàng */}
+          
           <div className="absolute top-[15%] left-[33%] z-10 flex flex-col items-center -translate-x-1/2 -translate-y-1/2">
             <div className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md mb-1 whitespace-nowrap">
               {task.customerName}
@@ -92,7 +92,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
           </div>
         </div>
 
-        {/* 2. Bottom Card chứa thông tin đơn & nút bấm */}
+        
         <div className="bg-white border-t rounded-t-3xl shadow-lg p-4 space-y-3 pb-6">
           <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100 space-y-2">
             <div className="flex items-center justify-between">
@@ -143,7 +143,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
             </div>
           </div>
 
-          {/* Button hành động */}
+          
           {status === "WAITING_MOVE" && (
             <button
               onClick={handleNextStep}

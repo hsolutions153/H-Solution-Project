@@ -63,10 +63,10 @@ export const NewAssignmentModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
-      {/* Box Container Popup */}
+      
       <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
 
-        {/* Header */}
+        
         <div className="bg-sky-800 text-white px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-base">
             <span className="p-1 bg-white/20 rounded-lg flex items-center justify-center">
@@ -84,10 +84,10 @@ export const NewAssignmentModal = ({
           </button>
         </div>
 
-        {/* Nội dung */}
+        
         <div className="p-4 space-y-4 text-xs text-slate-700">
 
-          {/* Địa điểm */}
+          
           <div className="flex gap-3">
             <span className="text-sky-800 mt-0.5 flex-shrink-0">
               <MapPin className="w-4 h-4" />
@@ -113,7 +113,7 @@ export const NewAssignmentModal = ({
 
           <hr className="border-gray-100" />
 
-          {/* Lỗi dự kiến */}
+          
           <div className="flex gap-3">
             <span className="text-amber-500 mt-0.5 flex-shrink-0">
               <TriangleAlert className="w-4 h-4" />
@@ -141,7 +141,7 @@ export const NewAssignmentModal = ({
 
           <hr className="border-gray-100" />
 
-          {/* Thời gian */}
+          
           <div className="flex gap-3">
             <span className="text-sky-800 mt-0.5 flex-shrink-0">
               <CalendarCheck className="w-4 h-4" />
@@ -169,7 +169,7 @@ export const NewAssignmentModal = ({
             </div>
           </div>
 
-          {/* Khoảng cách */}
+          
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sky-800 flex-shrink-0">
@@ -189,7 +189,7 @@ export const NewAssignmentModal = ({
             </span>
           </div>
 
-          {/* Buttons */}
+          
           <div className="space-y-2 pt-2">
             <button
               type="button"

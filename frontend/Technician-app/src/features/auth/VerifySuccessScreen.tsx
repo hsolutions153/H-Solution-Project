@@ -18,15 +18,15 @@ export const VerifySuccessScreen = ({
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      {/* Khung chứa chính */}
+      
       <div className="w-full max-w-sm bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm flex flex-col justify-between">
         <div className="my-auto pt-2">
-          {/* Header ứng dụng */}
+          
           <LoginHeader />
 
-          {/* Form wrapper hỗ trợ bấm Enter */}
+          
           <form onSubmit={handleSubmit} className="mt-6 text-center">
-            {/* Icon thành công */}
+            
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500 shadow-sm shadow-emerald-200">
               <Check className="h-8 w-8 text-white stroke-[2.5]" />
             </div>
@@ -40,7 +40,7 @@ export const VerifySuccessScreen = ({
               đặt lại mật khẩu mới.
             </p>
 
-            {/* Nút Đặt lại mật khẩu */}
+            
             <button
               type="submit"
               className="w-full rounded-xl bg-sky-900 py-3 text-sm font-bold text-white shadow-md hover:bg-sky-950 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -52,7 +52,7 @@ export const VerifySuccessScreen = ({
 
           <hr className="my-6 border-gray-100" />
 
-          {/* Hỗ trợ */}
+          
           <p className="text-[11px] text-center text-slate-500">
             Bạn cần hỗ trợ?{" "}
             <a

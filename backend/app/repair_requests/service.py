@@ -16,6 +16,8 @@ from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.repair_requests import repository
 from app.repair_requests.models import (
+    IMAGE_TYPES,
+    ITEM_TYPES,
     ISSUE_TYPES,
     REPAIR_REQUESTS_TABLE,
     REQUEST_STATUSES,
@@ -124,6 +126,18 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
         except Exception:
             pass
 
+    payments_map = {}
+    if repair_ids:
+        try:
+            payments_resp = supabase.table("payments").select("id,repair_id,payment_method,payment_status").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
+            if payments_resp and payments_resp.data:
+                for p in payments_resp.data:
+                    rid = p.get("repair_id")
+                    if rid and rid not in payments_map:
+                        payments_map[rid] = p.get("payment_method")
+        except Exception:
+            pass
+
     quotes_map = {}
     if repair_ids:
         try:
@@ -145,6 +159,7 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
         if item.get("technician_id"):
             item["technician"] = techs_map.get(item["technician_id"])
 
+        item["payment_method"] = item.get("payment_method") or payments_map.get(item["id"])
         q = quotes_map.get(item["id"])
         if q:
             item["quote"] = q
@@ -461,9 +476,8 @@ def create_request(current_user: dict, data):
             continue
         clean_url = str(img_url).strip()
         if clean_url.startswith("blob:") or clean_url.startswith("data:"):
-            sample_imgs = ["/images/s1.jpg", "/images/s2.jpg", "/images/s3.jpg"]
-            clean_url = sample_imgs[idx % len(sample_imgs)]
-        elif len(clean_url) > 480:
+            continue
+        if len(clean_url) > 480:
             clean_url = clean_url[:480]
 
         try:
@@ -513,6 +527,17 @@ def fetch_request(request_id: str, current_user: dict):
     images = repository.get_repair_images(request_id)
     request_data = dict(request)
     request_data["images"] = images
+
+    try:
+        if request.get("payment_method"):
+            request_data["payment_method"] = request.get("payment_method")
+        else:
+            from app.payments.repository import get_payment_by_repair_id
+            p_rec = get_payment_by_repair_id(request_id)
+            if p_rec and p_rec.get("payment_method"):
+                request_data["payment_method"] = p_rec.get("payment_method")
+    except Exception as pm_err:
+        logger.warning(f"Failed to load payment info in fetch_request: {pm_err}")
 
     if request.get("customer_id"):
         u = auth_repository.get_user_by_id(request["customer_id"])
@@ -800,6 +825,85 @@ def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict
     return fetch_request(request_id, current_user)
 
 
+def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > MAX_IMAGE_SIZE_BYTES:
+        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
+
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+
+    is_authorized = (
+        _is_role(current_user, ADMIN_ROLE_CODE)
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"])
+    )
+    if not is_authorized:
+        raise AppException(ErrorCode.FORBIDDEN)
+
+    file_extension = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'jpg'
+    file_name = f"{uuid.uuid4()}.{file_extension}"
+    supabase_path = f"public/diagnostic/{request_id}/{file_name}"
+
+    public_url = storage.upload_file_to_supabase(file, supabase_path)
+
+    repository.create_repair_image({
+        "id": _image_id(),
+        "repair_id": request_id,
+        "image_url": public_url,
+        "image_type": "BEFORE_REPAIR",
+        "description": "Ảnh chẩn đoán sự cố",
+        "created_by": current_user["sub"],
+    })
+
+    return fetch_request(request_id, current_user)
+
+
+def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > MAX_IMAGE_SIZE_BYTES:
+        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
+
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+
+    is_authorized = (
+        _is_role(current_user, ADMIN_ROLE_CODE)
+        or request.get("customer_id") == current_user["sub"]
+        or request.get("technician_id") == current_user["sub"]
+    )
+    if not is_authorized:
+        raise AppException(ErrorCode.FORBIDDEN)
+
+    file_extension = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'jpg'
+    file_name = f"{uuid.uuid4()}.{file_extension}"
+    supabase_path = f"public/customer-requests/{request_id}/{file_name}"
+
+    public_url = storage.upload_file_to_supabase(file, supabase_path)
+
+    repository.create_repair_image({
+        "id": _image_id(),
+        "repair_id": request_id,
+        "image_url": public_url,
+        "image_type": "BEFORE_REPAIR",
+        "description": "Ảnh sự cố từ khách hàng",
+        "created_by": current_user["sub"],
+    })
+
+    return fetch_request(request_id, current_user)
+
+
 def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -812,7 +916,8 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    if request.get("status") not in {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED"}:
+    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED"}
+    if request.get("status") not in allowed_statuses:
         raise AppException(
             ErrorCode.INVALID_STATUS_TRANSITION,
             message="Yêu cầu phải ở trạng thái Đang chẩn đoán (DIAGNOSING) để tạo báo giá.",
@@ -828,16 +933,39 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     computed_parts_cost = 0.0
     computed_labor_fee = 0.0
 
+    parsed_items = []
     for it in items:
         qty = float(it.get("quantity") or 1)
         price = float(it.get("price") or it.get("unit_price") or 0)
-        subtotal = qty * price
+        subtotal = float(it.get("subtotal") or (qty * price))
         total += subtotal
-        name_str = (it.get("name") or it.get("item_name") or "").lower()
-        if "tiền công" in name_str or "công sửa" in name_str or "công kỹ thuật" in name_str:
+
+        name = str(it.get("name") or it.get("item_name") or "Linh kiện").strip()
+        raw_type = it.get("item_type")
+        if raw_type:
+            it_type = str(raw_type).strip().upper()
+            if it_type not in ITEM_TYPES:
+                raise AppException(ErrorCode.INVALID_ITEM_TYPE)
+        else:
+            # Fallback an toàn cho client phiên bản cũ chưa gửi item_type
+            name_lower = name.lower()
+            if any(k in name_lower for k in ["tiền công", "công sửa", "công kỹ thuật", "labor"]):
+                it_type = "LABOR"
+            else:
+                it_type = "SPARE_PART"
+
+        if it_type == "LABOR":
             computed_labor_fee += subtotal
         else:
             computed_parts_cost += subtotal
+
+        parsed_items.append({
+            "name": name,
+            "quantity": qty,
+            "unit_price": price,
+            "subtotal": subtotal,
+            "item_type": it_type,
+        })
 
     labor_fee = float(data.get("labor_fee") or data.get("laborCost") or computed_labor_fee)
     parts_cost = float(data.get("parts_cost") or data.get("partsCost") or computed_parts_cost)
@@ -866,19 +994,16 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     created_quote = repository.create_quote(quote_record)
 
     created_items = []
-    for it in items:
-        name = it.get("name") or it.get("item_name") or "Linh kiện"
-        qty = float(it.get("quantity") or 1)
-        price = float(it.get("price") or it.get("unit_price") or 0)
-        subtotal = qty * price
+    for p_it in parsed_items:
         item_id = secrets.token_hex(5).upper()[:10]
         item_rec = {
             "id": item_id,
             "quote_id": quote_id,
-            "item_name": name[:200],
-            "quantity": qty,
-            "unit_price": price,
-            "subtotal": subtotal,
+            "item_name": p_it["name"][:200],
+            "item_type": p_it["item_type"],
+            "quantity": p_it["quantity"],
+            "unit_price": p_it["unit_price"],
+            "subtotal": p_it["subtotal"],
         }
         ci = repository.create_quote_item(item_rec)
         if ci:
@@ -886,7 +1011,6 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         else:
             created_items.append(item_rec)
 
-    # Transition request status to WAITING_FOR_APPROVAL
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
         repository.update_repair_request(request_id, {
@@ -923,10 +1047,29 @@ def fetch_quotes_for_request(request_id: str, current_user: dict):
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
 
+    # Fetch latest payment method if available
+    payment_method = None
+    try:
+        from app.db.database import supabase
+        pay_resp = (
+            supabase.table("payments")
+            .select("payment_method")
+            .eq("repair_id", request_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if pay_resp and pay_resp.data:
+            payment_method = pay_resp.data[0].get("payment_method")
+    except Exception:
+        pass
+
     quotes = repository.get_quotes_by_repair_id(request_id)
     result = []
     for q in quotes:
         items = repository.get_quote_items(q["id"])
         q["items"] = items or []
+        if payment_method:
+            q["payment_method"] = payment_method
         result.append(q)
     return result

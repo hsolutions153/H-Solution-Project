@@ -50,7 +50,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
 
   return (
     <div className="relative flex items-center justify-between p-4 bg-white border-b border-gray-100">
-      {/* Khung thông tin User có thể bấm vào */}
+      
       <div 
         ref={menuRef}
         className="relative"
@@ -70,7 +70,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
           </div>
         </div>
 
-        {/* Dropdown Menu */}
+        
         {isOpen && (
           <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
             <button

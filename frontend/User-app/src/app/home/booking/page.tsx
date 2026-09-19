@@ -95,6 +95,7 @@ export default function BookingPage() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [details, setDetails] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
@@ -211,6 +212,7 @@ export default function BookingPage() {
     try {
       const storedImages = await Promise.all(files.slice(0, 4).map(fileToStoredImage));
       setPhotos((current) => [...current, ...storedImages].slice(0, 4));
+      setPhotoFiles((current) => [...current, ...files.slice(0, 4)].slice(0, 4));
       setStep("DETAILS");
     } catch (photoError) {
       setCameraError(photoError instanceof Error ? photoError.message : "Không thể xử lý ảnh đã chọn.");
@@ -239,12 +241,19 @@ export default function BookingPage() {
           setCameraError("Không thể lưu ảnh vừa chụp.");
           return;
         }
+        const file = new File([blob], `capture_${Date.now()}.jpg`, { type: "image/jpeg" });
         const url = canvas.toDataURL("image/jpeg", 0.82);
         setPhotos((current) => {
           if (current.length >= 4) {
             return [...current.slice(1), url];
           }
           return [...current, url];
+        });
+        setPhotoFiles((current) => {
+          if (current.length >= 4) {
+            return [...current.slice(1), file];
+          }
+          return [...current, file];
         });
         setStep("DETAILS");
       },
@@ -255,6 +264,7 @@ export default function BookingPage() {
 
   const removePhoto = (index: number) => {
     setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+    setPhotoFiles((current) => current.filter((_, photoIndex) => photoIndex !== index));
   };
 
   const openCamera = () => {
@@ -309,7 +319,7 @@ export default function BookingPage() {
         location_address: fullAddress,
         is_sos: false,
         request_type: "NORMAL",
-        images: photos,
+        images: [],
         booking_date: selectedDate ? toDateKey(selectedDate) : "TODAY",
         booking_slot: selectedTime,
       };
@@ -318,6 +328,23 @@ export default function BookingPage() {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
+      if (result && result.id && photoFiles.length > 0) {
+        try {
+          await Promise.allSettled(
+            photoFiles.map((photoFile) => {
+              const formData = new FormData();
+              formData.append("file", photoFile);
+              return fetchApi(`/repair-requests/${result.id}/images`, {
+                method: "POST",
+                body: formData,
+              });
+            })
+          );
+        } catch (uploadErr) {
+          console.warn("Could not upload some booking photos", uploadErr);
+        }
+      }
 
       setOrderCode(result.request_code || result.id || "REQ-SUCCESS");
       setStep("SUCCESS");

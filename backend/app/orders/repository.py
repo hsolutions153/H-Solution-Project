@@ -57,7 +57,23 @@ def _enrich_orders(data: list[dict]):
             pass
 
     images_map = {}
+    payments_map = {}
     if repair_ids:
+        try:
+            pay_resp = (
+                supabase.table("payments")
+                .select("repair_id,payment_method,status,amount")
+                .in_("repair_id", repair_ids)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            if pay_resp and pay_resp.data:
+                for p in pay_resp.data:
+                    rid = p.get("repair_id")
+                    if rid and rid not in payments_map:
+                        payments_map[rid] = p
+        except Exception:
+            pass
         try:
             img_resp = (
                 supabase.table("repair_requests_images")
@@ -83,6 +99,10 @@ def _enrich_orders(data: list[dict]):
             item["device"] = devices_map.get(item.get("device_id"))
         if not item.get("images"):
             item["images"] = images_map.get(item["id"], [])
+        pay_info = payments_map.get(item.get("id"))
+        if pay_info:
+            item["payment_method"] = pay_info.get("payment_method")
+            item["payment_status"] = pay_info.get("status")
 
     return data
 

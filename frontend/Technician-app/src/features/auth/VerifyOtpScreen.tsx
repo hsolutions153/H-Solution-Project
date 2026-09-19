@@ -52,23 +52,23 @@ export const VerifyOtpScreen = ({
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-gray-200/60 p-6 shadow-sm relative flex flex-col justify-between">
-        {/* Nút chọn ngôn ngữ */}
+        
         <div className="absolute top-4 right-4">
           <LanguageSelector />
         </div>
 
         <div className="my-auto pt-4">
-          {/* Header */}
+          
           <LoginHeader />
 
-          {/* Form nhập OTP */}
+          
           <VerifyOtpForm
             ref={formRef}
             onSubmit={handleVerifyOtp}
             onResendOtp={handleResend}
           />
 
-          {/* Nút quay lại */}
+          
           <div className="text-center mt-4">
             <button
               type="button"
@@ -82,7 +82,7 @@ export const VerifyOtpScreen = ({
         </div>
       </div>
 
-      {/* Popup báo lỗi khi nhập sai OTP */}
+      
       <VerifyErrorModal
         isOpen={isErrorModalOpen}
         onClose={() => setIsErrorModalOpen(false)}

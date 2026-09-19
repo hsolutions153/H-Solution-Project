@@ -62,7 +62,7 @@ export const TaskCard = ({ task, onClick, onDetailClick }: TaskCardProps) => {
           : "border-gray-200 hover:border-l-4 hover:border-l-sky-800"
       }`}
     >
-      {/* Dòng 1: Mã Job + Badge Trạng thái */}
+      
       <div className="flex items-center justify-between mb-2">
         <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700">
           {task.code}
@@ -74,17 +74,17 @@ export const TaskCard = ({ task, onClick, onDetailClick }: TaskCardProps) => {
         </span>
       </div>
 
-      {/* Tên Khách hàng */}
+      
       <h3 className="font-bold text-slate-900 text-sm mb-1">
         {task.customerName}
       </h3>
 
-      {/* Thời gian */}
+      
       <div className="text-slate-500 text-[11px] mb-2">
         {task.time}
       </div>
 
-      {/* Địa chỉ */}
+      
       <div className="flex items-start gap-1.5 text-slate-500 mb-3 leading-relaxed">
         <MapPin className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
         <span>{task.address}</span>
@@ -92,7 +92,7 @@ export const TaskCard = ({ task, onClick, onDetailClick }: TaskCardProps) => {
 
       <hr className="border-gray-100 mb-3" />
 
-      {/* Tên dịch vụ & Nút Chi tiết */}
+      
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-slate-700 font-medium">
           {renderTaskIcon(task.icon)}

@@ -40,7 +40,7 @@ export const RejectTaskModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
       <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
-        {/* Header */}
+        
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-900 text-sm">
             Xác nhận từ chối công việc
@@ -54,9 +54,9 @@ export const RejectTaskModal = ({
           </button>
         </div>
 
-        {/* Form Body */}
+        
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          {/* Lý do từ chối */}
+          
           <div className="space-y-1.5">
             <label className="block font-medium text-slate-700">
               Lý do từ chối <span className="text-red-500">*</span>
@@ -74,7 +74,7 @@ export const RejectTaskModal = ({
             </select>
           </div>
 
-          {/* Ghi chú thêm */}
+          
           <div className="space-y-1.5">
             <label className="block font-medium text-slate-700">
               Ghi chú thêm
@@ -88,7 +88,7 @@ export const RejectTaskModal = ({
             />
           </div>
 
-          {/* Action Buttons */}
+          
           <div className="grid grid-cols-2 gap-2.5 pt-2">
             <button
               type="button"

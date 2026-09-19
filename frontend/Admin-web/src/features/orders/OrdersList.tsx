@@ -3,12 +3,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Search,
-  Filter,
   RefreshCw,
   Eye,
   UserCheck,
   AlertTriangle,
-  Clock,
   CheckCircle2,
   XCircle,
   Plus,
@@ -22,7 +20,7 @@ import {
 } from "lucide-react";
 import { getStatusBadge, ISSUE_TYPE_LABELS, STATUS_CONFIG } from "@/constants/orderStatus";
 import { Pagination } from "@/components/common/Pagination";
-import { OrderDetailModal } from "./OrderDetailModal";
+import { OrderDetailModal, type OrderRecord, type TechnicianItem } from "./OrderDetailModal";
 import { CreateOrderModal } from "./CreateOrderModal";
 
 function toLocalDateKey(date: Date) {
@@ -32,9 +30,15 @@ function toLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getDeviceLabel(device: OrderRecord["device"]): string {
+  if (!device) return "Thiết bị";
+  if (typeof device === "string") return device;
+  return device.model_name || device.device_type || "Thiết bị";
+}
+
 export const OrdersList = () => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [technicians, setTechnicians] = useState<TechnicianItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -48,16 +52,15 @@ export const OrdersList = () => {
   const [pageSize, setPageSize] = useState(10);
 
   // View Mode: 'table' (dạng bảng) hoặc 'grid' (dạng lưới)
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("admin_orders_view_mode");
-      if (saved === "grid" || saved === "table") {
-        setViewMode(saved);
-      }
-    } catch {}
-  }, []);
+  const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin_orders_view_mode");
+        if (saved === "grid" || saved === "table") return saved;
+      } catch {}
+    }
+    return "table";
+  });
 
   const handleViewModeChange = (mode: "table" | "grid") => {
     setViewMode(mode);
@@ -67,37 +70,36 @@ export const OrdersList = () => {
   };
 
   // Selected Order for Detail Modal
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Quick Action States
-  const [assigningOrder, setAssigningOrder] = useState<any | null>(null);
+  const [assigningOrder, setAssigningOrder] = useState<OrderRecord | null>(null);
   const [selectedTechId, setSelectedTechId] = useState<string>("");
-  const [cancellingOrder, setCancellingOrder] = useState<any | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<OrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customCancelReason, setCustomCancelReason] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchOrdersAndTechs = async () => {
-    setLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const [orderRes, techRes] = await Promise.all([
-        fetchApi<any>("/orders?limit=100"),
-        fetchApi<any>("/technicians"),
+        fetchApi<{ items?: OrderRecord[] } | OrderRecord[]>("/orders?limit=100"),
+        fetchApi<TechnicianItem[]>("/technicians"),
       ]);
 
-      const orderList = Array.isArray(orderRes?.items)
-        ? orderRes.items
+      const orderList = Array.isArray((orderRes as { items?: OrderRecord[] })?.items)
+        ? (orderRes as { items: OrderRecord[] }).items
         : Array.isArray(orderRes)
-        ? orderRes
+        ? (orderRes as OrderRecord[])
         : [];
       setOrders(orderList);
 
       const techList = Array.isArray(techRes) ? techRes : [];
       setTechnicians(techList);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Error fetching orders:", err);
     } finally {
       setLoading(false);
@@ -105,18 +107,39 @@ export const OrdersList = () => {
   };
 
   useEffect(() => {
-    fetchOrdersAndTechs();
+    let active = true;
+    import("@/lib/api-client").then(async ({ fetchApi }) => {
+      try {
+        const [orderRes, techRes] = await Promise.all([
+          fetchApi<{ items?: OrderRecord[] } | OrderRecord[]>("/orders?limit=100"),
+          fetchApi<TechnicianItem[]>("/technicians"),
+        ]);
+        if (!active) return;
+        const orderList = Array.isArray((orderRes as { items?: OrderRecord[] })?.items)
+          ? (orderRes as { items: OrderRecord[] }).items
+          : Array.isArray(orderRes)
+          ? (orderRes as OrderRecord[])
+          : [];
+        setOrders(orderList);
+
+        const techList = Array.isArray(techRes) ? techRes : [];
+        setTechnicians(techList);
+      } catch (err: unknown) {
+        console.warn("Error fetching orders:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleShowToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
-
-  // Reset về trang 1 khi lọc hoặc tìm kiếm
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, typeFilter, dateFrom, dateTo, techFilter]);
 
   // Filtered orders
   const filteredOrders = orders.filter((order) => {
@@ -178,30 +201,33 @@ export const OrdersList = () => {
   // Phân trang 10 bản ghi 1 trang
   const totalItems = filteredOrders.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    (safeCurrentPage - 1) * pageSize,
+    safeCurrentPage * pageSize
   );
 
   // Xử lý phân công nhanh
   const handleQuickAssign = async () => {
-    if (!assigningOrder || !selectedTechId) return;
+    if (!assigningOrder?.id || !selectedTechId) return;
+    const orderId = assigningOrder.id;
     setActionLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
-      await fetchApi(`/orders/${assigningOrder.id}/assign`, {
+      await fetchApi(`/orders/${orderId}/assign`, {
         method: "PATCH",
         body: JSON.stringify({ technician_id: selectedTechId }),
       });
       handleShowToast(
         `Phân công kỹ thuật viên cho đơn #${
-          assigningOrder.request_code || assigningOrder.id.substring(0, 8)
+          assigningOrder.request_code || orderId.substring(0, 8)
         } thành công!`
       );
       setAssigningOrder(null);
       fetchOrdersAndTechs();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi phân công kỹ thuật viên");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi phân công kỹ thuật viên";
+      alert(msg);
     } finally {
       setActionLoading(false);
     }
@@ -209,7 +235,8 @@ export const OrdersList = () => {
 
   // Xử lý hủy đơn nhanh
   const handleQuickCancel = async () => {
-    if (!cancellingOrder) return;
+    if (!cancellingOrder?.id) return;
+    const orderId = cancellingOrder.id;
     setActionLoading(true);
     const fullReason =
       [
@@ -221,7 +248,7 @@ export const OrdersList = () => {
 
     try {
       const { fetchApi } = await import("@/lib/api-client");
-      await fetchApi(`/repair-requests/${cancellingOrder.id}/status`, {
+      await fetchApi(`/repair-requests/${orderId}/status`, {
         method: "PATCH",
         body: JSON.stringify({
           status: "CANCELLED",
@@ -230,13 +257,14 @@ export const OrdersList = () => {
       });
       handleShowToast(
         `Đã hủy đơn #${
-          cancellingOrder.request_code || cancellingOrder.id.substring(0, 8)
+          cancellingOrder.request_code || orderId.substring(0, 8)
         } thành công!`
       );
       setCancellingOrder(null);
       fetchOrdersAndTechs();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi hủy đơn hàng");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi hủy đơn hàng";
+      alert(msg);
     } finally {
       setActionLoading(false);
     }
@@ -317,7 +345,7 @@ export const OrdersList = () => {
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         {/* Search (Kéo dài thanh tìm kiếm vừa vặn, cân đối) */}
-        <div className="relative w-full sm:w-80 md:w-96 lg:w-[420px] xl:w-[460px] flex-shrink-0">
+        <div className="relative w-full sm:w-80 md:w-96 lg:w-105 xl:w-115 shrink-0">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -420,7 +448,7 @@ export const OrdersList = () => {
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Hủy bộ lọc theo ngày"
               >
-                <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>Hủy lọc ngày</span>
               </button>
             )}
@@ -431,7 +459,7 @@ export const OrdersList = () => {
             <select
               value={techFilter}
               onChange={(e) => setTechFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer max-w-[200px]"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer max-w-50"
               title="Lọc theo kỹ thuật viên"
             >
               <option value="ALL">Tất cả kỹ thuật viên</option>
@@ -454,7 +482,7 @@ export const OrdersList = () => {
                 className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Hủy lọc kỹ thuật viên"
               >
-                <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>Hủy</span>
               </button>
             )}
@@ -479,9 +507,9 @@ export const OrdersList = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
                 {paginatedOrders.map((order) => {
-                  const badge = getStatusBadge(order.status);
+                  const badge = getStatusBadge(order.status || "");
                   const issueLabel =
-                    ISSUE_TYPE_LABELS[order.issue_type] ||
+                    (order.issue_type ? ISSUE_TYPE_LABELS[order.issue_type] : undefined) ||
                     order.issue_type ||
                     "Kỹ thuật";
                   const isFinished =
@@ -506,17 +534,40 @@ export const OrdersList = () => {
                               </span>
                             )}
                           </div>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border flex-shrink-0 ${badge.bg} ${badge.text} ${badge.border}`}
-                          >
-                            {badge.label}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
+                            >
+                              {badge.label}
+                            </span>
+                            {(() => {
+                              const paymentObj = (typeof order.payment === "object" && order.payment !== null)
+                                ? (order.payment as { payment_method?: string })
+                                : undefined;
+                              const rawPm = order.payment_method || paymentObj?.payment_method || "";
+                              if (!rawPm) return null;
+                              const pm = String(rawPm).toUpperCase();
+                              const isBank = pm.includes("TRANSFER") || pm.includes("BANK") || pm.includes("CHUYỂN KHOẢN") || pm.includes("VIETQR");
+                              const isCash = pm === "CASH" || pm === "TIỀN MẶT" || pm.includes("COD");
+                              return (
+                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                                  isBank
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : isCash
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-700 border border-slate-200"
+                                }`}>
+                                  {isBank ? "CK Ngân hàng" : isCash ? "Tiền mặt (COD)" : rawPm}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
 
                         {/* Customer Info */}
                         <div className="bg-slate-50/80 rounded-xl p-3 mb-3 border border-slate-100 space-y-1">
                           <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                            <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span className="truncate">
                               {order.customer?.full_name ||
                                 order.customer_name ||
@@ -524,7 +575,7 @@ export const OrdersList = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
-                            <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span>
                               {order.customer?.phone ||
                                 order.customer_phone ||
@@ -537,13 +588,10 @@ export const OrdersList = () => {
                         {/* Device & Issue */}
                         <div className="space-y-1.5 text-xs text-slate-600 mb-3">
                           <div className="flex items-start gap-2">
-                            <Wrench className="w-3.5 h-3.5 text-sky-800 flex-shrink-0 mt-0.5" />
+                            <Wrench className="w-3.5 h-3.5 text-sky-800 shrink-0 mt-0.5" />
                             <div className="min-w-0">
                               <span className="font-bold text-slate-800 block truncate">
-                                {order.device?.model_name ||
-                                  order.device?.device_type ||
-                                  order.device ||
-                                  "Thiết bị"}
+                                {getDeviceLabel(order.device)}
                               </span>
                               <span className="text-slate-500">
                                 Lỗi: <b className="text-slate-700">{issueLabel}</b>
@@ -553,7 +601,7 @@ export const OrdersList = () => {
 
                           {/* Location Address */}
                           <div className="flex items-start gap-2 pt-1">
-                            <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                             <span
                               className="text-slate-600 line-clamp-2"
                               title={order.location_address || order.address_detail}
@@ -581,7 +629,7 @@ export const OrdersList = () => {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-slate-400 text-[11px] flex-shrink-0">
+                          <div className="flex items-center gap-1 text-slate-400 text-[11px] shrink-0">
                             <Calendar className="w-3 h-3" />
                             <span>
                               {order.created_at
@@ -692,9 +740,9 @@ export const OrdersList = () => {
                   </tr>
                 ) : (
                   paginatedOrders.map((order) => {
-                    const badge = getStatusBadge(order.status);
+                    const badge = getStatusBadge(order.status || "");
                     const issueLabel =
-                      ISSUE_TYPE_LABELS[order.issue_type] ||
+                      (order.issue_type ? ISSUE_TYPE_LABELS[order.issue_type] : undefined) ||
                       order.issue_type ||
                       "Kỹ thuật";
                     const isFinished =
@@ -740,12 +788,9 @@ export const OrdersList = () => {
                         </td>
 
                         {/* Thiết bị & Lỗi */}
-                        <td className="py-3.5 px-4 max-w-[200px]">
+                        <td className="py-3.5 px-4 max-w-50">
                           <div className="font-bold text-slate-800 truncate">
-                            {order.device?.model_name ||
-                              order.device?.device_type ||
-                              order.device ||
-                              "Thiết bị"}
+                            {getDeviceLabel(order.device)}
                           </div>
                           <div className="text-xs text-slate-500 truncate">
                             Lỗi: <span className="font-semibold text-slate-700">{issueLabel}</span>
@@ -753,7 +798,7 @@ export const OrdersList = () => {
                         </td>
 
                         {/* Địa chỉ */}
-                        <td className="py-3.5 px-4 max-w-[220px]">
+                        <td className="py-3.5 px-4 max-w-55">
                           <div className="text-xs text-slate-600 truncate" title={order.location_address || order.address_detail}>
                             {order.location_address || order.address_detail || "Chưa có địa chỉ"}
                           </div>
@@ -761,11 +806,34 @@ export const OrdersList = () => {
 
                         {/* Trạng thái */}
                         <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
-                          >
-                            {badge.label}
-                          </span>
+                          <div className="space-y-1">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
+                            >
+                              {badge.label}
+                            </span>
+                            {(() => {
+                              const paymentObj = (typeof order.payment === "object" && order.payment !== null)
+                                ? (order.payment as { payment_method?: string })
+                                : undefined;
+                              const rawPm = order.payment_method || paymentObj?.payment_method || "";
+                              if (!rawPm) return null;
+                              const pm = String(rawPm).toUpperCase();
+                              const isBank = pm.includes("TRANSFER") || pm.includes("BANK") || pm.includes("CHUYỂN KHOẢN") || pm.includes("VIETQR");
+                              const isCash = pm === "CASH" || pm === "TIỀN MẶT" || pm.includes("COD");
+                              return (
+                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                                  isBank
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : isCash
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-700 border border-slate-200"
+                                }`}>
+                                  {isBank ? "CK Ngân hàng" : isCash ? "Tiền mặt (COD)" : rawPm}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </td>
 
                         {/* Thợ */}
@@ -860,7 +928,7 @@ export const OrdersList = () => {
 
         {/* Phân trang (10 bản ghi 1 trang) */}
         <Pagination
-          currentPage={currentPage}
+          currentPage={safeCurrentPage}
           totalPages={totalPages}
           pageSize={pageSize}
           pageSizeOptions={[10, 20, 50]}
@@ -928,12 +996,10 @@ export const OrdersList = () => {
                       "Khách hàng"}
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    {assigningOrder.device?.model_name ||
-                      assigningOrder.device?.device_type ||
-                      "Thiết bị"}{" "}
-                    - Lỗi:{" "}
-                    {ISSUE_TYPE_LABELS[assigningOrder.issue_type] ||
-                      assigningOrder.issue_type}
+                    {getDeviceLabel(assigningOrder.device)} - Lỗi:{" "}
+                    {(assigningOrder.issue_type ? ISSUE_TYPE_LABELS[assigningOrder.issue_type] : undefined) ||
+                      assigningOrder.issue_type ||
+                      "Kỹ thuật"}
                   </div>
                 </div>
               </div>

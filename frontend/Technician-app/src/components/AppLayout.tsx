@@ -28,18 +28,18 @@ export const AppLayout = ({
 
   return (
     <div className="h-screen bg-slate-50 w-full max-w-sm mx-auto border-x border-gray-200 flex flex-col relative shadow-lg rounded-3xl overflow-hidden font-sans">
-      {/* 1. Header cố định */}
+      
       <Header onLogout={onLogout} />
 
-      {/* 2. Nội dung hiển thị */}
+      
       <div className="flex-1 overflow-y-auto scroll-area pb-24">
         {children}
       </div>
 
-      {/* Vị trí cố định cho nút nổi (Floating Action Button) */}
+      
       <div id="fab-container" className="absolute bottom-20 right-4 z-30 pointer-events-auto" />
 
-      {/* 3. BottomNav cố định ở đáy */}
+      
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );

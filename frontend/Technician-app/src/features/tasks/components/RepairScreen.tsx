@@ -17,6 +17,7 @@ import {
   Clock,
   MapPin,
   Trash2,
+  Loader2,
 } from "lucide-react";
 
 interface ComponentItem {
@@ -25,6 +26,15 @@ interface ComponentItem {
   warehouse: string;
   price: number;
   quantity: number;
+}
+
+let repairPartCounter = 1;
+function generateRepairPartId(): string {
+  return `part-${Date.now()}-${repairPartCounter++}`;
+}
+
+function generateHistoryId(): string {
+  return `hist-${Date.now()}-${repairPartCounter++}`;
 }
 
 interface RepairScreenProps {
@@ -52,7 +62,9 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     },
   ]);
 
-  const [images, setImages] = useState<string[]>(["/images/s3.jpg"]);
+  const [images, setImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [note, setNote] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +108,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           const partItems = parsed.items
             .filter(
               (it: any) =>
+                it.item_type !== "LABOR" &&
                 !it.item_name?.toLowerCase().includes("tiền công") &&
                 !it.name?.toLowerCase().includes("tiền công")
             )
@@ -110,6 +123,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
           const laborItem = parsed.items.find(
             (it: any) =>
+              it.item_type === "LABOR" ||
               it.item_name?.toLowerCase().includes("tiền công") ||
               it.name?.toLowerCase().includes("tiền công")
           );
@@ -230,18 +244,29 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      const imageUrl = URL.createObjectURL(files[0]);
+      const file = files[0];
+      if (file.size > 50 * 1024 * 1024) {
+        alert("Ảnh vượt quá dung lượng tối đa 50MB. Vui lòng chọn ảnh khác.");
+        if (e.target) e.target.value = "";
+        return;
+      }
+      const imageUrl = URL.createObjectURL(file);
       setImages((prev) => [...prev, imageUrl]);
+      setImageFiles((prev) => [...prev, file]);
+    }
+    if (e.target) {
+      e.target.value = "";
     }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
     setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setImageFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleAddPart = (name: string, price: number) => {
     if (!name.trim()) return;
-    const newId = `part-${Date.now()}`;
+    const newId = generateRepairPartId();
     setComponents((prev) => [
       ...prev,
       {
@@ -262,10 +287,45 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
   // Xử lý đóng gói dữ liệu và gọi callback khi nhấn nút "Hoàn tất sửa chữa & Báo giá"
   const handleFinishRepair = async () => {
+    setIsUploading(true);
+    let uploadedUrls: string[] = [];
+    let lastResponse: any = null;
+
     if (task?.id) {
       try {
-        // Báo giá đã được tạo và khách duyệt ở bước trước. Khi xong việc chỉ cần cập nhật trạng thái COMPLETED.
-        // Cập nhật trạng thái hoàn thành với tổng tiền
+        // 1. Upload các ảnh sau sửa chữa thật lên Backend
+        if (imageFiles.length > 0) {
+          for (const file of imageFiles) {
+            try {
+              const formData = new FormData();
+              formData.append("file", file);
+              const res = await fetchApi<any>(
+                `/repair-requests/${task.id}/after-repair-images`,
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+              lastResponse = res;
+              if (res?.images && Array.isArray(res.images)) {
+                const afterImgs = res.images
+                  .filter(
+                    (img: any) =>
+                      img.image_type === "AFTER_REPAIR" ||
+                      img.type === "AFTER_REPAIR"
+                  )
+                  .map((img: any) => img.image_url || img.url);
+                if (afterImgs.length > 0) {
+                  uploadedUrls = afterImgs;
+                }
+              }
+            } catch (uploadErr) {
+              console.error("Lỗi khi upload ảnh nghiệm thu:", uploadErr);
+            }
+          }
+        }
+
+        // 2. Cập nhật trạng thái hoàn thành với tổng tiền
         await fetchApi(`/repair-requests/${task.id}/status`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -275,23 +335,56 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         }).catch((err) => console.error("Cập nhật hoàn thành:", err));
       } catch (err) {
         console.error("Lỗi khi kết nối:", err);
+      } finally {
+        setIsUploading(false);
       }
+    } else {
+      setIsUploading(false);
     }
 
     const now = new Date();
+    // Trích xuất URL ảnh trước sửa từ response backend hoặc task
+    const beforeImgFromRes = lastResponse?.images?.find(
+      (img: any) => img.image_type === "BEFORE_REPAIR"
+    )?.image_url;
+    const beforeImage =
+      beforeImgFromRes ||
+      (task?.images && task.images.length > 0
+        ? typeof task.images[0] === "string"
+          ? task.images[0]
+          : (task.images[0] as any)?.image_url || ""
+        : "");
+
+    // Trích xuất URL ảnh sau sửa thật từ Supabase Backend
+    const afterImgFromRes = lastResponse?.images?.filter(
+      (img: any) => img.image_type === "AFTER_REPAIR"
+    );
+    const afterImage =
+      (afterImgFromRes && afterImgFromRes.length > 0
+        ? afterImgFromRes[afterImgFromRes.length - 1].image_url
+        : null) ||
+      uploadedUrls[uploadedUrls.length - 1] ||
+      images[0] ||
+      "";
+
     const completedData: HistoryTask = {
-      id: `hist-${Date.now()}`,
-      code: task?.code || "JOB-8829",
+      id: generateHistoryId(),
+      code: task?.code || lastResponse?.request_code || "JOB-8829",
       date: now.toLocaleDateString("vi-VN"),
       time: now.toLocaleTimeString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
       }),
       serviceType: task?.serviceName || "Kiểm tra bánh xe và hệ thống xích",
-      customerName: task?.customerName || "Nguyễn Văn A",
-      deviceInfo: task?.deviceInfo || "Xe lăn điện Karma KP-80",
+      customerName:
+        task?.customerName ||
+        lastResponse?.customer?.full_name ||
+        "Khách hàng",
+      deviceInfo: task?.deviceInfo || "Xe lăn điện",
       address:
-        task?.address || "Số 12 Chùa Bộc, Quang Trung, Đống Đa, Hà Nội",
+        task?.address ||
+        lastResponse?.location_address ||
+        "Số 12 Chùa Bộc, Quang Trung, Đống Đa, Hà Nội",
       type: "repair",
       diagnosis:
         "Kiểm tra và khắc phục lỗi hoạt động của thiết bị theo lịch hẹn.",
@@ -299,8 +392,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         note ||
         `Đã thay thế linh kiện và hoàn tất căn chỉnh thiết bị. Tổng chi phí: ${totalCost.toLocaleString("vi-VN")} đ.`,
       images: {
-        before: "/images/before-repair.jpg",
-        after: images[0] || "/images/s3.jpg",
+        before: beforeImage,
+        after: afterImage,
       },
       totalAmount: totalCost,
     };
@@ -313,7 +406,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   return (
     <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between border-x border-slate-100 font-sans">
       <div className="p-4 space-y-4">
-        {/* Header */}
+        
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -329,7 +422,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
         </div>
 
-        {/* Thông tin đơn đặt lịch */}
+        
         <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">
@@ -346,7 +439,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </p>
         </div>
 
-        {/* Đồng hồ tính giờ */}
+        
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center space-y-3">
           <div className="flex items-center justify-center gap-2 text-[#005288]">
             <Clock className="w-6 h-6" />
@@ -390,7 +483,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           )}
         </div>
 
-        {/* Linh kiện & Chi phí sửa chữa */}
+        
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
@@ -450,7 +543,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             ))
           )}
 
-          {/* Tiền công sửa chữa */}
+          
           <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
             <div>
               <p className="font-bold text-xs text-slate-800">Tiền công kỹ thuật viên</p>
@@ -469,7 +562,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
         </div>
 
-        {/* Modal Thêm Linh Kiện */}
+        
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3 shadow-xl">
@@ -483,7 +576,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 </button>
               </div>
 
-              {/* Danh sách gợi ý linh kiện phổ biến */}
+              
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Linh kiện có sẵn:</p>
                 <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
@@ -500,7 +593,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 </div>
               </div>
 
-              {/* Nhập tùy chỉnh */}
+              
               <div className="border-t border-slate-100 pt-2 space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Hoặc nhập linh kiện khác:</p>
                 <input
@@ -529,7 +622,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
         )}
 
-        {/* Chụp ảnh sau khi sửa */}
+        
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <Camera className="w-4 h-4 text-slate-500" /> Chụp ảnh sau khi sửa
@@ -574,7 +667,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
         </div>
 
-        {/* Ghi chú */}
+        
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <FileText className="w-4 h-4 text-slate-500" /> Báo cáo nội dung sửa chữa thực tế
@@ -588,7 +681,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           />
         </div>
 
-        {/* Tổng chi phí thanh toán */}
+        
         <div className="bg-sky-50 border border-sky-100 p-4 rounded-2xl space-y-1.5">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-sky-900">
@@ -606,7 +699,6 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
         </div>
 
-        {/* Nút thao tác dưới cùng */}
         <div className="flex gap-2.5 pt-2">
           <button
             onClick={handleToggleTimer}
@@ -624,9 +716,18 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </button>
           <button
             onClick={handleFinishRepair}
-            className="flex-1 py-3 bg-[#005288] hover:bg-sky-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
+            disabled={isUploading}
+            className="flex-1 py-3 bg-[#005288] hover:bg-sky-900 disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
           >
-            Hoàn tất sửa & Báo giá <Check className="w-4 h-4" />
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Đang tải ảnh & hoàn tất...
+              </>
+            ) : (
+              <>
+                Hoàn tất sửa & Báo giá <Check className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

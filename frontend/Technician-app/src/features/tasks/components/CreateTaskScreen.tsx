@@ -43,7 +43,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
   return (
     <div className="p-4 pb-28 space-y-4 relative">
       
-      {/* Tiêu đề trang & Nút quay lại */}
+      
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -56,9 +56,9 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
 
       <form id="create-task-form" onSubmit={handleSubmit} className="space-y-4">
         
-        {/* Card Thông tin Khách hàng */}
+        
         <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-100 space-y-3">
-          {/* Nút chuyển đổi Khách hàng mới / Khách hàng cũ */}
+          
           <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
@@ -80,7 +80,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
             </button>
           </div>
 
-          {/* NỘI DUNG KHI LÀ KHÁCH HÀNG MỚI */}
+          
           {customerType === 'new' ? (
             <div className="space-y-3 animate-fadeIn">
               <div>
@@ -134,7 +134,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                 </div>
               </div>
 
-              {/* Card hiển thị thông tin khách hàng cũ đã chọn */}
+              
               {selectedOldCustomer && (
                 <div className="p-3 bg-slate-50 border border-sky-100 rounded-xl relative space-y-1.5">
                   <div className="flex justify-between items-start">
@@ -157,7 +157,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
           )}
         </div>
 
-        {/* Card Thông tin thiết bị & Sự cố */}
+        
         <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-100 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 text-sky-900 font-bold text-xs uppercase tracking-wide">
@@ -183,7 +183,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
             )}
           </div>
 
-          {/* Nếu là khách hàng cũ và CHƯA BẬT chế độ thêm thiết bị mới -> Hiển thị ô chọn thiết bị đã lưu */}
+          
           {customerType === 'old' && !isAddingNewDevice && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Chọn từ thiết bị đã lưu của KH</label>
@@ -201,7 +201,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
             </div>
           )}
 
-          {/* Các trường Loại thiết bị, Thương hiệu, Serial */}
+          
           {(customerType === 'new' || isAddingNewDevice) && (
             <div className="space-y-3 animate-fadeIn">
               {isAddingNewDevice && (
@@ -283,7 +283,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
           </div>
         </div>
 
-        {/* Nút submit nằm ngay cuối form */}
+        
         <div className="pt-2">
           <button
             type="submit"

@@ -7,8 +7,10 @@ import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X, FileText, Spark
 interface DiagnosticScreenProps {
   task: Task;
   onBack: () => void;
-  // Truyền kèm diagnosticData khi chuyển bước sang màn hình báo giá
-  onSubmitDiagnostic: (diagnosticData: { note: string; repairType: string; images: string[] }) => void;
+  onSubmitDiagnostic: (
+    diagnosticData: { note: string; repairType: string; images: string[] },
+    updatedTask?: any
+  ) => void;
 }
 
 export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
@@ -20,25 +22,34 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
   const [noteError, setNoteError] = useState<string | null>(null);
   const [repairType, setRepairType] = useState<"FIX_NOW" | "BRING_TO_WORKSHOP" | "CANT_FIX">("FIX_NOW");
   
-  // Quản lý danh sách ảnh (khởi tạo có sẵn 1 ảnh mẫu)
-  const [images, setImages] = useState<string[]>(["/images/s1.jpg"]);
+  const [images, setImages] = useState<string[]>(() => {
+    if (Array.isArray((task as any)?.images) && (task as any).images.length > 0) {
+      const existing = (task as any).images
+        .filter((img: any) => img.image_type === "BEFORE_REPAIR" || img.type === "BEFORE_REPAIR")
+        .map((img: any) => img.image_url || img.url);
+      if (existing.length > 0) return existing;
+    }
+    return [];
+  });
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // State điều khiển hiển thị bảng chọn (Thư viện hay Camera) khi bấm "+ Thêm ảnh"
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
 
-  // Hàm xử lý khi chọn/chụp file ảnh xong
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const imageUrl = URL.createObjectURL(file);
       setImages((prev) => [...prev, imageUrl]);
+      setImageFiles((prev) => [...prev, file]);
     }
     setShowImagePickerModal(false);
+    e.target.value = "";
   };
 
-  // Hàm xóa ảnh
   const handleRemoveImage = (indexToRemove: number) => {
     setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   return (
@@ -279,22 +290,79 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 py-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-slate-700 font-bold text-xs cursor-pointer shadow-xs"
+          disabled={isUploading}
+          className="flex-1 py-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-slate-700 font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50"
         >
           Hủy bỏ
         </button>
         <button
           type="button"
-          onClick={() => {
+          disabled={isUploading}
+          onClick={async () => {
             if (!note.trim()) {
               setNoteError("Vui lòng nhập nội dung chẩn đoán trước khi tiếp tục.");
               return;
             }
-            onSubmitDiagnostic({ note, repairType, images });
+
+            setIsUploading(true);
+            let finalImages = [...images];
+            let updatedTaskResponse: any = null;
+
+            if (task?.id && imageFiles.length > 0) {
+              try {
+                const { fetchApi } = await import("@/lib/api-client");
+                for (const file of imageFiles) {
+                  try {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    const res = await fetchApi<any>(
+                      `/repair-requests/${task.id}/diagnostic-images`,
+                      {
+                        method: "POST",
+                        body: formData,
+                      }
+                    );
+                    updatedTaskResponse = res;
+                    if (res?.images && Array.isArray(res.images)) {
+                      const beforeImgs = res.images
+                        .filter(
+                          (img: any) =>
+                            img.image_type === "BEFORE_REPAIR" ||
+                            img.type === "BEFORE_REPAIR"
+                        )
+                        .map((img: any) => img.image_url || img.url);
+                      if (beforeImgs.length > 0) {
+                        finalImages = beforeImgs;
+                      }
+                    }
+                  } catch (uploadErr) {
+                    console.error("Lỗi khi upload ảnh chẩn đoán:", uploadErr);
+                  }
+                }
+              } catch (err) {
+                console.error("Lỗi kết nối khi tải ảnh chẩn đoán:", err);
+              } finally {
+                setIsUploading(false);
+              }
+            } else {
+              setIsUploading(false);
+            }
+
+            onSubmitDiagnostic(
+              { note, repairType, images: finalImages },
+              updatedTaskResponse
+            );
           }}
-          className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm"
+          className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm disabled:opacity-50"
         >
-          Lưu & Tiếp tục báo giá ➔
+          {isUploading ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+              Đang tải ảnh lên...
+            </span>
+          ) : (
+            <span>Lưu & Tiếp tục báo giá ➔</span>
+          )}
         </button>
       </div>
 

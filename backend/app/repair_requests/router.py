@@ -12,6 +12,8 @@ from app.repair_requests.schemas import (
 )
 from app.repair_requests.service import (
     add_after_repair_image,
+    add_customer_image,
+    add_diagnostic_image,
     create_quote_for_request,
     create_request,
     fetch_all_requests,
@@ -92,6 +94,25 @@ def upload_after_repair_image(
     current_user: dict = Depends(get_current_user),
 ):
     return add_after_repair_image(request_id, file, current_user)
+
+
+@router.post("/{request_id}/diagnostic-images", response_model=RepairRequestResponse)
+def upload_diagnostic_image(
+    request_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return add_diagnostic_image(request_id, file, current_user)
+
+
+@router.post("/{request_id}/images", response_model=RepairRequestResponse)
+@router.post("/{request_id}/customer-images", response_model=RepairRequestResponse, include_in_schema=False)
+def upload_customer_image(
+    request_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return add_customer_image(request_id, file, current_user)
 
 
 @router.post("/{request_id}/quotes", response_model=QuoteResponse, status_code=status.HTTP_201_CREATED)

@@ -30,7 +30,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   return (
     <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between">
       <div className="p-4 space-y-4">
-        {/* Tiêu đề & Nút quay lại đồng nhất với CreateQuoteScreen */}
+        
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -41,7 +41,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           </button>
         </div>
 
-        {/* Card thông tin công việc */}
+        
         <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold px-2.5 py-1 bg-sky-50 text-sky-700 rounded-md">
@@ -61,7 +61,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           </div>
         </div>
 
-        {/* Icon trạng thái & Mô tả */}
+        
         <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm text-center space-y-3">
           <div className="w-16 h-16 bg-sky-50 border border-sky-100 rounded-2xl mx-auto flex items-center justify-center">
             <Clock className="w-8 h-8 text-sky-500 animate-spin-slow" />
@@ -77,7 +77,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
             </p>
           </div>
 
-          {/* Chi phí & Dự kiến */}
+          
           <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-4 text-left mt-4">
             <div className="pl-2">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
@@ -107,7 +107,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           </div>
         </div>
 
-        {/* Phần Chỉnh sửa báo giá & Hành động */}
+        
         <div className="space-y-3 pt-2">
           <p className="text-xs font-semibold text-slate-600 text-center">
             Chỉnh sửa báo giá

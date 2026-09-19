@@ -24,21 +24,21 @@ export const ForgotPasswordScreen = ({
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4">
-      {/* Khung giống LoginScreen */}
+      
       <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-gray-200/60 p-6 shadow-sm relative flex flex-col justify-between">
-        {/* Nút ngôn ngữ */}
+        
         <div className="absolute top-4 right-4">
           <LanguageSelector />
         </div>
 
         <div className="my-auto pt-4">
-          {/* Header */}
+          
           <LoginHeader />
 
-          {/* Form */}
+          
           <ForgotPasswordForm onSubmit={handleForgotPassword} />
 
-          {/* Quay lại đăng nhập */}
+          
           <div className="text-center mt-4">
             <button
               type="button"

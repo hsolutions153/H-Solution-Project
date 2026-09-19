@@ -45,6 +45,7 @@ export interface QuoteDetail {
   notes?: string;
   diagnosis_note?: string;
   status?: string;
+  payment_method?: string;
   items?: OrderItem[];
 }
 
@@ -57,7 +58,9 @@ export interface TechnicianItem {
   specialization?: string;
   is_online?: boolean;
   user?: {
+    id?: string;
     full_name?: string;
+    phone?: string;
   };
 }
 
@@ -73,12 +76,14 @@ export interface OrderImageItem {
 }
 
 export interface OrderCustomer {
+  id?: string;
   full_name?: string;
   phone?: string;
   email?: string;
 }
 
 export interface OrderDevice {
+  id?: string;
   model_name?: string;
   device_type?: string;
   manufacturer?: string;
@@ -86,10 +91,13 @@ export interface OrderDevice {
 }
 
 export interface OrderTechnician {
+  id?: string;
+  user_id?: string;
   name?: string;
   full_name?: string;
   phone?: string;
   user?: {
+    id?: string;
     full_name?: string;
     phone?: string;
   };
@@ -685,18 +693,23 @@ export const OrderDetailModal = ({
                           </span>
                           <span className="font-bold text-slate-800">
                             {(() => {
-                              const pm = String(
+                              const paymentObj = (typeof orderDetail.payment === "object" && orderDetail.payment !== null)
+                                ? (orderDetail.payment as { payment_method?: string })
+                                : undefined;
+                              const rawPm =
+                                quoteData?.payment_method ||
                                 orderDetail.payment_method ||
-                                  order.payment_method ||
-                                  ""
-                              ).toUpperCase();
-                              if (pm === "CASH") return "Tiền mặt";
-                              if (pm.includes("TRANSFER") || pm.includes("BANK"))
+                                paymentObj?.payment_method ||
+                                order.payment_method ||
+                                "";
+                              const pm = String(rawPm).toUpperCase();
+                              if (pm === "CASH" || pm === "TIỀN MẶT" || pm.includes("COD")) return "Tiền mặt (COD)";
+                              if (pm.includes("TRANSFER") || pm.includes("BANK") || pm.includes("CHUYỂN KHOẢN") || pm.includes("VIETQR"))
                                 return "Chuyển khoản ngân hàng";
                               if (pm.includes("MOMO")) return "Ví MoMo";
                               if (pm.includes("VNPAY")) return "Cổng VNPAY";
                               if (pm.includes("CARD")) return "Thẻ ngân hàng";
-                              return orderDetail.payment_method || "Tiền mặt";
+                              return rawPm || "Chưa thanh toán";
                             })()}
                           </span>
                         </div>

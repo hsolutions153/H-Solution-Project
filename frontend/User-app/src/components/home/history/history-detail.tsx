@@ -108,7 +108,6 @@ export function HistoryDetail() {
     if (!id) return;
 
     let isMounted = true;
-    let intervalId: any = null;
 
     async function fetchDetail() {
       try {
@@ -281,7 +280,7 @@ export function HistoryDetail() {
               parts: parsedParts,
               laborCost: parsedLaborCost,
               partsCost: parsedPartsCost,
-              paymentMethod: res.payment_method || "Chuyển khoản ngân hàng",
+              paymentMethod: res.payment_method || null,
               total: effectiveTotal,
               images: (res.images || []).map((img: any) => img.image_url),
             });
@@ -747,16 +746,26 @@ export function HistoryDetail() {
               </span>
             </div>
 
-            {/* Phương thức thanh toán */}
             <div className="flex justify-between items-center text-slate-600 pt-1">
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-slate-500 text-base">
-                  {detail.paymentMethod === "Cash" || detail.paymentMethod === "Tiền mặt" ? "payments" : "account_balance"}
+                  {(() => {
+                    const pm = String(detail.paymentMethod || "").toUpperCase();
+                    return pm === "CASH" || pm === "TIỀN MẶT" ? "payments" : "account_balance";
+                  })()}
                 </span>
                 Phương thức thanh toán:
               </span>
               <span className="font-bold text-slate-800">
-                {detail.paymentMethod === "Cash" ? "Tiền mặt" : detail.paymentMethod === "Bank Transfer" ? "Chuyển khoản ngân hàng" : detail.paymentMethod}
+                {(() => {
+                  const pm = String(detail.paymentMethod || "").toUpperCase();
+                  if (pm === "CASH" || pm === "TIỀN MẶT") return "Tiền mặt";
+                  if (pm.includes("TRANSFER") || pm.includes("BANK") || pm.includes("CHUYỂN KHOẢN"))
+                    return "Chuyển khoản ngân hàng";
+                  if (pm.includes("MOMO")) return "Ví MoMo";
+                  if (pm.includes("VNPAY")) return "Cổng VNPAY";
+                  return detail.paymentMethod || "Chưa thanh toán";
+                })()}
               </span>
             </div>
 

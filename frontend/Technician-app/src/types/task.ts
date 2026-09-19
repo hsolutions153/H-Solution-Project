@@ -61,3 +61,24 @@ export interface HistoryTask {
   };
   totalAmount: string | number;
 }
+
+export type QuoteItemType = "SPARE_PART" | "LABOR" | "SERVICE";
+
+export interface QuoteItem {
+  id?: string;
+  item_name: string;
+  item_type: QuoteItemType;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface QuotePayload {
+  items: QuoteItem[];
+  parts_cost: number;
+  labor_fee: number;
+  estimated_price: number;
+  total_amount: number;
+  diagnosis_note?: string;
+  estimatedTime?: string;
+}

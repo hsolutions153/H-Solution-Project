@@ -47,6 +47,8 @@ class OrderResponse(BaseModel):
     device: OrderDevice | None = None
     images: list[OrderImage] = []
     total_amount: Decimal | float | None = None
+    payment_method: str | None = None
+    payment_status: str | None = None
     quote: dict[str, Any] | None = None
 
 

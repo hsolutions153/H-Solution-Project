@@ -44,12 +44,23 @@ class RepairRequestStatusUpdate(BaseModel):
     totalCost: Decimal | float | None = None
 
 
+from enum import Enum
+
+
+class ItemTypeEnum(str, Enum):
+    SPARE_PART = "SPARE_PART"
+    LABOR = "LABOR"
+    SERVICE = "SERVICE"
+
+
 class QuoteItemCreate(BaseModel):
     name: str | None = None
     item_name: str | None = None
-    quantity: float | Decimal = 1
-    price: float | Decimal = 0
-    unit_price: float | Decimal | None = None
+    item_type: str | None = None
+    quantity: float = 1.0
+    price: float = 0.0
+    unit_price: float | None = None
+    subtotal: float | None = None
 
 
 class QuoteCreateRequest(BaseModel):
@@ -57,18 +68,19 @@ class QuoteCreateRequest(BaseModel):
     estimatedTime: str | None = None
     diagnosis_note: str | None = None
     severity: str | None = "MINOR"
-    labor_fee: float | Decimal | None = None
-    parts_cost: float | Decimal | None = None
-    laborCost: float | Decimal | None = None
-    partsCost: float | Decimal | None = None
-    estimated_price: float | Decimal | None = None
-    total_amount: float | Decimal | None = None
+    labor_fee: float | None = None
+    parts_cost: float | None = None
+    laborCost: float | None = None
+    partsCost: float | None = None
+    estimated_price: float | None = None
+    total_amount: float | None = None
 
 
 class QuoteItemResponse(BaseModel):
     id: str
     quote_id: str
     item_name: str
+    item_type: str | None = "SPARE_PART"
     quantity: float
     unit_price: float
     subtotal: float
@@ -84,6 +96,7 @@ class QuoteResponse(BaseModel):
     estimated_price: float
     status: str
     created_at: datetime | str
+    payment_method: str | None = None
     items: list[QuoteItemResponse] = []
 
 
@@ -158,6 +171,7 @@ class RepairRequestResponse(BaseModel):
     cancelled_at: datetime | None = None
     cancel_reason: str | None = None
     total_amount: Decimal | None = None
+    payment_method: str | None = None
     created_at: datetime
     created_by: str
     updated_at: datetime

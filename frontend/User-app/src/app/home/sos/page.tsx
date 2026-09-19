@@ -25,7 +25,7 @@ export default function SosPage() {
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
-  const [, setUploadedPhotos] = useState<File[]>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState("");
   const [cameraFlash, setCameraFlash] = useState(false);
 
@@ -379,7 +379,7 @@ export default function SosPage() {
         location_address: [streetAddress.trim(), ward.trim(), province.trim()].join(", "),
         is_sos: true,
         request_type: "EMERGENCY",
-        images: photoPreviews,
+        images: [],
       };
 
       const createdReq = await fetchApi<any>("/repair-requests", {
@@ -391,6 +391,23 @@ export default function SosPage() {
         if (createdReq.id) {
           setActiveRequestId(createdReq.id);
           sessionStorage.setItem("activeSosId", createdReq.id);
+
+          if (uploadedPhotos.length > 0) {
+            try {
+              await Promise.allSettled(
+                uploadedPhotos.map((photoFile) => {
+                  const formData = new FormData();
+                  formData.append("file", photoFile);
+                  return fetchApi(`/repair-requests/${createdReq.id}/images`, {
+                    method: "POST",
+                    body: formData,
+                  });
+                })
+              );
+            } catch (uploadErr) {
+              console.warn("Could not upload some customer photos", uploadErr);
+            }
+          }
         }
         if (createdReq.technician) {
           setAssignedTech(createdReq.technician);

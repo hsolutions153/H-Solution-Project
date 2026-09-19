@@ -45,7 +45,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6 text-center">
-      {/* Tiêu đề & Mô tả */}
+      
       <div className="mb-5">
         <h2 className="text-base font-bold text-slate-800 mb-1">
           Đặt lại mật khẩu
@@ -56,7 +56,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 text-left">
-        {/* Mật khẩu mới */}
+        
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
             Mật khẩu mới
@@ -80,7 +80,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
           </div>
         </div>
 
-        {/* Xác nhận mật khẩu mới */}
+        
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
             Xác nhận mật khẩu mới
@@ -104,18 +104,18 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
           </div>
         </div>
 
-        {/* Thông báo yêu cầu mật khẩu */}
+        
         <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg text-[11px] text-slate-500 leading-relaxed">
           <Info className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
           <span>Mật khẩu phải từ 8 ký tự, bao gồm chữ cái và chữ số.</span>
         </div>
 
-        {/* Báo lỗi nếu validate thất bại */}
+        
         {errorMessage && (
           <p className="text-xs text-red-500 font-medium text-center">{errorMessage}</p>
         )}
 
-        {/* Nút Lưu mật khẩu & Đăng nhập */}
+        
         <button
           type="submit"
           className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-xs rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
@@ -125,7 +125,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
         </button>
       </form>
 
-      {/* Link Quay lại đăng nhập */}
+      
       <div className="mt-5 text-center">
         <button
           type="button"

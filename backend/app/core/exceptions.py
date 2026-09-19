@@ -41,6 +41,7 @@ class ErrorCode(str, Enum):
     QUOTE_NOT_ACCEPTED = "QUOTE_NOT_ACCEPTED"
     QUOTE_ALREADY_DECIDED = "QUOTE_ALREADY_DECIDED"
     INVALID_QUOTE_STATUS = "INVALID_QUOTE_STATUS"
+    INVALID_ITEM_TYPE = "INVALID_ITEM_TYPE"
 
     PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND"
     PAYMENT_ALREADY_PAID = "PAYMENT_ALREADY_PAID"
@@ -97,6 +98,7 @@ ERROR_METADATA: dict[ErrorCode, tuple[int, str]] = {
     ErrorCode.QUOTE_NOT_ACCEPTED: (status.HTTP_409_CONFLICT, "Cần khách hàng duyệt báo giá trước khi tiến hành sửa chữa"),
     ErrorCode.QUOTE_ALREADY_DECIDED: (status.HTTP_409_CONFLICT, "Báo giá này đã được phản hồi trước đó"),
     ErrorCode.INVALID_QUOTE_STATUS: (422, "Trạng thái báo giá không hợp lệ"),
+    ErrorCode.INVALID_ITEM_TYPE: (422, "Loại mục báo giá không hợp lệ (chỉ chấp nhận SPARE_PART, LABOR hoặc SERVICE)"),
 
     ErrorCode.PAYMENT_NOT_FOUND: (status.HTTP_404_NOT_FOUND, "Không tìm thấy thông tin thanh toán"),
     ErrorCode.PAYMENT_ALREADY_PAID: (status.HTTP_409_CONFLICT, "Khoản thanh toán này đã được hoàn tất trước đó"),
