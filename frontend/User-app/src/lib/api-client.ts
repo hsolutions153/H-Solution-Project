@@ -8,6 +8,9 @@ export interface UserSession {
   phone?: string;
   email?: string;
   role?: string;
+  address?: string;
+  is_new_user?: boolean;
+  is_profile_complete?: boolean;
 }
 
 export function getAuthToken(): string | null {
@@ -21,6 +24,13 @@ export function setAuthToken(token: string, user?: UserSession): void {
   if (user) {
     localStorage.setItem("user_info", JSON.stringify(user));
   }
+}
+
+export function updateUserInfo(partial: Partial<UserSession>): void {
+  if (typeof window === "undefined") return;
+  const current = getUserInfo() || ({} as UserSession);
+  const updated = { ...current, ...partial };
+  localStorage.setItem("user_info", JSON.stringify(updated));
 }
 
 export function removeAuthToken(): void {

@@ -46,12 +46,26 @@ def authenticate_user(email_or_phone: str, password: str):
     access_token = create_access_token(
         data={"sub": user["id"], "email": user["email"], "role_id": role_id, "role": role_code}
     )
+    user_addr = (user.get("address") or "").strip()
+    user_phone = (user.get("phone") or "").strip()
+    is_profile_complete = bool(user_addr and user_addr != "Chưa cập nhật" and user_phone)
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "role_id": role_id,
         "role": role_code,
-        "user": {"id": user["id"], "name": user["full_name"], "phone": user.get("phone")},
+        "is_new_user": False,
+        "is_profile_complete": is_profile_complete,
+        "user": {
+            "id": user["id"],
+            "name": user["full_name"],
+            "phone": user.get("phone"),
+            "email": user.get("email"),
+            "address": user_addr if user_addr != "Chưa cập nhật" else None,
+            "is_new_user": False,
+            "is_profile_complete": is_profile_complete,
+        },
     }
 
 
@@ -84,6 +98,87 @@ def register_customer(data):
     if not new_user:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
     return {"message": "Đăng ký tài khoản thành công", "user_id": new_user["id"]}
+
+
+def authenticate_or_register_google_user(payload):
+    email = str(payload.email).strip().lower()
+    name = (payload.name or "").strip() or "Khách hàng Google"
+
+    user = repository.get_user_by_email(email)
+    if isinstance(user, list) and len(user) > 0:
+        user = user[0]
+    elif isinstance(user, list):
+        user = None
+
+    customer_role = repository.get_role_by_code(CUSTOMER_ROLE_CODE)
+    if not customer_role:
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
+    role_id = customer_role[0]["id"] if isinstance(customer_role, list) else customer_role["id"]
+
+    is_new = False
+    if not user:
+        is_new = True
+        user_id = _generate_user_id()
+        import random
+        placeholder_phone = f"09{random.randint(10000000, 99999999)}"
+        while repository.get_user_by_phone(placeholder_phone):
+            placeholder_phone = f"09{random.randint(10000000, 99999999)}"
+
+        user_data = {
+            "id": user_id,
+            "role_id": role_id,
+            "full_name": name,
+            "email": email,
+            "phone": placeholder_phone,
+            "password_hash": hash_password(secrets.token_urlsafe(32)),
+            "address": "Chưa cập nhật",
+            "is_active": True,
+        }
+        user = repository.create_user(user_data)
+        if not user:
+            raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+
+        try:
+            from app.repair_requests.repository import create_default_device_for_customer
+            create_default_device_for_customer(user["id"])
+        except Exception:
+            pass
+    else:
+        if not user.get("is_active", True):
+            raise AppException(ErrorCode.USER_LOCKED)
+
+    role = user.get("role") or {}
+    user_role_id = role.get("id") or user.get("role_id") or role_id
+    user_role_code = role.get("code") or CUSTOMER_ROLE_CODE
+
+    user_addr = (user.get("address") or "").strip()
+    user_phone = (user.get("phone") or "").strip()
+    is_profile_complete = (
+        not is_new
+        and bool(user_addr and user_addr != "Chưa cập nhật" and user_phone)
+    )
+    is_new_user = is_new or (not is_profile_complete)
+
+    access_token = create_access_token(
+        data={"sub": user["id"], "email": user["email"], "role_id": user_role_id, "role": user_role_code}
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role_id": user_role_id,
+        "role": user_role_code,
+        "is_new_user": is_new_user,
+        "is_profile_complete": is_profile_complete,
+        "user": {
+            "id": user["id"],
+            "name": user.get("full_name") or name,
+            "phone": user.get("phone") if is_profile_complete else "",
+            "email": user["email"],
+            "address": user_addr if user_addr != "Chưa cập nhật" else "",
+            "is_new_user": is_new_user,
+            "is_profile_complete": is_profile_complete,
+        },
+    }
 
 
 

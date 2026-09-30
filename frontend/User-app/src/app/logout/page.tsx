@@ -2,10 +2,12 @@
 
 import { signOut } from "next-auth/react";
 import { useEffect } from "react";
+import { removeAuthToken } from "@/lib/api-client";
 
 export default function LogoutPage() {
   useEffect(() => {
-    void signOut({ redirectTo: "/login" });
+    removeAuthToken();
+    void signOut({ redirectTo: "/login?logged_out=1" });
   }, []);
 
   return (

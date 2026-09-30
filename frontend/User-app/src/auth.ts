@@ -57,7 +57,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const googleSecret = process.env.AUTH_GOOGLE_SECRET;
 
   if (googleId && googleSecret) {
-    providers.push(Google({ clientId: googleId, clientSecret: googleSecret }));
+    providers.push(
+      Google({
+        clientId: googleId,
+        clientSecret: googleSecret,
+        authorization: {
+          params: {
+            prompt: "select_account",
+            access_type: "offline",
+            response_type: "code",
+          },
+        },
+      }),
+    );
   }
 
   const appleClientSecret = await createAppleClientSecret();
@@ -95,6 +107,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       strategy: "jwt",
     },
     callbacks: {
+      async jwt({ token, user, account }) {
+        if (account?.provider === "google" && user?.email) {
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+            const res = await fetch(`${apiUrl}/auth/google`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: user.email,
+                name: user.name || "Khách hàng Google",
+                avatar: user.image,
+                google_id: account.providerAccountId,
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              token.accessToken = data.access_token;
+              token.backendUser = data.user;
+              token.isNewUser = data.is_new_user;
+              token.isProfileComplete = data.is_profile_complete;
+            } else {
+              console.error("Backend auth/google returned status:", res.status);
+            }
+          } catch (err) {
+            console.error("Backend auth/google call failed:", err);
+          }
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (token?.accessToken) {
+          (session as any).accessToken = token.accessToken;
+          (session as any).backendUser = token.backendUser;
+          (session as any).isNewUser = token.isNewUser;
+          (session as any).isProfileComplete = token.isProfileComplete;
+        }
+        return session;
+      },
       authorized({ auth: session }) {
         return Boolean(session?.user);
       },

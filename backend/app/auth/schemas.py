@@ -23,6 +23,17 @@ class AuthenticatedUser(BaseModel):
     id: str
     name: str
     phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    is_new_user: bool = False
+    is_profile_complete: bool = True
+
+
+class GoogleAuthRequest(BaseModel):
+    email: EmailStr
+    name: str | None = None
+    avatar: str | None = None
+    google_id: str | None = None
 
 
 class SignupResponse(BaseModel):
@@ -36,6 +47,8 @@ class TokenResponse(BaseModel):
     role_id: str
     role: str
     user: AuthenticatedUser
+    is_new_user: bool = False
+    is_profile_complete: bool = True
 
 
 class ForgotPasswordRequest(BaseModel):

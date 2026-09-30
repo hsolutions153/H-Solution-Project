@@ -3,6 +3,7 @@ from fastapi import APIRouter, status
 from app.auth.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    GoogleAuthRequest,
     LoginRequest,
     ResetPasswordRequest,
     ResetPasswordResponse,
@@ -10,7 +11,13 @@ from app.auth.schemas import (
     SignupResponse,
     TokenResponse,
 )
-from app.auth.service import authenticate_user, register_customer, request_password_reset, reset_password
+from app.auth.service import (
+    authenticate_or_register_google_user,
+    authenticate_user,
+    register_customer,
+    request_password_reset,
+    reset_password,
+)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -23,6 +30,11 @@ def signup(payload: SignupRequest):
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
     return authenticate_user(str(payload.email), payload.password)
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(payload: GoogleAuthRequest):
+    return authenticate_or_register_google_user(payload)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

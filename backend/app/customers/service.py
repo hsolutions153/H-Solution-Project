@@ -63,6 +63,9 @@ def fetch_customer(customer_id: str):
         raise AppException(ErrorCode.USER_NOT_FOUND)
     device_counts = repository.get_device_counts_by_customer_ids([customer_id])
     customer["device_count"] = device_counts.get(customer_id, 0)
+    address = (customer.get("address") or "").strip()
+    phone = (customer.get("phone") or "").strip()
+    customer["is_profile_complete"] = bool(address and address != "Chưa cập nhật" and phone)
     return customer
 
 

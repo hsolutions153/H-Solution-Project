@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -64,6 +64,50 @@ export function SocialAuthCard({
   const errorMessage = formError || oauthError;
   const isLogin = mode === "login";
 
+  // Check if user authenticated via NextAuth (e.g. Google OAuth redirect)
+  useEffect(() => {
+    let isMounted = true;
+    async function checkNextAuthSession() {
+      if (searchParams.get("logged_out")) {
+        const { removeAuthToken } = await import("@/lib/api-client");
+        removeAuthToken();
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/session");
+        if (res.ok) {
+          const session = await res.json();
+          if (session?.accessToken) {
+            const { setAuthToken } = await import("@/lib/api-client");
+            const backendUser = session.backendUser || {
+              id: session.user?.id || "google-user",
+              name: session.user?.name || "Khách hàng",
+              email: session.user?.email,
+            };
+            const isProfileComplete = session.isProfileComplete ?? backendUser.is_profile_complete;
+            const isNewUser = session.isNewUser ?? backendUser.is_new_user;
+
+            backendUser.is_new_user = isNewUser;
+            backendUser.is_profile_complete = isProfileComplete;
+
+            setAuthToken(session.accessToken, backendUser);
+            if (isMounted) {
+              if (isNewUser || isProfileComplete === false) {
+                router.push("/complete-profile");
+              } else {
+                router.push("/home");
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    checkNextAuthSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
@@ -105,7 +149,9 @@ export function SocialAuthCard({
       const loginRes = await fetchApi<{
         access_token: string;
         token_type: string;
-        user: { id: string; name: string; phone?: string };
+        is_new_user?: boolean;
+        is_profile_complete?: boolean;
+        user: { id: string; name: string; phone?: string; address?: string; is_new_user?: boolean; is_profile_complete?: boolean };
       }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email: email || phone, password }),
@@ -113,7 +159,11 @@ export function SocialAuthCard({
 
       if (loginRes.access_token) {
         setAuthToken(loginRes.access_token, loginRes.user);
-        router.push("/home");
+        if (loginRes.is_profile_complete === false || loginRes.user?.is_profile_complete === false) {
+          router.push("/complete-profile");
+        } else {
+          router.push("/home");
+        }
         router.refresh();
       } else {
         setFormError("Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.");
