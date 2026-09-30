@@ -93,21 +93,69 @@
   }
 }
 
-/* ── Skip button ── */
-.onboarding-skip {
+/* ── Brand header bar ── */
+.onboarding-top-bar {
   position: absolute;
   top: max(env(safe-area-inset-top, 16px), 16px);
+  left: 20px;
   right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   z-index: 10;
+}
+
+.onboarding-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 28px;
+  padding: 6px 14px 6px 8px;
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  user-select: none;
+}
+
+.onboarding-brand-icon-wrap {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.onboarding-brand-icon {
+  font-size: 17px !important;
+  color: #0052cc;
+  font-weight: 800;
+}
+
+.onboarding-brand-text {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+/* ── Skip button ── */
+.onboarding-skip {
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 24px;
-  padding: 8px 20px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
   letter-spacing: 0.01em;
@@ -120,6 +168,56 @@
 
 .onboarding-skip:active {
   transform: scale(0.96);
+}
+
+/* ── Feature badges & Tag Chip ── */
+.onboarding-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  margin-bottom: 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.onboarding-features-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+  max-width: 380px;
+}
+
+.onboarding-feature-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 5px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.onboarding-feature-pill .material-symbols-outlined {
+  font-size: 15px !important;
+  color: #7af2f2;
 }
 
 /* ── Main content area ── */

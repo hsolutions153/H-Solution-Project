@@ -19,7 +19,7 @@ export default function HomePage() {
         const { fetchApi } = await import("@/lib/api-client");
         const list = await fetchApi<any[]>("/devices");
         if (Array.isArray(list) && list.length > 0) {
-          const item = list[0];
+          const item = list.find((d: any) => d.is_default) || list[0];
           const hasCustomNotes = item.notes && !item.notes.includes(":") && item.notes.length < 50;
           const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
           const modelName = item.model_name || item.model || "";
@@ -27,13 +27,13 @@ export default function HomePage() {
           // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
           let displayName = item.nickname || item.name || (hasCustomNotes ? item.notes : "");
           if (!displayName) {
-            displayName = item.device_type === "SCOOTER" ? "Xe scooter điện" : "Xe lăn điện";
+            displayName = "Xe máy điện";
           }
 
           setDevice({
             name: displayName,
-            model: modelName || (item.device_type === "SCOOTER" ? "Scooter" : "Xe lăn"),
-            image: item.image_url || "/wheelchair.png",
+            model: modelName || "Xe máy điện",
+            image: item.image_url || "/electric-scooter.jpg",
           });
         }
       } catch {}
@@ -95,19 +95,19 @@ export default function HomePage() {
           </svg>
         </button>
 
-        {/* My Chair Card */}
+        {/* My Vehicle Card */}
         <section className="chair-card">
           <div className="chair-card-image">
             <Image
-              src={device?.image || "/wheelchair.png"}
-              alt={device?.name || "Xe lăn của tôi"}
+              src={device?.image || "/electric-scooter.jpg"}
+              alt={device?.name || "Xe máy điện của tôi"}
               width={1024}
               height={1024}
               unoptimized
             />
             <div className="chair-label">
-              <span className="chair-name">{device?.name || "Xe của tôi"}</span>
-              <span className="chair-model">{device?.model || "Model X-200"}</span>
+              <span className="chair-name">{device?.name || "Xe máy điện"}</span>
+              <span className="chair-model">{device?.model || "VinFast Feliz S"}</span>
             </div>
           </div>
           <div className="chair-card-info">

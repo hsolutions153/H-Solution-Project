@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS "public"."customer_devices" (
     "image_url" character varying(500),
     "notes" "text",
     "purchase_date" "date",
+    "battery_type" character varying(100),
+    "manufacturing_year" integer,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "created_by" character varying(20) DEFAULT 'SYSTEM'::character varying NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,

@@ -55,7 +55,7 @@ insert into public.customer_devices (
 )
 values
   ('DEV0000001', 'CUST000001', 'SCOOTER', 'Honda', 'U-Go', 'SC-0001', 'FR-0001', null, 'Daily commuter scooter', '2025-03-10', 'CUST000001', 'CUST000001'),
-  ('DEV0000002', 'CUST000001', 'WHEELCHAIR', 'Yamaha', 'JW Active', 'WC-0001', 'FR-0002', null, 'Electric wheelchair', '2024-11-20', 'CUST000001', 'CUST000001')
+  ('DEV0000002', 'CUST000001', 'SCOOTER', 'VinFast', 'Feliz S', 'VF-0002', 'FR-0002', null, 'Xe may dien VinFast Feliz S', '2024-11-20', 'CUST000001', 'CUST000001')
 on conflict (id) do update
 set
   customer_id = excluded.customer_id,

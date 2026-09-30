@@ -22,6 +22,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { VIETNAM_PHONE_PATTERN } from "@/utils/auth-validation";
+import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 export type UserProfile = {
   id: string;
   name: string;
@@ -95,6 +96,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   const [profile, setProfile] = useState(initialProfile);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
   useEffect(() => {
@@ -206,7 +208,10 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
             <Link href="/home/profile" className="profile-icon-button" aria-label="Back to profile">
               <ArrowLeft />
             </Link>
-            <h1>Edit Profile</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <EMobiCareLogoIcon size={20} />
+              <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Chỉnh sửa hồ sơ H-Mobi Care</h1>
+            </div>
           </header>
 
           <form className="profile-edit-form" onSubmit={handleSubmit}>
@@ -291,7 +296,10 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
           <Link href="/home" className="profile-icon-button" aria-label="Back to home">
             <ArrowLeft />
           </Link>
-          <h1>Personal Profile</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <EMobiCareLogoIcon size={20} />
+            <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Hồ sơ H-Mobility Care</h1>
+          </div>
           <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Edit profile">
             <Pencil />
           </Link>
@@ -346,16 +354,16 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
           </section>
 
           <section className="profile-section">
-            <div className="profile-section-heading"><h3>My Vehicle</h3></div>
+            <div className="profile-section-heading"><h3>Phương tiện của tôi</h3></div>
             <Link href="/home/device" className="profile-vehicle-card">
               <div className="profile-vehicle-image">
-                <Image src="/wheelchair.png" alt="Lucas wheelchair" fill sizes="100px" />
-                <span>XE-110LA</span>
+                <Image src="/electric-scooter.jpg" alt="VinFast Evo 200" fill sizes="100px" style={{ objectFit: "cover" }} />
+                <span>29MD-88291</span>
               </div>
               <div className="profile-vehicle-copy">
-                <small>Current Model</small>
-                <strong>Lucas</strong>
-                <span>Change Device <RefreshCw /></span>
+                <small>Dòng xe hiện tại</small>
+                <strong>VinFast Evo 200</strong>
+                <span>Đổi phương tiện <RefreshCw /></span>
               </div>
             </Link>
           </section>
@@ -366,17 +374,111 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
               type="button"
               className="profile-single-card profile-logout-button"
               disabled={isLoggingOut}
-              onClick={async () => {
-                setIsLoggingOut(true);
-                const { removeAuthToken } = await import("@/lib/api-client");
-                removeAuthToken();
-                router.push("/login");
-              }}
+              onClick={() => setShowLogoutConfirm(true)}
             >
               <span className="profile-row-icon profile-row-icon--danger">{isLoggingOut ? <LoaderCircle className="profile-spinner" /> : <LogOut />}</span>
               <strong>{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</strong>
             </button>
           </section>
+
+          {/* Modal xác nhận đăng xuất */}
+          {showLogoutConfirm && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 9999,
+                padding: "16px",
+              }}
+              onClick={() => setShowLogoutConfirm(false)}
+            >
+              <div
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: "24px",
+                  padding: "24px",
+                  maxWidth: "340px",
+                  width: "100%",
+                  textAlign: "center",
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "16px",
+                    backgroundColor: "#FEF2F2",
+                    border: "1px solid #FEE2E2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px auto",
+                    color: "#DC2626",
+                  }}
+                >
+                  <LogOut size={24} />
+                </div>
+
+                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0F172A", margin: "0 0 6px 0" }}>
+                  Xác nhận đăng xuất
+                </h3>
+                <p style={{ fontSize: "13px", color: "#64748B", margin: "0 0 20px 0", lineHeight: 1.5 }}>
+                  Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?
+                </p>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLogoutConfirm(false)}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      backgroundColor: "#F1F5F9",
+                      color: "#334155",
+                      border: "none",
+                      borderRadius: "12px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowLogoutConfirm(false);
+                      setIsLoggingOut(true);
+                      const { removeAuthToken } = await import("@/lib/api-client");
+                      removeAuthToken();
+                      router.push("/login");
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      backgroundColor: "#DC2626",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "12px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 12px rgba(220, 38, 38, 0.3)",
+                    }}
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {notice && <p className={`profile-toast profile-toast--${notice.type}`} role="status">{notice.message}</p>}
         </div>

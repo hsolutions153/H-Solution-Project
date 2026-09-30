@@ -9,6 +9,8 @@ from app.repair_requests.schemas import (
     RepairRequestResponse,
     RepairRequestStatusSyncResponse,
     RepairRequestStatusUpdate,
+    TechnicianRatingRequest,
+    TechnicianRatingResponse,
 )
 from app.repair_requests.service import (
     add_after_repair_image,
@@ -22,6 +24,7 @@ from app.repair_requests.service import (
     fetch_request,
     fetch_request_status_sync,
     fetch_technician_requests,
+    submit_technician_rating,
     update_request_status,
 )
 
@@ -130,3 +133,13 @@ def get_quotes(
     current_user: dict = Depends(get_current_user),
 ):
     return fetch_quotes_for_request(request_id, current_user)
+
+
+@router.post("/{request_id}/rating", response_model=TechnicianRatingResponse)
+def rate_technician(
+    request_id: str,
+    data: TechnicianRatingRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return submit_technician_rating(request_id, data.model_dump(), current_user)
+

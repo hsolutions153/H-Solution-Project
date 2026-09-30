@@ -30,21 +30,26 @@ export default function EditDevicePage({ params }: { params: Promise<{ id: strin
             manufacturer: brand || data.manufacturer || "",
             model: modelName,
             serialNumber: data.serial_number || data.id,
+            batteryType: data.battery_type || data.batteryType || "LFP",
+            manufacturingYear: data.manufacturing_year || data.manufacturingYear || undefined,
             purchaseDate: data.purchase_date || "",
             macAddress: data.notes || "",
-            image: data.image_url || "/wheelchair.png",
+            image: data.image_url || "/electric-scooter.jpg",
             isDefault: Boolean(data.is_default),
           });
         }
       } catch {
         setDevice({
           id: String(id),
-          nickname: "Xe lăn thông minh Karma KP-80",
-          model: "Karma Power Pro",
+          nickname: "Xe VinFast Evo 200",
+          model: "Evo 200",
+          manufacturer: "VinFast",
           serialNumber: String(id),
+          batteryType: "LFP",
+          manufacturingYear: 2024,
           purchaseDate: "15/01/2026",
           macAddress: "AA:BB:CC:DD:EE:FF",
-          image: "/wheelchair.png",
+          image: "/electric-scooter.jpg",
           isDefault: true,
         });
       } finally {

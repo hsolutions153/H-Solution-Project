@@ -21,6 +21,7 @@ import {
   isStrongPassword,
   VIETNAM_PHONE_PATTERN,
 } from "@/utils/auth-validation";
+import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 
 type SocialAuthCardProps = {
   mode: "login" | "register";
@@ -148,19 +149,16 @@ export function SocialAuthCard({
     <div className="responsive-container bg-background text-on-background font-sans selection:bg-primary/20 selection:text-primary">
       <main className="responsive-card px-margin-mobile py-lg md:py-xl">
         <div className="flex flex-col items-center mb-lg text-center responsive-header">
-          <div className="w-64 h-32 overflow-hidden flex items-center justify-center mb-xs -mt-sm relative">
-            <Image
-              src="/logo.jpg"
-              alt="H-solutions Logo"
-              fill
-              sizes="256px"
-              className="w-full h-full scale-[1.8] object-contain"
-              priority
-            />
+          <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-sky-50 border border-sky-200 rounded-full">
+            <EMobiCareLogoIcon size={20} />
+            <span className="text-xs font-extrabold tracking-wider text-sky-900 uppercase">H-MOBILITY CARE</span>
           </div>
           <h1 className="font-headline-md text-headline-md text-on-surface">
             {isLogin ? "Đăng nhập tài khoản" : "Tạo tài khoản"}
           </h1>
+          <p className="text-xs text-on-surface-variant mt-1">
+            Hệ sinh thái cứu hộ & chăm sóc xe máy điện
+          </p>
         </div>
 
         {errorMessage && (

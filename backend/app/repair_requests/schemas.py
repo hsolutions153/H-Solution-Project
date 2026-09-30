@@ -180,6 +180,8 @@ class RepairRequestResponse(BaseModel):
     customer: CustomerInfo | None = None
     device: DeviceInfo | None = None
     technician: TechnicianDetailInfo | None = None
+    quote: QuoteResponse | None = None
+    quotes: list[QuoteResponse] = []
 
     class Config:
         from_attributes = True
@@ -190,3 +192,17 @@ class RepairRequestListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class TechnicianRatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: str | None = None
+    tags: list[str] | None = None
+
+
+class TechnicianRatingResponse(BaseModel):
+    success: bool = True
+    message: str = "Đánh giá kỹ thuật viên thành công"
+    rating: int
+    technician_id: str | None = None
+

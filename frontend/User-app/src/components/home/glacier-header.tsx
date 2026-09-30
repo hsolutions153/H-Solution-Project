@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 
 type GlacierHeaderProps = {
   title?: string;
@@ -8,24 +9,17 @@ type GlacierHeaderProps = {
 export function GlacierHeader({ title, showProfileLink = true }: GlacierHeaderProps) {
   return (
     <header className="home-header">
-      <div className="home-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="14" cy="14" r="3" fill="#0D2137" />
-          <line x1="14" y1="2" x2="14" y2="26" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-          <line x1="2" y1="14" x2="26" y2="14" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-          <line x1="5.5" y1="5.5" x2="22.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-          <line x1="22.5" y1="5.5" x2="5.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-          <line x1="14" y1="2" x2="11" y2="5" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="14" y1="2" x2="17" y2="5" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="14" y1="26" x2="11" y2="23" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="14" y1="26" x2="17" y2="23" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="2" y1="14" x2="5" y2="11" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="2" y1="14" x2="5" y2="17" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="26" y1="14" x2="23" y2="11" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="26" y1="14" x2="23" y2="17" stroke="#0D2137" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-        <span className="home-logo-text">{title ?? "GLACIER"}</span>
-      </div>
+      <Link href="/home" className="home-logo" aria-label="Về trang chủ H-Mobility Care">
+        <EMobiCareLogoIcon size={32} />
+        <div className="home-brand-header-info">
+          <span className="home-brand-name">H-Mobility Care</span>
+          {title ? (
+            <span className="home-page-subtitle">{title}</span>
+          ) : (
+            <span className="home-brand-tagline">Ứng dụng cứu hộ xe 24/7</span>
+          )}
+        </div>
+      </Link>
       {showProfileLink ? (
         <div className="home-header-actions">
           <button type="button" className="home-notification-btn" aria-label="Thông báo">

@@ -165,7 +165,7 @@ export const TaskDetailScreen = ({
         <RepairScreen
           task={activeTask}
           onBack={() => {
-            if (activeTask.status === "ESTIMATE_APPROVED") {
+            if (activeTask.status === "ESTIMATE_APPROVED" || activeTask.status === "WAITING_FOR_APPROVAL") {
               setSubStep("QUOTE_STATUS");
             } else {
               onBack();
@@ -178,6 +178,10 @@ export const TaskDetailScreen = ({
               onCompleteRepair(completedData);
             }
             onBack();
+          }}
+          onSupplementaryQuoteCreated={() => {
+            onUpdateStatus(activeTask.id, "WAITING_FOR_APPROVAL", "Chờ phê duyệt", "WAITING_FOR_APPROVAL");
+            setSubStep("QUOTE_STATUS");
           }}
         />
       );

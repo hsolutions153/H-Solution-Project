@@ -2,20 +2,25 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Plus, SlidersHorizontal } from "lucide-react";
+import { Bike, LoaderCircle, Plus, Star, Trash2 } from "lucide-react";
 import { HomeShell } from "@/components/home/home-shell";
+import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
 import type { Device } from "@/types/device";
 
 export default function DevicesPage() {
+  const router = useRouter();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
 
   const loadDevices = useCallback(async () => {
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const list = await fetchApi<any[]>("/devices");
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         const formatted: Device[] = list.map((item) => {
           const hasCustomNotes = item.notes && !item.notes.includes(":") && item.notes.length < 50;
           const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
@@ -24,7 +29,7 @@ export default function DevicesPage() {
           // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
           let displayName = item.nickname || item.name || (hasCustomNotes ? item.notes : "");
           if (!displayName) {
-            displayName = item.device_type === "SCOOTER" ? "Xe scooter điện" : "Xe lăn điện";
+            displayName = "Xe máy điện";
           }
 
           let formattedDate = item.purchase_date || item.purchaseDate || "";
@@ -36,45 +41,24 @@ export default function DevicesPage() {
           return {
             id: item.id,
             nickname: displayName,
-            deviceType: item.device_type || "WHEELCHAIR",
+            deviceType: item.device_type || "SCOOTER",
             manufacturer: item.manufacturer || "",
-            model: modelName || (item.device_type === "SCOOTER" ? "Scooter" : "Xe lăn"),
+            model: modelName || "Xe máy điện",
             serialNumber: item.serial_number || item.serialNumber || item.id,
+            batteryType: item.battery_type || item.batteryType || "LFP",
+            manufacturingYear: item.manufacturing_year || item.manufacturingYear || undefined,
             purchaseDate: formattedDate,
             macAddress: item.notes || "AA:BB:CC:DD:EE:FF",
-            image: item.image_url || "/wheelchair.png",
+            image: item.image_url || "/electric-scooter.jpg",
             isDefault: Boolean(item.is_default),
           };
         });
         setDevices(formatted);
       } else {
-        setDevices([
-          {
-            id: "dev-default",
-            nickname: "Xe lăn điện Karma KP-80",
-            model: "Model Karma Pro",
-            serialNumber: "SN-8829-VN",
-            purchaseDate: "15/01/2026",
-            macAddress: "AA:BB:CC:11:22:33",
-            image: "/wheelchair.png",
-            isDefault: true,
-          },
-        ]);
+        setDevices([]);
       }
     } catch {
-      // Fallback an toàn khi offline hoặc chưa kết nối
-      setDevices([
-        {
-          id: "dev-default",
-          nickname: "Xe lăn điện Karma KP-80",
-          model: "Model Karma Pro",
-          serialNumber: "SN-8829-VN",
-          purchaseDate: "15/01/2026",
-          macAddress: "AA:BB:CC:11:22:33",
-          image: "/wheelchair.png",
-          isDefault: true,
-        },
-      ]);
+      setDevices([]);
     } finally {
       setLoading(false);
     }
@@ -98,20 +82,43 @@ export default function DevicesPage() {
     }
   };
 
+  const deleteDevice = (device: Device) => {
+    setDeviceToDelete(device);
+  };
+
+  const confirmDeleteDevice = async () => {
+    if (!deviceToDelete) return;
+    const target = deviceToDelete;
+    setDeletingId(target.id);
+    const previous = devices;
+    setDevices((current) => current.filter((d) => d.id !== target.id));
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi(`/devices/${target.id}`, { method: "DELETE" });
+      setDeviceToDelete(null);
+      router.refresh();
+    } catch (err: any) {
+      alert(err.message || "Không thể xóa phương tiện. Vui lòng thử lại.");
+      setDevices(previous);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
-    <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
+    <HomeShell activeNav="device" title="Quản lý xe" mainClassName="device-page-content">
       <div className="device-list-page">
         <div className="device-heading-row">
           <div>
-            <p className="device-eyebrow">Thiết bị đã kết nối</p>
-            <h1>Thiết bị của tôi</h1>
-            <p className="device-intro">Quản lý và theo dõi các thiết bị hỗ trợ di chuyển đã kết nối.</p>
+            <p className="device-eyebrow">H-Mobility Care · Phương tiện kết nối</p>
+            <h1>Xe của tôi</h1>
+            <p className="device-intro">Quản lý các dòng xe máy điện và gói dịch vụ chăm sóc H-Mobility Care.</p>
           </div>
-          <span className="device-count">{devices.length} thiết bị</span>
+          <span className="device-count">{devices.length} phương tiện</span>
         </div>
 
         {loading ? (
-          <div className="device-loading">Đang tải thiết bị…</div>
+          <div className="device-loading">Đang tải phương tiện…</div>
         ) : (
           <div className="device-grid">
             {devices.map((device) => (
@@ -124,14 +131,49 @@ export default function DevicesPage() {
                   <div className="device-card-title-row">
                     <div>
                       <h2>{device.nickname}</h2>
-                      <p>{device.model} · ID: {device.serialNumber}</p>
+                      <p>
+                        {device.manufacturer ? `${device.manufacturer} ${device.model}` : device.model} · ID: <b>{device.serialNumber}</b>
+                      </p>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
+                        <span className="vp-battery-badge" style={{ fontSize: "10px", padding: "2px 6px" }}>
+                          Pin: {device.batteryType || "LFP"}
+                        </span>
+                        {device.manufacturingYear && (
+                          <span className="vp-type-badge" style={{ fontSize: "10px", padding: "2px 6px" }}>
+                            Đời {device.manufacturingYear}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="device-status"><i /> Đã kết nối</span>
+                    <span className="device-status"><i /> Sẵn sàng</span>
                   </div>
                   <div className="device-card-actions">
-                    <Link href={`/home/device/${device.id}`} className="device-primary-button">Quản lý</Link>
-                    <button className="device-icon-button" onClick={() => void makeDefault(device.id)} aria-label="Đặt làm thiết bị mặc định" title="Đặt làm mặc định">
-                      {device.isDefault ? <SlidersHorizontal size={18} /> : <MoreHorizontal size={19} />}
+                    <Link href={`/home/device/${device.id}`} className="device-primary-button">Chi tiết & Quản lý</Link>
+                    <button
+                      type="button"
+                      className="device-icon-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void makeDefault(device.id);
+                      }}
+                      aria-label="Đặt làm thiết bị mặc định"
+                      title={device.isDefault ? "Phương tiện mặc định" : "Đặt làm xe mặc định"}
+                      style={device.isDefault ? { color: "#ca8a04", background: "#fef9c3", borderColor: "#fde047" } : undefined}
+                    >
+                      <Star size={18} fill={device.isDefault ? "currentColor" : "none"} />
+                    </button>
+                    <button
+                      type="button"
+                      className="device-icon-button device-delete-icon-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteDevice(device);
+                      }}
+                      disabled={deletingId === device.id}
+                      aria-label={`Xóa xe ${device.nickname}`}
+                      title="Xóa xe này"
+                    >
+                      {deletingId === device.id ? <LoaderCircle size={18} className="device-upload-spinner" /> : <Trash2 size={18} />}
                     </button>
                   </div>
                 </div>
@@ -140,13 +182,21 @@ export default function DevicesPage() {
 
             <Link className="device-register-card" href="/home/device/new">
               <span className="device-register-icon"><Plus size={24} /></span>
-              <strong>Đăng ký thiết bị mới</strong>
-              <span>Kết nối một thiết bị hỗ trợ di chuyển Glacier mới</span>
+              <strong>Đăng ký phương tiện mới</strong>
+              <span>Thêm xe máy điện để dễ dàng nhận hỗ trợ cứu hộ khẩn cấp & bảo trì từ H-Mobility Care</span>
             </Link>
           </div>
         )}
       </div>
       <Link href="/home/device/new" className="device-fab" aria-label="Thêm thiết bị mới"><Plus size={24} /></Link>
+      <DeleteConfirmModal
+        isOpen={Boolean(deviceToDelete)}
+        onClose={() => setDeviceToDelete(null)}
+        onConfirm={confirmDeleteDevice}
+        deviceName={deviceToDelete?.nickname || deviceToDelete?.model || "Xe máy điện"}
+        serialNumber={deviceToDelete?.serialNumber}
+        loading={Boolean(deletingId)}
+      />
     </HomeShell>
   );
 }

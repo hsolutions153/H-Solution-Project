@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { ArrowLeft, BatteryCharging, CalendarDays, ChevronRight, CircleDollarSign, Pencil, RotateCw, Star, Trash2, Wrench } from "lucide-react";
 import { HomeShell } from "@/components/home/home-shell";
+import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
 
 export default function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
   const [device, setDevice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isSettingDefault, setIsSettingDefault] = useState(false);
 
   const handleMakeDefault = async () => {
@@ -31,17 +33,17 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleDelete = async () => {
-    if (!device) return;
-    const confirmDelete = window.confirm(
-      `Bạn có chắc chắn muốn xóa "${device.nickname}" không? Thao tác này không thể hoàn tác.`
-    );
-    if (!confirmDelete) return;
+  const handleDelete = () => {
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!device) return;
     setIsDeleting(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       await fetchApi(`/devices/${device.id}`, { method: "DELETE" });
+      setShowDeleteModal(false);
       router.push("/home/device");
       router.refresh();
     } catch (err: any) {
@@ -63,7 +65,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
           // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
           let displayName = data.nickname || data.name || (hasCustomNotes ? data.notes : "");
           if (!displayName) {
-            displayName = data.device_type === "SCOOTER" ? "Xe scooter điện" : "Xe lăn điện";
+            displayName = "Xe máy điện";
           }
 
           let formattedDate = data.purchase_date || data.purchaseDate || "Chưa cung cấp";
@@ -75,12 +77,14 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
           setDevice({
             id: data.id,
             nickname: displayName,
-            deviceType: data.device_type || "WHEELCHAIR",
+            deviceType: data.device_type || "SCOOTER",
             manufacturer: data.manufacturer || "",
-            model: modelName || (data.device_type === "SCOOTER" ? "Scooter" : "Xe lăn"),
+            model: modelName || "Xe máy điện",
             serialNumber: data.serial_number || data.id,
+            batteryType: data.battery_type || data.batteryType || "LFP",
+            manufacturingYear: data.manufacturing_year || data.manufacturingYear || undefined,
             purchaseDate: formattedDate,
-            image: data.image_url || "/wheelchair.png",
+            image: data.image_url || "/electric-scooter.jpg",
             isDefault: Boolean(data.is_default),
             maintenance: [],
           });
@@ -88,11 +92,14 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
       } catch {
         setDevice({
           id: String(id),
-          nickname: "Xe lăn thông minh Karma KP-80",
-          model: "Karma Power Pro",
+          nickname: "Xe VinFast Evo 200",
+          model: "Evo 200",
+          manufacturer: "VinFast",
           serialNumber: String(id),
+          batteryType: "LFP",
+          manufacturingYear: 2024,
           purchaseDate: "15/01/2026",
-          image: "/wheelchair.png",
+          image: "/electric-scooter.jpg",
           isDefault: true,
           maintenance: [],
         });
@@ -105,27 +112,35 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
-        <div className="device-loading">Đang tải thông tin thiết bị...</div>
+      <HomeShell activeNav="device" title="Chi tiết xe" mainClassName="device-page-content">
+        <div className="device-loading">Đang tải thông tin xe...</div>
       </HomeShell>
     );
   }
 
   if (!device) {
     return (
-      <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
-        <div className="device-detail-page">Không tìm thấy thiết bị.</div>
+      <HomeShell activeNav="device" title="Chi tiết xe" mainClassName="device-page-content">
+        <div className="device-detail-page">Không tìm thấy phương tiện.</div>
       </HomeShell>
     );
   }
 
   return (
-    <HomeShell activeNav="device" title="Glacier Mobility" mainClassName="device-page-content">
+    <HomeShell activeNav="device" title="Chi tiết xe" mainClassName="device-page-content">
       <div className="device-detail-page">
-        <div className="device-detail-back"><Link href="/home/device"><ArrowLeft size={19} /> Thiết bị của tôi</Link></div>
+        <div className="device-detail-back"><Link href="/home/device"><ArrowLeft size={19} /> Danh sách xe của tôi</Link></div>
         <div className="device-detail-heading">
-          <div><p className="device-eyebrow">Chi tiết thiết bị</p><h1>{device.nickname}</h1><p>{device.model} · Số sê-ri: {device.serialNumber}</p></div>
-          <span className="device-status"><i /> Đã kết nối</span>
+          <div>
+            <p className="device-eyebrow">
+              {device.manufacturer ? `${device.manufacturer} · Xe máy điện` : "Xe máy điện H-Mobility Care"}
+            </p>
+            <h1>{device.nickname}</h1>
+            <p>
+              {device.manufacturer ? `${device.manufacturer} ${device.model}` : device.model} · ID/Biển số: <b>{device.serialNumber}</b>
+            </p>
+          </div>
+          <span className="device-status"><i /> Sẵn sàng hoạt động</span>
         </div>
 
         <div className="device-hero">
@@ -134,7 +149,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
 
         <div className="device-detail-actions">
           <Link href={`/home/device/${device.id}/edit`} className="device-primary-button">
-            <Pencil size={16} /> Sửa thông tin
+            <Pencil size={16} /> Sửa thông tin xe
           </Link>
           {!device.isDefault && (
             <button
@@ -143,12 +158,12 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
               onClick={() => void handleMakeDefault()}
               disabled={isSettingDefault}
             >
-              <Star size={16} /> {isSettingDefault ? "Đang đặt..." : "Đặt làm mặc định"}
+              <Star size={16} /> {isSettingDefault ? "Đang đặt..." : "Đặt làm xe mặc định"}
             </button>
           )}
           {device.isDefault && (
             <div className="device-default-note">
-              <Star size={15} fill="currentColor" /> Thiết bị mặc định
+              <Star size={15} fill="currentColor" /> Phương tiện mặc định
             </div>
           )}
           <button
@@ -156,16 +171,34 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
             className="device-danger-button"
             onClick={handleDelete}
             disabled={isDeleting}
-            title="Xóa thiết bị"
+            title="Xóa phương tiện"
           >
-            <Trash2 size={16} /> {isDeleting ? "Đang xóa…" : "Xóa thiết bị"}
+            <Trash2 size={16} /> {isDeleting ? "Đang xóa…" : "Xóa xe này"}
           </button>
         </div>
 
         <div className="device-stats">
-          <div><BatteryCharging /><span><small>Tình trạng pin</small><strong>94%</strong></span></div>
-          <div><CalendarDays /><span><small>Ngày mua</small><strong>{device.purchaseDate}</strong></span></div>
-          <div><RotateCw /><span><small>Đồng bộ gần nhất</small><strong>Vừa xong</strong></span></div>
+          <div>
+            <BatteryCharging />
+            <span>
+              <small>Loại pin trang bị</small>
+              <strong>{device.batteryType || "Pin LFP"}</strong>
+            </span>
+          </div>
+          <div>
+            <CalendarDays />
+            <span>
+              <small>Năm SX / Ngày mua</small>
+              <strong>{device.manufacturingYear ? `Năm ${device.manufacturingYear}` : device.purchaseDate}</strong>
+            </span>
+          </div>
+          <div>
+            <RotateCw />
+            <span>
+              <small>Dịch vụ hỗ trợ</small>
+              <strong>Cứu hộ & Sửa chữa</strong>
+            </span>
+          </div>
         </div>
 
         <section className="maintenance-section">
@@ -181,6 +214,15 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </section>
       </div>
+
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        deviceName={device.nickname || device.model || "Xe máy điện"}
+        serialNumber={device.serialNumber}
+        loading={isDeleting}
+      />
     </HomeShell>
   );
 }

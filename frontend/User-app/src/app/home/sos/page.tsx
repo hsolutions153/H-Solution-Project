@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 
 type SosStep = "PROBLEM" | "DETAILS" | "CAMERA" | "LOCATION" | "CALLING" | "TECHNICIAN";
 type SosIssue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -468,14 +469,8 @@ export default function SosPage() {
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="sos-flow-logo">
-            <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-              <circle cx="14" cy="14" r="3" fill="#0D2137" />
-              <line x1="14" y1="2" x2="14" y2="26" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="2" y1="14" x2="26" y2="14" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="5.5" y1="5.5" x2="22.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="22.5" y1="5.5" x2="5.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <span className="sos-flow-logo-text">GLACIER</span>
+            <EMobiCareLogoIcon size={26} />
+            <span className="sos-flow-logo-text">H-Mobility Care</span>
           </div>
         </div>
         {(step === "CALLING" || step === "TECHNICIAN") && (
@@ -589,7 +584,7 @@ export default function SosPage() {
             />
             {!cameraReady && (
               <Image
-                src="/wheelchair.png"
+                src="/electric-scooter.jpg"
                 alt="camera fallback"
                 fill
                 sizes="(max-width: 480px) 100vw, 480px"
@@ -771,7 +766,7 @@ export default function SosPage() {
             <div className="sos-map-container">
               <div className="sos-map-mock">
                 <Image
-                  src="/wheelchair.png"
+                  src="/electric-scooter.jpg"
                   alt="location preview"
                   width={420}
                   height={150}
@@ -850,7 +845,7 @@ export default function SosPage() {
               )}
             </div>
             <h3>{assignedTech ? assignedTech.name : "Kỹ thuật viên Cứu hộ"}</h3>
-            <p>{assignedTech ? (assignedTech.specialization || "Chuyên gia bảo trì xe lăn điện") : "Trung tâm đang điều phối KTV khẩn cấp"}</p>
+            <p>{assignedTech ? (assignedTech.specialization || "Chuyên gia bảo trì xe máy điện") : "Trung tâm đang điều phối KTV khẩn cấp"}</p>
 
             <div className="sos-tech-meta">
               <span>{assignedTech ? `${assignedTech.rating || 4.9} (${assignedTech.reviews || 25} reviews)` : "Hỗ trợ 24/7"}</span>
@@ -874,7 +869,7 @@ export default function SosPage() {
           </article>
 
           <div className="sos-tech-issue-card">
-            <Image src="/wheelchair.png" alt="issue" width={48} height={48} />
+            <Image src="/electric-scooter.jpg" alt="issue" width={48} height={48} style={{ borderRadius: "8px", objectFit: "cover" }} />
             <div>
               <strong>Sự cố {selectedIssueLabel.toLowerCase()}</strong>
               <p>Hệ thống tự động đồng bộ thời gian thực. Khi KTV nhận đơn, hành trình sẽ cập nhật ngay.</p>

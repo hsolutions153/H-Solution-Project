@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Plus,
@@ -10,6 +10,9 @@ import {
   User,
   Wrench,
   CheckCircle2,
+  Search,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 
@@ -28,6 +31,10 @@ export const CreateOrderModal = ({
 
   // Form fields
   const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
+
   const [deviceId, setDeviceId] = useState("");
   const [issueType, setIssueType] = useState("BATTERY");
   const [issueDescription, setIssueDescription] = useState("");
@@ -35,6 +42,20 @@ export const CreateOrderModal = ({
   const [isSos, setIsSos] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Close customer dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        customerDropdownRef.current &&
+        !customerDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,6 +74,7 @@ export const CreateOrderModal = ({
         setCustomers(custList);
         if (custList.length > 0) {
           setCustomerId(custList[0].id);
+          setCustomerSearch(custList[0].full_name || custList[0].name || "");
         }
 
         const devList = Array.isArray(devRes) ? devRes : [];
@@ -73,6 +95,17 @@ export const CreateOrderModal = ({
   const filteredDevices = customerId
     ? devices.filter((d) => d.customer_id === customerId)
     : devices;
+
+  const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  const filteredCustomers = customers.filter((c) => {
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return true;
+    const name = (c.full_name || c.name || "").toLowerCase();
+    const phone = (c.phone || "").toLowerCase();
+    const id = (c.id || "").toLowerCase();
+    return name.includes(q) || phone.includes(q) || id.includes(q);
+  });
 
   // Auto select first device when customer changes
   useEffect(() => {
@@ -184,23 +217,110 @@ export const CreateOrderModal = ({
             />
           </div>
 
-          {/* Customer selection */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <User className="w-4 h-4 text-sky-700" />
-              Khách hàng
-            </label>
-            <select
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 outline-none"
-            >
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_name || c.name || "Khách hàng"} - {c.phone || "Không SĐT"}
-                </option>
-              ))}
-            </select>
+          {/* Customer selection with Search */}
+          <div className="relative" ref={customerDropdownRef}>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                <User className="w-4 h-4 text-sky-700" />
+                Khách hàng
+              </label>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {customers.length} khách hàng
+              </span>
+            </div>
+
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+              <input
+                type="text"
+                value={customerSearch}
+                onFocus={() => setIsCustomerDropdownOpen(true)}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setIsCustomerDropdownOpen(true);
+                }}
+                placeholder="Nhập tên hoặc SĐT khách hàng để tìm..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-20 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 focus:bg-white transition outline-none"
+              />
+              <div className="absolute right-2 top-2 flex items-center gap-1">
+                {customerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerSearch("");
+                      setIsCustomerDropdownOpen(true);
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition"
+                    title="Xóa tìm kiếm"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition"
+                >
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${
+                      isCustomerDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Dropdown Results */}
+            {isCustomerDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto z-50 py-1">
+                {filteredCustomers.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                    Không tìm thấy khách hàng nào khớp với "{customerSearch}"
+                  </div>
+                ) : (
+                  filteredCustomers.map((c) => {
+                    const isSelected = c.id === customerId;
+                    const cName = c.full_name || c.name || "Khách hàng";
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setCustomerId(c.id);
+                          setCustomerSearch(cName);
+                          setIsCustomerDropdownOpen(false);
+                        }}
+                        className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition cursor-pointer hover:bg-sky-50 ${
+                          isSelected ? "bg-sky-50/80 font-bold text-sky-900" : "text-slate-700"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">{cName}</div>
+                          <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                            SĐT: <span className="font-semibold text-slate-600">{c.phone || "Không có"}</span> • ID: {c.id}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div className="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Currently Selected Customer Badge */}
+            {selectedCustomer && (
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-sky-50/50 border border-sky-100 px-3 py-1.5 rounded-lg">
+                <span>
+                  Đang chọn: <b className="text-sky-900">{selectedCustomer.full_name || selectedCustomer.name}</b> ({selectedCustomer.phone || "Không SĐT"})
+                </span>
+                <span className="font-mono text-slate-400 text-[10px]">{selectedCustomer.id}</span>
+              </div>
+            )}
           </div>
 
           {/* Device selection */}

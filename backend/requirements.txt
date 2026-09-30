@@ -10,3 +10,4 @@ PyJWT[crypto]>=2.8.0
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
 requests>=2.31.0
+aiofiles>=24.0.0

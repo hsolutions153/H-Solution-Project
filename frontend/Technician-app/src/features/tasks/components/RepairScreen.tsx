@@ -18,6 +18,9 @@ import {
   MapPin,
   Trash2,
   Loader2,
+  AlertTriangle,
+  Send,
+  FilePlus,
 } from "lucide-react";
 
 interface ComponentItem {
@@ -41,26 +44,20 @@ interface RepairScreenProps {
   task?: Task;
   onBack: () => void;
   onComplete?: (completedData: HistoryTask) => void;
+  onSupplementaryQuoteCreated?: () => void;
 }
 
 export const RepairScreen: React.FC<RepairScreenProps> = ({
   task,
   onBack,
   onComplete,
+  onSupplementaryQuoteCreated,
 }) => {
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [seconds, setSeconds] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
 
-  const [components, setComponents] = useState<ComponentItem[]>([
-    {
-      id: "1",
-      name: "Bộ xích truyền động",
-      warehouse: "KCN Quang Minh",
-      price: 250000,
-      quantity: 1,
-    },
-  ]);
+  const [components, setComponents] = useState<ComponentItem[]>([]);
 
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -71,7 +68,16 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newPartName, setNewPartName] = useState("");
   const [newPartPrice, setNewPartPrice] = useState("150000");
-  const [customLaborCost, setCustomLaborCost] = useState<number>(200000);
+  const [customLaborCost, setCustomLaborCost] = useState<number>(0);
+
+  // Quản lý hạn mức báo giá đã duyệt & chi phí phát sinh
+  const [approvedEstimate, setApprovedEstimate] = useState<number>(0);
+  const [initialEstimate, setInitialEstimate] = useState<number>(0);
+  const [hasPendingQuote, setHasPendingQuote] = useState<boolean>(false);
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
+  const [isSupplementaryModalOpen, setIsSupplementaryModalOpen] = useState<boolean>(false);
+  const [supplementaryNote, setSupplementaryNote] = useState<string>("Chi phí linh kiện / công việc phát sinh trong quá trình sửa chữa");
+  const [isSubmittingSupplementary, setIsSubmittingSupplementary] = useState<boolean>(false);
 
   const PRESET_PARTS = [
     { name: "Ắc quy 12V-20Ah (Cặp)", price: 1200000 },
@@ -133,6 +139,9 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             setCustomLaborCost(Number(parsed.laborCost || parsed.labor_fee));
           }
         }
+        if (parsed.approvedEstimate) {
+          setApprovedEstimate(Number(parsed.approvedEstimate));
+        }
       } catch {}
     }
 
@@ -143,6 +152,21 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           .then((quotesRes) => {
             if (!isMounted) return;
             if (quotesRes && quotesRes.length > 0) {
+              const accepted = quotesRes.filter((q: any) => q.status === "ACCEPTED");
+              const pending = quotesRes.find((q: any) => q.status === "PENDING");
+              setHasPendingQuote(Boolean(pending));
+
+              let totalAccepted = 0;
+              if (accepted.length > 0) {
+                totalAccepted = accepted.reduce((sum: number, q: any) => sum + Number(q.estimated_price || 0), 0);
+              } else {
+                totalAccepted = Number(quotesRes[0].estimated_price || task?.totalAmount || 0);
+              }
+              setApprovedEstimate(totalAccepted);
+
+              const sortedByDate = [...quotesRes].sort((a: any, b: any) => (a.created_at || "").localeCompare(b.created_at || ""));
+              setInitialEstimate(Number(sortedByDate[0]?.estimated_price || totalAccepted));
+
               const latestQuote = quotesRes[0];
               if (latestQuote.items && latestQuote.items.length > 0) {
                 const partItems = latestQuote.items
@@ -154,7 +178,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                     price: Number(it.unit_price || 0),
                     quantity: Number(it.quantity || 1),
                   }));
-                if (partItems.length > 0) setComponents(partItems);
+                setComponents(partItems);
 
                 const laborItem = latestQuote.items.find((it: any) =>
                   it.item_name?.toLowerCase().includes("tiền công")
@@ -164,7 +188,25 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 } else if (latestQuote.labor_fee) {
                   setCustomLaborCost(Number(latestQuote.labor_fee));
                 }
+              } else {
+                if (latestQuote.labor_fee) {
+                  setCustomLaborCost(Number(latestQuote.labor_fee));
+                }
+                if (latestQuote.parts_cost && Number(latestQuote.parts_cost) > 0) {
+                  setComponents([
+                    {
+                      id: "quote-part-1",
+                      name: "Linh kiện thay thế theo báo giá",
+                      warehouse: "Kho kỹ thuật",
+                      price: Number(latestQuote.parts_cost),
+                      quantity: 1,
+                    },
+                  ]);
+                }
               }
+            } else if (task?.totalAmount) {
+              setApprovedEstimate(Number(task.totalAmount));
+              setInitialEstimate(Number(task.totalAmount));
             }
           })
           .catch(() => {});
@@ -285,8 +327,79 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     setComponents((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const handleCreateSupplementaryQuote = async () => {
+    if (!task?.id) return;
+    setIsSubmittingSupplementary(true);
+    try {
+      const diff = Math.max(0, totalCost - approvedEstimate);
+      const supplementaryAmount = diff > 0 ? diff : totalCost;
+
+      const formattedItems = [
+        ...components.map((it) => ({
+          name: it.name,
+          item_name: it.name,
+          quantity: it.quantity,
+          unit_price: it.price,
+          subtotal: it.price * it.quantity,
+          item_type: "SPARE_PART",
+        })),
+        {
+          name: "Tiền công kỹ thuật viên",
+          item_name: "Tiền công kỹ thuật viên",
+          quantity: 1,
+          unit_price: laborCost,
+          subtotal: laborCost,
+          item_type: "LABOR",
+        },
+      ];
+
+      const payload = {
+        items: formattedItems,
+        parts_cost: partsCost,
+        labor_fee: laborCost,
+        estimated_price: supplementaryAmount,
+        total_amount: supplementaryAmount,
+        diagnosis_note: supplementaryNote || "Báo giá bổ sung linh kiện & công việc phát sinh",
+        severity: "MINOR",
+      };
+
+      await fetchApi(`/repair-requests/${task.id}/quotes`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      sessionStorage.setItem("quoteData", JSON.stringify({
+        ...payload,
+        status: "SENT",
+        totalCost,
+        approvedEstimate,
+      }));
+
+      setIsSupplementaryModalOpen(false);
+      setValidationWarning(null);
+
+      if (onSupplementaryQuoteCreated) {
+        onSupplementaryQuoteCreated();
+      } else {
+        onBack();
+      }
+    } catch (err: any) {
+      alert(err.message || "Lỗi khi tạo báo giá bổ sung");
+    } finally {
+      setIsSubmittingSupplementary(false);
+    }
+  };
+
   // Xử lý đóng gói dữ liệu và gọi callback khi nhấn nút "Hoàn tất sửa chữa & Báo giá"
   const handleFinishRepair = async () => {
+    // 1. Kiểm tra nếu chi phí thực tế vượt quá báo giá đã duyệt -> CHẶN LẠI và cảnh báo
+    if (approvedEstimate > 0 && totalCost > approvedEstimate) {
+      setValidationWarning(
+        `Chi phí thực tế (${totalCost.toLocaleString("vi-VN")} đ) cao hơn Báo giá được duyệt (${approvedEstimate.toLocaleString("vi-VN")} đ) là +${(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ. Hệ thống không cho phép hoàn tất đơn khi chi phí phát sinh chưa được Khách hàng phê duyệt.`
+      );
+      return;
+    }
+
     setIsUploading(true);
     let uploadedUrls: string[] = [];
     let lastResponse: any = null;
@@ -326,15 +439,20 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         }
 
         // 2. Cập nhật trạng thái hoàn thành với tổng tiền
-        await fetchApi(`/repair-requests/${task.id}/status`, {
+        const finalCostToSubmit = totalCost > 0 ? totalCost : (approvedEstimate > 0 ? approvedEstimate : Number(task?.totalAmount || 0));
+        const statusRes = await fetchApi(`/repair-requests/${task.id}/status`, {
           method: "PATCH",
           body: JSON.stringify({
             status: "COMPLETED",
-            total_amount: totalCost,
+            total_amount: finalCostToSubmit,
           }),
-        }).catch((err) => console.error("Cập nhật hoàn thành:", err));
-      } catch (err) {
-        console.error("Lỗi khi kết nối:", err);
+        });
+        lastResponse = statusRes;
+      } catch (err: any) {
+        console.error("Lỗi khi hoàn tất đơn:", err);
+        alert(err.message || "Không thể hoàn tất đơn sửa chữa. Vui lòng kiểm tra lại báo giá đã duyệt.");
+        setIsUploading(false);
+        return; // KHÔNG gọi onComplete nếu API thất bại!
       } finally {
         setIsUploading(false);
       }
@@ -682,21 +800,71 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         </div>
 
         
-        <div className="bg-sky-50 border border-sky-100 p-4 rounded-2xl space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-sky-900">
-              Tổng chi phí báo giá
+        {/* Khối Tổng chi phí & Báo giá đã duyệt */}
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-3 shadow-xs">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+            <div>
+              <span className="text-xs font-bold text-slate-800 block">
+                Báo giá đã duyệt ban đầu
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Hạn mức tối đa được khách hàng phê duyệt
+              </span>
+            </div>
+            <span className="text-sm font-bold text-slate-700">
+              {approvedEstimate > 0 ? `${approvedEstimate.toLocaleString("vi-VN")} đ` : "Chưa có"}
             </span>
-            <span className="text-base font-bold text-[#005288]">
+          </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-900">
+              Chi phí thực tế hiện tại
+            </span>
+            <span className={`text-base font-extrabold ${approvedEstimate > 0 && totalCost > approvedEstimate ? "text-amber-700" : "text-[#005288]"}`}>
               {totalCost.toLocaleString("vi-VN")} đ
             </span>
           </div>
-          <div className="flex items-start gap-1.5 text-[10px] text-sky-700 leading-snug">
-            <Info className="w-3.5 h-3.5 text-sky-600 shrink-0 mt-0.5" />
+
+          <div className="flex items-start gap-1.5 text-[10px] text-slate-500 leading-snug">
+            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
             <span>
-              Chi phí gồm {components.length} linh kiện ({partsCost.toLocaleString("vi-VN")} đ) + tiền công kỹ thuật ({laborCost.toLocaleString("vi-VN")} đ).
+              Gồm {components.length} linh kiện ({partsCost.toLocaleString("vi-VN")} đ) + tiền công ({laborCost.toLocaleString("vi-VN")} đ).
             </span>
           </div>
+
+          {/* Cảnh báo nếu chi phí thực tế vượt Báo giá đã duyệt */}
+          {approvedEstimate > 0 && totalCost > approvedEstimate && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-amber-900 leading-tight">
+                  <span className="font-bold">Chi phí vượt báo giá đã duyệt: </span>
+                  <span className="font-extrabold text-red-600">+{((totalCost - approvedEstimate)).toLocaleString("vi-VN")} đ</span>.
+                  <p className="mt-1 text-slate-600">
+                    Cần gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSupplementaryModalOpen(true)}
+                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <FilePlus className="w-3.5 h-3.5" /> Tạo báo giá bổ sung (+{(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ)
+              </button>
+            </div>
+          )}
+
+          {/* Nút Tạo chi phí phát sinh nếu technician muốn chủ động tạo thêm */}
+          {(!approvedEstimate || totalCost <= approvedEstimate) && (
+            <button
+              type="button"
+              onClick={() => setIsSupplementaryModalOpen(true)}
+              className="w-full py-2 bg-slate-50 hover:bg-sky-50 text-sky-800 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <FilePlus className="w-3.5 h-3.5" /> Tạo chi phí phát sinh / Báo giá bổ sung
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2.5 pt-2">
@@ -730,6 +898,120 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             )}
           </button>
         </div>
+
+        {/* Modal Cảnh báo khi bấm Hoàn tất mà vượt báo giá */}
+        {validationWarning && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in">
+              <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Không thể hoàn tất đơn sửa chữa!
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {validationWarning}
+                </p>
+              </div>
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValidationWarning(null);
+                    setIsSupplementaryModalOpen(true);
+                  }}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
+                >
+                  Tạo báo giá bổ sung (+{(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setValidationWarning(null)}
+                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Quay lại điều chỉnh chi phí
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Xác nhận gửi Báo giá phát sinh */}
+        {isSupplementaryModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
+                  <FilePlus className="w-4 h-4 text-sky-700" />
+                  <span>Tạo Báo Giá Bổ Sung</span>
+                </div>
+                <button
+                  onClick={() => setIsSupplementaryModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="bg-sky-50/70 p-3 rounded-xl border border-sky-100 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Báo giá đã duyệt:</span>
+                    <span className="font-bold text-slate-800">{approvedEstimate.toLocaleString("vi-VN")} đ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Chi phí sau phát sinh:</span>
+                    <span className="font-bold text-slate-900">{totalCost.toLocaleString("vi-VN")} đ</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-sky-200/60 text-sky-950 font-bold">
+                    <span>Số tiền phát sinh:</span>
+                    <span className="text-amber-700 font-black">
+                      +{Math.max(0, totalCost - approvedEstimate).toLocaleString("vi-VN")} đ
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Lý do phát sinh chi phí:</label>
+                  <textarea
+                    rows={2}
+                    value={supplementaryNote}
+                    onChange={(e) => setSupplementaryNote(e.target.value)}
+                    placeholder="Mô tả lý do phát sinh thêm linh kiện/công việc..."
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsSupplementaryModalOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingSupplementary}
+                  onClick={handleCreateSupplementaryQuote}
+                  className="flex-1 py-2.5 bg-sky-900 hover:bg-sky-950 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm cursor-pointer"
+                >
+                  {isSubmittingSupplementary ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang gửi...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" /> Gửi khách hàng
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

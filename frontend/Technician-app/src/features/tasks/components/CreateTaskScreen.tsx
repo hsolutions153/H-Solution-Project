@@ -28,10 +28,10 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
   const [isAddingNewDevice, setIsAddingNewDevice] = useState(false); // Quản lý trạng thái hiện/ẩn form thêm thiết bị mới cho KH cũ
   const [oldFormData, setOldFormData] = useState({
     searchKeyword: '',
-    selectedDevice: 'Xe lăn điện Karma KP-80 - SN: KM12345',
-    deviceType: 'Xe lăn điện',
-    brandModel: 'Karma KP-80',
-    serialNumber: 'KM12345',
+    selectedDevice: 'Xe máy điện VinFast Feliz S - SN: VF12345',
+    deviceType: 'Xe máy điện',
+    brandModel: 'VinFast Feliz S',
+    serialNumber: 'VF12345',
     description: '',
   });
 
@@ -193,8 +193,8 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                   onChange={(e) => setOldFormData({ ...oldFormData, selectedDevice: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 appearance-none cursor-pointer"
                 >
-                  <option>Xe lăn điện Karma KP-80 - SN: KM12345</option>
-                  <option>Xe lăn cơ bản Karma Ergo - SN: K98765</option>
+                  <option>Xe máy điện VinFast Feliz S - SN: VF12345</option>
+                  <option>Xe máy điện Dat Bike Quantum - SN: DB98765</option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -215,7 +215,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Loại thiết bị</label>
                   <input
                     type="text"
-                    placeholder="VD: Xe lăn điện"
+                    placeholder="VD: Xe máy điện"
                     value={customerType === 'new' ? newFormData.deviceType : oldFormData.deviceType}
                     onChange={(e) => customerType === 'new' 
                       ? setNewFormData({ ...newFormData, deviceType: e.target.value })
@@ -228,7 +228,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Thương hiệu / Model</label>
                   <input
                     type="text"
-                    placeholder="VD: Karma KP-8..."
+                    placeholder="VD: VinFast Evo 200..."
                     value={customerType === 'new' ? newFormData.brandModel : oldFormData.brandModel}
                     onChange={(e) => customerType === 'new' 
                       ? setNewFormData({ ...newFormData, brandModel: e.target.value })

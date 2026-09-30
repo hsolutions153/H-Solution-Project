@@ -27,7 +27,17 @@ from app.repair_requests.models import (
 
 MAX_IMAGE_SIZE_MB = 50
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
-ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
+ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/jpg",
+    "image/pjpeg",
+    "image/x-png",
+    "application/octet-stream",
+]
+VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+
 
 
 def _payload(data):
@@ -105,26 +115,7 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
             pass
 
     technician_ids = {item["technician_id"] for item in items if item.get("technician_id")}
-    techs_map = {}
-    if technician_ids:
-        try:
-            for tid in technician_ids:
-                tu = auth_repo.get_user_by_id(tid)
-                tp = repository.get_technician_profile(tid)
-                if tu:
-                    techs_map[tid] = {
-                        "id": tu["id"],
-                        "name": tu.get("full_name") or "Kỹ thuật viên",
-                        "phone": tu.get("phone") or "0912 345 678",
-                        "avatar": tu.get("avatar_url") or "/images/s1.jpg",
-                        "specialization": (tp and tp.get("specialization")) or "Chuyên gia bảo trì xe lăn điện",
-                        "rating": (tp and tp.get("rating_avg")) or 4.9,
-                        "reviews": (tp and tp.get("total_jobs_done")) or 25,
-                        "experience_years": (tp and tp.get("experience_years")) or 3,
-                        "verified": True,
-                    }
-        except Exception:
-            pass
+    techs_map = _get_technicians_map(technician_ids)
 
     payments_map = {}
     if repair_ids:
@@ -169,14 +160,67 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
     return items
 
 
+_TECH_CACHE: dict[str, tuple[float, dict]] = {}
+_USER_CACHE: dict[str, tuple[float, dict]] = {}
+TECH_CACHE_TTL_SECONDS = 300
+
+
+def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
+    if not technician_ids:
+        return {}
+    import time
+    from app.db.database import supabase
+
+    now = time.time()
+    techs_map = {}
+    missing_ids = []
+
+    for tid in technician_ids:
+        cached = _TECH_CACHE.get(tid)
+        if cached and (now - cached[0] < TECH_CACHE_TTL_SECONDS):
+            techs_map[tid] = cached[1]
+        else:
+            missing_ids.append(tid)
+
+    if missing_ids:
+        try:
+            u_resp = supabase.table("users").select("id,full_name,phone,email").in_("id", missing_ids).execute()
+            users_by_id = {u["id"]: u for u in (u_resp.data or [])}
+
+            p_resp = (
+                supabase.table("technician_profiles")
+                .select("user_id,specialization,rating_avg,total_jobs_done,experience_years")
+                .in_("user_id", missing_ids)
+                .execute()
+            )
+            profiles_by_id = {p["user_id"]: p for p in (p_resp.data or [])}
+
+            for tid in missing_ids:
+                tu = users_by_id.get(tid)
+                tp = profiles_by_id.get(tid)
+                if tu:
+                    t_info = {
+                        "id": tu["id"],
+                        "name": tu.get("full_name") or "Kỹ thuật viên",
+                        "phone": tu.get("phone") or "0912 345 678",
+                        "avatar": "/images/s1.jpg",
+                        "specialization": (tp and tp.get("specialization")) or "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
+                        "rating": float(tp.get("rating_avg")) if (tp and tp.get("rating_avg")) else 4.9,
+                        "reviews": int(tp.get("total_jobs_done")) if (tp and tp.get("total_jobs_done")) else 25,
+                        "experience_years": int(tp.get("experience_years")) if (tp and tp.get("experience_years")) else 3,
+                        "verified": True,
+                    }
+                    _TECH_CACHE[tid] = (now, t_info)
+                    techs_map[tid] = t_info
+        except Exception as err:
+            logger.warning(f"Failed to batch fetch technicians: {err}")
+
+    return techs_map
+
+
 def _list(customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int):
     if request_status and request_status not in REQUEST_STATUSES:
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái yêu cầu không hợp lệ")
-
-    try:
-        reassign_timed_out_requests(timeout_seconds=120)
-    except Exception:
-        pass
 
     items, total = repository.get_repair_requests(
         customer_id=customer_id,
@@ -513,7 +557,26 @@ def fetch_all_requests(current_user: dict, request_status: str | None, customer_
 
 
 def fetch_request(request_id: str, current_user: dict):
-    request = repository.get_repair_request_by_id(request_id)
+    # Ultra-optimized: fetch repair request + images + device + quotes in ONE roundtrip
+    try:
+        from app.db.database import supabase
+        resp = (
+            supabase.table("repair_requests")
+            .select("""
+                *,
+                repair_requests_images(*),
+                customer_devices(id,device_type,manufacturer,model_name),
+                repair_quotes(*)
+            """)
+            .or_(f"id.eq.{request_id},request_code.eq.{request_id}")
+            .maybe_single()
+            .execute()
+        )
+        request = resp.data if resp else None
+    except Exception as query_err:
+        logger.warning(f"Mega query failed in fetch_request, falling back: {query_err}")
+        request = repository.get_repair_request_by_id(request_id)
+
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
     can_view = (
@@ -524,44 +587,20 @@ def fetch_request(request_id: str, current_user: dict):
     if not can_view:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    images = repository.get_repair_images(request_id)
     request_data = dict(request)
-    request_data["images"] = images
 
-    try:
-        if request.get("payment_method"):
-            request_data["payment_method"] = request.get("payment_method")
-        else:
-            from app.payments.repository import get_payment_by_repair_id
-            p_rec = get_payment_by_repair_id(request_id)
-            if p_rec and p_rec.get("payment_method"):
-                request_data["payment_method"] = p_rec.get("payment_method")
-    except Exception as pm_err:
-        logger.warning(f"Failed to load payment info in fetch_request: {pm_err}")
+    # 1. Unpack images
+    if "repair_requests_images" in request_data:
+        images = request_data.pop("repair_requests_images") or []
+        images.sort(key=lambda img: img.get("created_at") or "")
+        request_data["images"] = images
+    elif "images" not in request_data:
+        request_data["images"] = repository.get_repair_images(request_data.get("id") or request_id)
 
-    if request.get("customer_id"):
-        u = auth_repository.get_user_by_id(request["customer_id"])
-        if u:
-            request_data["customer"] = u
-    if request.get("technician_id"):
-        try:
-            tu = auth_repository.get_user_by_id(request["technician_id"])
-            tp = repository.get_technician_profile(request["technician_id"])
-            if tu:
-                request_data["technician"] = {
-                    "id": tu["id"],
-                    "name": tu.get("full_name") or "Kỹ thuật viên",
-                    "phone": tu.get("phone") or "0912 345 678",
-                    "avatar": tu.get("avatar_url") or "/images/s1.jpg",
-                    "specialization": (tp and tp.get("specialization")) or "Chuyên gia bảo trì xe lăn điện",
-                    "rating": (tp and tp.get("rating_avg")) or 4.9,
-                    "reviews": (tp and tp.get("total_jobs_done")) or 25,
-                    "experience_years": (tp and tp.get("experience_years")) or 3,
-                    "verified": True,
-                }
-        except Exception as t_err:
-            logger.warning(f"Failed to load technician info in fetch_request: {t_err}")
-    if request.get("device_id"):
+    # 2. Unpack device
+    if request_data.get("customer_devices"):
+        request_data["device"] = request_data.pop("customer_devices")
+    elif request.get("device_id") and "device" not in request_data:
         try:
             d_resp = supabase.table("customer_devices").select("id,device_type,manufacturer,model_name").eq("id", request["device_id"]).maybe_single().execute()
             if d_resp and d_resp.data:
@@ -569,19 +608,77 @@ def fetch_request(request_id: str, current_user: dict):
         except Exception:
             pass
 
+    # 3. Unpack quotes and load items from repair_quote_items
+    quotes = request_data.pop("repair_quotes", None)
+    actual_id = request_data.get("id") or request_id
+    if quotes is None:
+        try:
+            quotes = repository.get_quotes_by_repair_id(actual_id) or []
+        except Exception:
+            quotes = []
+
+    for q in quotes:
+        items = q.pop("quote_items", None) or q.get("items") or []
+        if not items:
+            try:
+                items = repository.get_quote_items(q["id"]) or []
+            except Exception:
+                items = []
+        q["items"] = items
+    quotes.sort(key=lambda q: q.get("created_at") or "", reverse=True)
+
+    if quotes:
+        latest_quote = quotes[0]
+        request_data["quote"] = latest_quote
+        request_data["quotes"] = quotes
+
+        accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+        pending_quotes = [q for q in quotes if q.get("status") == "PENDING"]
+        sorted_by_date = sorted(quotes, key=lambda q: q.get("created_at") or "")
+        initial_quote = sorted_by_date[0] if sorted_by_date else latest_quote
+
+        request_data["initial_estimate"] = float(initial_quote.get("estimated_price") or 0)
+        if accepted_quotes:
+            request_data["approved_estimate"] = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+        else:
+            request_data["approved_estimate"] = float(latest_quote.get("estimated_price") or 0)
+        request_data["pending_quote"] = pending_quotes[0] if pending_quotes else None
+
+        if request_data.get("status") == "COMPLETED":
+            request_data["final_cost"] = float(request_data.get("total_amount") or 0)
+        elif (request_data.get("total_amount") is None or float(request_data.get("total_amount") or 0) == 0):
+            request_data["total_amount"] = request_data["approved_estimate"]
+
+    # 4. Payment method
     try:
-        quotes = repository.get_quotes_by_repair_id(request_id)
-        if quotes:
-            for q in quotes:
-                items = repository.get_quote_items(q["id"])
-                q["items"] = items or []
-            latest_quote = quotes[0]
-            request_data["quote"] = latest_quote
-            request_data["quotes"] = quotes
-            if (request_data.get("total_amount") is None or float(request_data.get("total_amount") or 0) == 0) and latest_quote.get("estimated_price"):
-                request_data["total_amount"] = float(latest_quote["estimated_price"])
-    except Exception as q_err:
-        logger.warning(f"Failed to load quotes in fetch_request: {q_err}")
+        if not request_data.get("payment_method"):
+            from app.payments.repository import get_payment_by_repair_id
+            p_rec = get_payment_by_repair_id(request_id)
+            if p_rec and p_rec.get("payment_method"):
+                request_data["payment_method"] = p_rec.get("payment_method")
+    except Exception as pm_err:
+        logger.warning(f"Failed to load payment info in fetch_request: {pm_err}")
+
+    # 5. Customer info (cached in memory)
+    cid = request.get("customer_id")
+    if cid:
+        import time
+        now = time.time()
+        cached_cust = _USER_CACHE.get(cid)
+        if cached_cust and (now - cached_cust[0] < 300):
+            request_data["customer"] = cached_cust[1]
+        else:
+            u = auth_repository.get_user_by_id(cid)
+            if u:
+                _USER_CACHE[cid] = (now, u)
+                request_data["customer"] = u
+
+    # 6. Technician info (cached in memory)
+    tid = request.get("technician_id")
+    if tid:
+        t_map = _get_technicians_map({tid})
+        if tid in t_map:
+            request_data["technician"] = t_map[tid]
 
     return request_data
 
@@ -745,6 +842,41 @@ def update_request_status(request_id: str, current_user: dict, data):
             update_data["arrived_at"] = now
         elif new_status in {"DIAGNOSING", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"}:
             update_data["diagnosed_at"] = now
+        elif new_status == "ESTIMATE_APPROVED":
+            try:
+                from app.db.database import supabase
+                supabase.table("repair_quotes").update({
+                    "status": "ACCEPTED",
+                    "replied_by": current_user["sub"],
+                    "replied_at": now,
+                    "updated_by": current_user["sub"],
+                    "updated_at": now,
+                }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+            except Exception as q_err:
+                logger.warning(f"Failed to update quote to ACCEPTED: {q_err}")
+
+            try:
+                quotes = repository.get_quotes_by_repair_id(request_id) or []
+                accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+                if accepted_quotes:
+                    approved_total = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+                    update_data["total_amount"] = approved_total
+            except Exception as sum_err:
+                logger.warning(f"Failed to sum accepted quotes: {sum_err}")
+        elif new_status == "ESTIMATE_REJECTED":
+            reject_reason = payload.get("cancel_reason") or payload.get("reject_reason") or "Không đồng ý"
+            try:
+                from app.db.database import supabase
+                supabase.table("repair_quotes").update({
+                    "status": "REJECTED",
+                    "reject_reason": reject_reason,
+                    "replied_by": current_user["sub"],
+                    "replied_at": now,
+                    "updated_by": current_user["sub"],
+                    "updated_at": now,
+                }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+            except Exception as q_err:
+                logger.warning(f"Failed to update quote to REJECTED: {q_err}")
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
@@ -752,13 +884,17 @@ def update_request_status(request_id: str, current_user: dict, data):
             try:
                 quotes = repository.get_quotes_by_repair_id(request_id)
                 if quotes:
-                    latest_quote = quotes[0]
-                    est_price = float(latest_quote.get("estimated_price") or 0)
+                    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+                    if accepted_quotes:
+                        est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+                    else:
+                        est_price = float(quotes[0].get("estimated_price") or 0)
+
                     final_cost = float(total_amt) if total_amt is not None else float(request.get("total_amount") or 0)
                     if est_price > 0 and final_cost > est_price:
                         raise AppException(
                             ErrorCode.VALIDATION_ERROR,
-                            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá ban đầu ({est_price:,.0f} đ). Vui lòng xác nhận trước khi hoàn tất.",
+                            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
                         )
             except AppException:
                 raise
@@ -775,20 +911,39 @@ def update_request_status(request_id: str, current_user: dict, data):
             update_data["total_amount"] = float(total_amt)
 
         repository.update_repair_request(request_id, update_data)
+
+        history_note = payload.get("cancel_reason")
+        if not history_note:
+            if new_status == "ACCEPTED":
+                history_note = "Kỹ thuật viên chấp nhận yêu cầu"
+            elif new_status == "ESTIMATE_APPROVED":
+                history_note = "Khách hàng đã phê duyệt báo giá"
+            elif new_status == "ESTIMATE_REJECTED":
+                history_note = f"Khách hàng từ chối báo giá ({payload.get('reject_reason') or 'Không đồng ý'})"
+
         repository.add_status_history(
             {
                 "id": _request_id(),
                 "repair_id": request_id,
                 "status": new_status,
                 "changed_by": current_user["sub"],
-                "note": payload.get("cancel_reason") or ("Kỹ thuật viên chấp nhận yêu cầu" if new_status == "ACCEPTED" else None),
+                "note": history_note,
             }
         )
         return fetch_request(request_id, current_user)
 
 
 def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    content_type = (file.content_type or "").lower()
+    file_extension = (
+        file.filename.split(".")[-1].lower()
+        if file.filename and "." in file.filename
+        else "jpg"
+    )
+    if (
+        content_type not in ALLOWED_IMAGE_TYPES
+        and file_extension not in VALID_IMAGE_EXTENSIONS
+    ):
         raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
 
     file.file.seek(0, 2)
@@ -807,8 +962,8 @@ def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict
     if not is_assigned_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    file_name = f"{uuid.uuid4()}.{file_extension}"
+    safe_ext = file_extension if file_extension in VALID_IMAGE_EXTENSIONS else "jpg"
+    file_name = f"{uuid.uuid4()}.{safe_ext}"
     supabase_path = f"public/after-repair/{request_id}/{file_name}"
 
     public_url = storage.upload_file_to_supabase(file, supabase_path)
@@ -826,7 +981,16 @@ def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict
 
 
 def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    content_type = (file.content_type or "").lower()
+    file_extension = (
+        file.filename.split(".")[-1].lower()
+        if file.filename and "." in file.filename
+        else "jpg"
+    )
+    if (
+        content_type not in ALLOWED_IMAGE_TYPES
+        and file_extension not in VALID_IMAGE_EXTENSIONS
+    ):
         raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
 
     file.file.seek(0, 2)
@@ -846,8 +1010,8 @@ def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
     if not is_authorized:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    file_extension = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'jpg'
-    file_name = f"{uuid.uuid4()}.{file_extension}"
+    safe_ext = file_extension if file_extension in VALID_IMAGE_EXTENSIONS else "jpg"
+    file_name = f"{uuid.uuid4()}.{safe_ext}"
     supabase_path = f"public/diagnostic/{request_id}/{file_name}"
 
     public_url = storage.upload_file_to_supabase(file, supabase_path)
@@ -865,7 +1029,16 @@ def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
 
 
 def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    content_type = (file.content_type or "").lower()
+    file_extension = (
+        file.filename.split(".")[-1].lower()
+        if file.filename and "." in file.filename
+        else "jpg"
+    )
+    if (
+        content_type not in ALLOWED_IMAGE_TYPES
+        and file_extension not in VALID_IMAGE_EXTENSIONS
+    ):
         raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
 
     file.file.seek(0, 2)
@@ -886,8 +1059,8 @@ def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
     if not is_authorized:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    file_extension = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'jpg'
-    file_name = f"{uuid.uuid4()}.{file_extension}"
+    safe_ext = file_extension if file_extension in VALID_IMAGE_EXTENSIONS else "jpg"
+    file_name = f"{uuid.uuid4()}.{safe_ext}"
     supabase_path = f"public/customer-requests/{request_id}/{file_name}"
 
     public_url = storage.upload_file_to_supabase(file, supabase_path)
@@ -904,6 +1077,7 @@ def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
     return fetch_request(request_id, current_user)
 
 
+
 def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -916,15 +1090,15 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED"}
+    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED", "REPAIRING"}
     if request.get("status") not in allowed_statuses:
         raise AppException(
             ErrorCode.INVALID_STATUS_TRANSITION,
-            message="Yêu cầu phải ở trạng thái Đang chẩn đoán (DIAGNOSING) để tạo báo giá.",
+            message="Yêu cầu không ở trạng thái cho phép tạo báo giá.",
         )
 
     items = data.get("items") or []
-    diagnosis_note = data.get("diagnosis_note") or "Báo giá sửa chữa"
+    diagnosis_note = data.get("diagnosis_note") or ("Báo giá bổ sung / Chi phí phát sinh" if request.get("status") == "REPAIRING" else "Báo giá sửa chữa")
     severity = data.get("severity") or "MINOR"
     if severity not in {"MINOR", "MAJOR"}:
         severity = "MINOR"
@@ -1013,18 +1187,27 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
-        repository.update_repair_request(request_id, {
+        is_in_repair = request.get("status") == "REPAIRING"
+        update_fields = {
             "status": "WAITING_FOR_APPROVAL",
             "diagnosed_at": now_iso,
-            "total_amount": total,
             "updated_by": current_user["sub"],
-        })
+        }
+        if not is_in_repair:
+            update_fields["total_amount"] = total
+
+        repository.update_repair_request(request_id, update_fields)
+        note_msg = (
+            f"Kỹ thuật viên đã tạo báo giá bổ sung (Phát sinh: {total:,.0f} đ), chờ khách hàng duyệt"
+            if is_in_repair
+            else f"Kỹ thuật viên đã lập báo giá (Tổng: {total:,.0f} đ), chờ khách hàng duyệt"
+        )
         repository.add_status_history({
             "id": _request_id(),
             "repair_id": request_id,
             "status": "WAITING_FOR_APPROVAL",
             "changed_by": current_user["sub"],
-            "note": f"Kỹ thuật viên đã lập báo giá (Tổng: {total:,.0f} đ), chờ khách hàng duyệt",
+            "note": note_msg,
         })
     except Exception as stat_err:
         logger.warning(f"Failed to update repair status on quote create: {stat_err}")
@@ -1043,33 +1226,45 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
 
 def fetch_quotes_for_request(request_id: str, current_user: dict):
-    request = repository.get_repair_request_by_id(request_id)
-    if not request:
+    from app.db.database import supabase
+    try:
+        req = repository.get_repair_request_by_id(request_id)
+        actual_id = req["id"] if req else request_id
+        quotes = repository.get_quotes_by_repair_id(actual_id) or []
+        for q in quotes:
+            items = repository.get_quote_items(q["id"]) or []
+            q["items"] = items
+        return quotes
+    except Exception as q_err:
+        logger.warning(f"Failed to fetch quotes: {q_err}")
+        return []
+
+
+def submit_technician_rating(request_id: str, data: dict, current_user: dict):
+    req = repository.get_repair_request_by_id(request_id)
+    if not req:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
 
-    # Fetch latest payment method if available
-    payment_method = None
-    try:
-        from app.db.database import supabase
-        pay_resp = (
-            supabase.table("payments")
-            .select("payment_method")
-            .eq("repair_id", request_id)
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        if pay_resp and pay_resp.data:
-            payment_method = pay_resp.data[0].get("payment_method")
-    except Exception:
-        pass
+    rating = data.get("rating", 5)
+    if not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
+        raise AppException(ErrorCode.INVALID_RATING_VALUE)
 
-    quotes = repository.get_quotes_by_repair_id(request_id)
-    result = []
-    for q in quotes:
-        items = repository.get_quote_items(q["id"])
-        q["items"] = items or []
-        if payment_method:
-            q["payment_method"] = payment_method
-        result.append(q)
-    return result
+    tech_id = req.get("technician_id")
+    if tech_id:
+        try:
+            from app.db.database import supabase
+            profile = repository.get_technician_profile(tech_id)
+            if profile:
+                current_avg = float(profile.get("rating_avg") or 5.0)
+                new_avg = round((current_avg + float(rating)) / 2.0, 2)
+                supabase.table("technician_profiles").update({"rating_avg": new_avg}).eq("user_id", tech_id).execute()
+        except Exception as e:
+            logger.warning(f"Failed to update technician rating_avg: {e}")
+
+    return {
+        "success": True,
+        "message": "Đánh giá kỹ thuật viên thành công",
+        "rating": int(rating),
+        "technician_id": tech_id,
+    }
+

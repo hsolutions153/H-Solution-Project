@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, RefreshCw, Wrench, Calendar, User, XCircle, Bike } from "lucide-react";
+import { Search, RefreshCw, Bike, X } from "lucide-react";
 import { Pagination } from "@/components/common/Pagination";
 
 export const DevicesList = () => {
@@ -9,16 +9,15 @@ export const DevicesList = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedOwner, setSelectedOwner] = useState("ALL");
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset về trang 1 khi từ khóa tìm kiếm hoặc bộ lọc chủ sở hữu thay đổi
+  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedOwner]);
+  }, [searchTerm]);
 
   const fetchDevicesAndCustomers = async () => {
     setLoading(true);
@@ -64,57 +63,30 @@ export const DevicesList = () => {
     return map;
   }, [customers]);
 
-  // Danh sách các chủ sở hữu có thiết bị trong hệ thống
-  const ownersList = useMemo(() => {
-    const counts: Record<string, { id: string; name: string; count: number }> = {};
-    devices.forEach((d) => {
-      const cid = d.customer_id;
-      if (!cid) return;
-      const name = d.customer?.full_name || customerMap.get(cid) || cid;
-      if (!counts[cid]) {
-        counts[cid] = { id: cid, name, count: 0 };
-      }
-      counts[cid].count += 1;
-    });
-    return Object.values(counts).sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [devices, customerMap]);
-
-  // Helper hiển thị tên loại thiết bị chuẩn dạng liên quan đến scooter điện
+  // Helper hiển thị tên loại thiết bị chuẩn dạng xe máy điện
   const getDeviceTypeBadge = (deviceType: string) => {
-    const type = (deviceType || "").toUpperCase();
-    if (type === "SCOOTER") {
-      return {
-        label: "Scooter điện",
-        bg: "bg-blue-50 text-blue-700 border-blue-200",
-      };
-    }
-    // Chuyển loại hỗ trợ / WHEELCHAIR thành dạng thiết bị scooter hỗ trợ di chuyển
     return {
-      label: "Scooter hỗ trợ di chuyển",
-      bg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      label: "Xe máy điện",
+      bg: "bg-blue-50 text-blue-700 border-blue-200",
     };
   };
 
   const filteredDevices = devices.filter((d) => {
+    if (!searchTerm.trim()) return true;
     const model = (d.model_name || "").toLowerCase();
     const manufacturer = (d.manufacturer || "").toLowerCase();
     const serial = (d.serial_number || "").toLowerCase();
     const ownerName = (d.customer?.full_name || customerMap.get(d.customer_id) || "").toLowerCase();
     const ownerId = (d.customer_id || "").toLowerCase();
-    const query = searchTerm.toLowerCase();
+    const query = searchTerm.trim().toLowerCase();
 
-    const matchesSearch =
-      !searchTerm ||
+    return (
       model.includes(query) ||
       manufacturer.includes(query) ||
       serial.includes(query) ||
       ownerName.includes(query) ||
-      ownerId.includes(query);
-
-    const matchesOwner =
-      selectedOwner === "ALL" || d.customer_id === selectedOwner;
-
-    return matchesSearch && matchesOwner;
+      ownerId.includes(query)
+    );
   });
 
   // Cắt lát dữ liệu cho phân trang
@@ -157,39 +129,17 @@ export const DevicesList = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo tên model, hãng, số serial, tên chủ sở hữu..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+            placeholder="Tìm thiết bị theo tên hãng, chủ sở hữu, model, số serial..."
+            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-10 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
           />
-        </div>
-
-        {/* Bộ lọc loại thiết bị theo tên chủ sở hữu (Thay thế cụm Tất cả / Scooter điện / Xe lăn điện) */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <select
-              value={selectedOwner}
-              onChange={(e) => setSelectedOwner(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer min-w-[200px] max-w-[280px] truncate"
-              title="Lọc thiết bị theo chủ sở hữu"
-            >
-              <option value="ALL">Tất cả chủ sở hữu ({ownersList.length})</option>
-              {ownersList.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name} ({owner.count} thiết bị)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedOwner !== "ALL" && (
+          {searchTerm && (
             <button
               type="button"
-              onClick={() => setSelectedOwner("ALL")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
-              title="Hủy lọc chủ sở hữu"
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-md transition"
+              title="Xóa tìm kiếm"
             >
-              <XCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>Hủy lọc</span>
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>

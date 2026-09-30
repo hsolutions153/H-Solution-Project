@@ -21,7 +21,7 @@ export const CreateTechnicianModal = ({
     "Kỹ thuật viên Sửa chữa H-Solution"
   );
   const [experienceYears, setExperienceYears] = useState(2);
-  const [skills, setSkills] = useState("BOTH");
+  const [skills, setSkills] = useState("SCOOTER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -184,7 +184,7 @@ export const CreateTechnicianModal = ({
               type="text"
               value={specialization}
               onChange={(e) => setSpecialization(e.target.value)}
-              placeholder="VD: Sửa chữa xe Scooter điện & Bo mạch điều khiển"
+              placeholder="VD: Sửa chữa xe máy điện, động cơ & bo mạch điều khiển"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
             />
           </div>
@@ -214,9 +214,8 @@ export const CreateTechnicianModal = ({
                 onChange={(e) => setSkills(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none cursor-pointer"
               >
-                <option value="BOTH">Tất cả thiết bị</option>
-                <option value="SCOOTER">Chuyên Scooter điện</option>
-                <option value="WHEELCHAIR">Chuyên xe hỗ trợ</option>
+                <option value="SCOOTER">Xe máy điện</option>
+                <option value="BOTH">Tất cả hệ thống xe máy điện</option>
               </select>
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -31,6 +31,7 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const router = useRouter();
   const { sidebarCollapsed, toggleSidebar } = useAdmin();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
@@ -163,7 +164,7 @@ export const Sidebar = ({
         {/* Logout */}
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-red-50 hover:text-red-600 cursor-pointer ${
             sidebarCollapsed
               ? "justify-center p-3 h-11"
@@ -175,6 +176,46 @@ export const Sidebar = ({
           {!sidebarCollapsed && <span className="truncate">Đăng xuất</span>}
         </button>
       </div>
+
+      {/* Modal xác nhận đăng xuất */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto text-red-600 shadow-xs">
+              <LogOut className="w-6 h-6 stroke-[2.2]" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">
+                Xác nhận đăng xuất
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Bạn có chắc chắn muốn đăng xuất khỏi trang Quản trị viên không?
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-red-600/30"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 };

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pg-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00a86b"/>
+      <stop offset="100%" stop-color="#007a4d"/>
+    </linearGradient>
+    <filter id="pg-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#pg-bg)"/>
+  <g transform="translate(60, 52)" filter="url(#pg-shadow)">
+    <!-- Stylized Winged Pegasus P Monogram -->
+    <path d="M -18,-24 C -5,-24 16,-22 22,-8 C 26,0 22,12 12,16 C 4,19 -6,18 -10,18 L -10,24 L -20,24 L -20,-24 Z M -10,-14 L -10,9 C -5,9 2,9 7,6 C 11,3 12,-3 10,-8 C 8,-13 0,-14 -10,-14 Z" fill="#ffffff"/>
+    <!-- Wing accent feathers -->
+    <path d="M 12,-16 C 18,-18 25,-16 28,-11 C 24,-11 18,-12 12,-16 Z" fill="#a7f3d0"/>
+    <path d="M 15,-8 C 22,-9 27,-6 30,0 C 25,-2 19,-4 15,-8 Z" fill="#6ee7b7"/>
+  </g>
+  <text x="60" y="103" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="900" fill="#ffffff" letter-spacing="3" text-anchor="middle">PEGA</text>
+</svg>

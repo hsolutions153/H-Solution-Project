@@ -48,10 +48,10 @@ def create_default_device_for_customer(customer_id: str):
     data = {
         "id": new_id,
         "customer_id": customer_id,
-        "device_type": "WHEELCHAIR",
+        "device_type": "SCOOTER",
         "manufacturer": "Chưa xác định",
-        "model_name": "Thiết bị cá nhân",
-        "notes": "Thiết bị tự động tạo khi đặt lịch",
+        "model_name": "Xe máy điện",
+        "notes": "Phương tiện tự động tạo khi đặt lịch",
         "created_by": customer_id,
         "updated_by": customer_id,
     }
@@ -65,12 +65,21 @@ def create_repair_request(data: dict):
 
 
 def get_repair_request_by_id(request_id: str):
-    response = supabase.table(REPAIR_REQUESTS_TABLE).select("*").eq("id", request_id).maybe_single().execute()
+    response = (
+        supabase.table(REPAIR_REQUESTS_TABLE)
+        .select("*")
+        .or_(f"id.eq.{request_id},request_code.eq.{request_id}")
+        .maybe_single()
+        .execute()
+    )
     return response.data if response and hasattr(response, "data") else None
 
 
-def get_repair_requests(*, customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int):
-    query = supabase.table(REPAIR_REQUESTS_TABLE).select("*", count="exact")
+def get_repair_requests(*, customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int, include_count: bool = False):
+    if include_count:
+        query = supabase.table(REPAIR_REQUESTS_TABLE).select("*", count="exact")
+    else:
+        query = supabase.table(REPAIR_REQUESTS_TABLE).select("*")
     if customer_id:
         query = query.eq("customer_id", customer_id)
     if technician_id:
@@ -78,7 +87,9 @@ def get_repair_requests(*, customer_id: str | None, technician_id: str | None, r
     if request_status:
         query = query.eq("status", request_status)
     response = query.order("created_at", desc=True).range((page - 1) * limit, page * limit - 1).execute()
-    return response.data or [], response.count or 0
+    data = response.data or []
+    total = response.count if include_count and response.count is not None else ((page - 1) * limit + len(data))
+    return data, total
 
 
 def update_repair_request(request_id: str, data: dict):

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, User, LogOut } from 'lucide-react';
+import { Search, Bell, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   onLogout?: () => void; // Hàm nhận sự kiện đăng xuất
@@ -9,6 +9,7 @@ interface HeaderProps {
 
 export const Header = ({ onLogout }: HeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [techName, setTechName] = useState<string>("Kỹ thuật viên");
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -72,24 +73,11 @@ export const Header = ({ onLogout }: HeaderProps) => {
 
         
         {isOpen && (
-          <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => {
                 setIsOpen(false);
-                // Thêm logic chuyển đến trang hồ sơ kỹ thuật viên ở đây nếu muốn
-              }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-900 transition-colors cursor-pointer font-medium"
-            >
-              <User className="w-4 h-4 text-sky-800" />
-              <span>Hồ sơ kỹ thuật viên</span>
-            </button>
-
-            <div className="h-px bg-gray-100 my-1"></div>
-
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                if (onLogout) onLogout();
+                setShowLogoutModal(true);
               }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors cursor-pointer font-medium"
             >
@@ -99,6 +87,46 @@ export const Header = ({ onLogout }: HeaderProps) => {
           </div>
         )}
       </div>
+
+      {/* Modal xác nhận đăng xuất */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+          <div className="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto text-red-600 shadow-xs">
+              <LogOut className="w-6 h-6 stroke-[2.2]" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">
+                Xác nhận đăng xuất
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Bạn có chắc chắn muốn đăng xuất khỏi tài khoản kỹ thuật viên không?
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  if (onLogout) onLogout();
+                }}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-red-600/30"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-1">
         <button className="p-2 text-slate-600 hover:bg-sky-50 rounded-full flex items-center justify-center transition-colors cursor-pointer">

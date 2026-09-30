@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="vf-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b2341"/>
+      <stop offset="100%" stop-color="#18458b"/>
+    </linearGradient>
+    <linearGradient id="vf-silver" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <filter id="vf-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#vf-bg)"/>
+  <g transform="translate(60, 56) scale(0.95)" filter="url(#vf-shadow)">
+    <!-- VinFast Right Wing -->
+    <path d="M 0,28 C 12,14 26,0 44,-16 C 36,-14 26,-8 18,-1 C 11,5 0,16 0,16 Z" fill="url(#vf-silver)"/>
+    <!-- VinFast Left Wing -->
+    <path d="M 0,28 C -12,14 -26,0 -44,-16 C -36,-14 -26,-8 -18,-1 C -11,5 0,16 0,16 Z" fill="url(#vf-silver)"/>
+    <!-- Inner V Cutout Accent -->
+    <path d="M 0,18 C 7,8 18,-3 32,-13 C 24,-11 16,-5 10,1 C 6,6 0,12 0,12 Z" fill="#ffffff" opacity="0.9"/>
+    <path d="M 0,18 C -7,8 -18,-3 -32,-13 C -24,-11 -16,-5 -10,1 C -6,6 0,12 0,12 Z" fill="#cbd5e1" opacity="0.9"/>
+  </g>
+  <text x="60" y="103" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="900" fill="#ffffff" letter-spacing="2" text-anchor="middle">VINFAST</text>
+</svg>

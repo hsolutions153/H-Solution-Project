@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="ym-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#df0024"/>
+      <stop offset="100%" stop-color="#a60018"/>
+    </linearGradient>
+    <filter id="ym-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#ym-bg)"/>
+  <g transform="translate(60, 48)" filter="url(#ym-shadow)">
+    <!-- Outer Ring -->
+    <circle cx="0" cy="0" r="23" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <!-- Center Point -->
+    <circle cx="0" cy="0" r="4.5" fill="#ffffff"/>
+    <!-- Top Tuning Fork (0 deg) -->
+    <g>
+      <rect x="-2" y="-23" width="4" height="23" fill="#ffffff"/>
+      <path d="M -7,-24 L -7,-12 L -3,-12 L -3,-24 Z M 3,-24 L 3,-12 L 7,-12 L 7,-24 Z" fill="#ffffff"/>
+    </g>
+    <!-- Right-Bottom Tuning Fork (120 deg) -->
+    <g transform="rotate(120)">
+      <rect x="-2" y="-23" width="4" height="23" fill="#ffffff"/>
+      <path d="M -7,-24 L -7,-12 L -3,-12 L -3,-24 Z M 3,-24 L 3,-12 L 7,-12 L 7,-24 Z" fill="#ffffff"/>
+    </g>
+    <!-- Left-Bottom Tuning Fork (240 deg) -->
+    <g transform="rotate(240)">
+      <rect x="-2" y="-23" width="4" height="23" fill="#ffffff"/>
+      <path d="M -7,-24 L -7,-12 L -3,-12 L -3,-24 Z M 3,-24 L 3,-12 L 7,-12 L 7,-24 Z" fill="#ffffff"/>
+    </g>
+  </g>
+  <text x="60" y="103" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="900" fill="#ffffff" letter-spacing="2.5" text-anchor="middle">YAMAHA</text>
+</svg>

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface JobItem {
   title: string;
@@ -37,8 +37,13 @@ interface RepairDetail {
   parts?: Array<{ name: string; quantity: number; unitPrice: number; subtotal: number }>;
   laborCost?: number;
   partsCost?: number;
-  paymentMethod: string;
+  paymentMethod?: string | null;
   total: number;
+  initialEstimate?: number;
+  approvedEstimate?: number;
+  finalCost?: number;
+  isSupplementaryQuote?: boolean;
+  additionalAmount?: number;
   images: string[];
 }
 
@@ -84,17 +89,205 @@ function getStatusLabel(status: string, rawStatus?: string) {
   }
 }
 
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString("vi-VN") + "đ";
+function getServiceTitle(isSos: boolean, issueType?: string, description?: string): string {
+  if (isSos) return "Cứu hộ khẩn cấp 24/7 (SOS)";
+  const t = (issueType || "").toUpperCase();
+  switch (t) {
+    case "BATTERY":
+    case "PIN":
+      return "Bảo dưỡng & Phục hồi Pin LFP";
+    case "TIRE":
+    case "WHEEL":
+    case "LOP":
+      return "Sửa chữa & Thay thế Lốp xe";
+    case "MOTOR":
+    case "DONG_CO":
+      return "Kiểm tra & Sửa chữa Động cơ";
+    case "BRAKE":
+    case "PHANH":
+      return "Bảo dưỡng Hệ thống Phanh";
+    case "CONTROLLER":
+    case "ECU":
+      return "Xử lý Lỗi Bộ điều khiển (ECU)";
+    case "ELECTRICAL":
+    case "DIEN":
+      return "Hệ thống Điện & Đèn còi";
+    case "MAINTENANCE":
+    case "BAO_DUONG":
+      return "Bảo dưỡng định kỳ Xe điện";
+    case "OTHER":
+    case "KHAC":
+    default:
+      if (description && description.trim().length > 3) {
+        const clean = description.trim();
+        return clean.length > 40 ? clean.slice(0, 40) + "..." : clean;
+      }
+      return "Bảo trì & Sửa chữa Xe máy điện";
+  }
 }
+
+function formatCurrency(amount: number): string {
+  return amount.toLocaleString("vi-VN") + " ₫";
+}
+
+const AVAILABLE_RATING_TAGS = [
+  "⏱️ Đến đúng giờ",
+  "💬 Tư vấn tận tình",
+  "🛠️ Tay nghề xuất sắc",
+  "💰 Giá cả minh bạch",
+  "😊 Thái độ thân thiện",
+  "🛵 Xe vận hành êm",
+];
+
+const RATING_LABELS: Record<number, string> = {
+  1: "Rất không hài lòng",
+  2: "Chưa hài lòng",
+  3: "Bình thường",
+  4: "Hài lòng",
+  5: "Rất hài lòng & Xuất sắc!",
+};
 
 export function HistoryDetail() {
   const params = useParams();
   const id = params?.id as string;
 
-  const [detail, setDetail] = useState<RepairDetail | null>(null);
+  // Rating states
+  const [ratingStars, setRatingStars] = useState<number>(5);
+  const [ratingHover, setRatingHover] = useState<number>(0);
+  const [ratingComment, setRatingComment] = useState<string>("");
+  const [ratingTags, setRatingTags] = useState<string[]>([]);
+  const [isRated, setIsRated] = useState<boolean>(false);
+  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+  const [ratingSuccessMsg, setRatingSuccessMsg] = useState<string>("");
+  const [isEditingRating, setIsEditingRating] = useState<boolean>(false);
+
+  // Load rating from localStorage & handle #rating hash
+  useEffect(() => {
+    if (!id || typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(`emobi_rating_${id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setRatingStars(parsed.rating || 5);
+        setRatingComment(parsed.comment || "");
+        setRatingTags(parsed.tags || []);
+        setIsRated(true);
+      }
+    } catch {
+      // ignore
+    }
+
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (hash === "#rating" || urlParams.get("rate") === "true") {
+      setTimeout(() => {
+        const el = document.getElementById("rating-section");
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 400);
+    }
+  }, [id]);
+
+  const handleSubmitRating = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!detail) return;
+    setIsSubmittingRating(true);
+    try {
+      const payload = {
+        rating: ratingStars,
+        comment: ratingComment,
+        tags: ratingTags,
+      };
+
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        await fetchApi(`/repair-requests/${detail.id}/rating`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      } catch (apiErr) {
+        console.warn("Rating API call error (fallback to local storage):", apiErr);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `emobi_rating_${detail.id}`,
+          JSON.stringify({
+            ...payload,
+            ratedAt: new Date().toISOString(),
+          })
+        );
+      }
+
+      setIsRated(true);
+      setIsEditingRating(false);
+      setRatingSuccessMsg("Cảm ơn bạn đã gửi đánh giá kỹ thuật viên!");
+      setTimeout(() => setRatingSuccessMsg(""), 4000);
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  // Instant cache lookup: renders within 0ms if visited or coming from history list
+  const [detail, setDetail] = useState<RepairDetail | null>(() => {
+    if (!id) return null;
+    if (typeof window !== "undefined") {
+      try {
+        const cachedList = sessionStorage.getItem("emobi_history_cache");
+        if (cachedList) {
+          const list = JSON.parse(cachedList);
+          const found = list.find((it: any) => it.id === id || it.orderCode === id);
+          if (found) {
+            return {
+              id: found.id,
+              orderCode: found.orderCode,
+              title: found.title,
+              status: found.status,
+              rawStatus: found.rawStatus || "REQUESTED",
+              dateTime: found.dateTime,
+              location: found.location || "Tại vị trí xe gặp sự cố",
+              technician: found.technicianName
+                ? {
+                    name: found.technicianName,
+                    phone: "",
+                    rating: 4.9,
+                    reviews: 25,
+                    avatar: "/images/s1.jpg",
+                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
+                    verified: true,
+                  }
+                : null,
+              jobs: [],
+              issueType: found.issueType,
+              repairDesc: found.title,
+              parts: [],
+              laborCost: 0,
+              partsCost: 0,
+              paymentMethod: null,
+              total: found.total || 0,
+              images: [],
+            };
+          }
+        }
+      } catch {}
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (!id) return true;
+    if (typeof window !== "undefined") {
+      try {
+        const cachedList = sessionStorage.getItem("emobi_history_cache");
+        if (cachedList) {
+          const list = JSON.parse(cachedList);
+          if (list.some((it: any) => it.id === id || it.orderCode === id)) return false;
+        }
+      } catch {}
+    }
+    return true;
+  });
+
   const [quoteData, setQuoteData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [isQrLoading, setIsQrLoading] = useState(false);
@@ -104,132 +297,150 @@ export function HistoryDetail() {
   const [paymentNotice, setPaymentNotice] = useState("");
   const [momoData, setMomoData] = useState<any>(null);
 
+  const isFetchingRef = useRef(false);
+
   useEffect(() => {
     if (!id) return;
 
     let isMounted = true;
 
     async function fetchDetail() {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+
       try {
         const { fetchApi } = await import("@/lib/api-client");
+        // Backend /repair-requests/{id} returns full request, images, device, quotes and items in ONE fast mega-query
         const res = await fetchApi<any>(`/repair-requests/${id}`);
         if (res && res.id) {
           let status: "completed" | "cancelled" | "in_progress" = "in_progress";
-          if (res.status === "completed" || res.status === "COMPLETED") status = "completed";
-          else if (res.status === "cancelled" || res.status === "CANCELLED") status = "cancelled";
+          if (res.status === "completed" || res.status === "COMPLETED" || res.status === "PAID") status = "completed";
+          else if (res.status === "cancelled" || res.status === "CANCELLED" || res.status === "REJECTED" || res.status === "ESTIMATE_REJECTED") status = "cancelled";
 
-          let tech = res.technician
+          const tech = res.technician
             ? {
-              name: res.technician.name || "Kỹ thuật viên",
-              phone: res.technician.phone || "",
-              rating: res.technician.rating || 4.9,
-              reviews: res.technician.reviews || 25,
-              specialization: res.technician.specialization || "Chuyên gia bảo trì xe lăn điện",
-              experience_years: res.technician.experience_years || 3,
-              avatar: res.technician.avatar || "",
-              verified: true,
-            }
+                name: res.technician.name || "Kỹ thuật viên",
+                phone: res.technician.phone || "",
+                rating: res.technician.rating || 4.9,
+                reviews: res.technician.reviews || 25,
+                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
+                experience_years: res.technician.experience_years || 3,
+                avatar: res.technician.avatar || "/images/s1.jpg",
+                verified: true,
+              }
             : null;
 
-          if (!tech) {
-            try {
-              const statusData = await fetchApi<any>(`/repair-requests/${id}/status`);
-              if (statusData && statusData.technician_info) {
-                tech = {
-                  name: statusData.technician_info.name || "Kỹ thuật viên H-Solution",
-                  phone: statusData.technician_info.phone || "",
-                  rating: statusData.technician_info.rating || 4.9,
-                  reviews: 50,
-                  specialization: statusData.technician_info.specialization || "Kỹ thuật viên chuyên nghiệp",
-                  experience_years: statusData.technician_info.experience_years || 3,
-                  avatar: statusData.technician_info.avatar || "",
-                  verified: true,
-                };
-              }
-            } catch {
-              // technician_info optional
-            }
+          // Quotes are already included by backend, eliminating redundant network roundtrips
+          const quotesList: any[] = res.quotes || (res.quote ? [res.quote] : []);
+          const pendingQuote = quotesList.find((q: any) => q.status === "PENDING") || null;
+          const acceptedQuotes = quotesList.filter((q: any) => q.status === "ACCEPTED");
+
+          // Earliest quote is the initial estimate
+          const sortedQuotes = [...quotesList].sort((a: any, b: any) => (a.created_at || "").localeCompare(b.created_at || ""));
+          const initialEstimate = Number(
+            (res.initial_estimate !== undefined && res.initial_estimate !== null && Number(res.initial_estimate) > 0)
+              ? res.initial_estimate
+              : (sortedQuotes.length > 0 && sortedQuotes[0]?.estimated_price
+                  ? sortedQuotes[0].estimated_price
+                  : (res.total_amount || 0))
+          );
+
+          // Total approved estimate: sum of accepted quotes
+          let approvedEstimate = Number(res.approved_estimate || 0);
+          if (!approvedEstimate && acceptedQuotes.length > 0) {
+            approvedEstimate = acceptedQuotes.reduce((sum: number, q: any) => sum + Number(q.estimated_price || 0), 0);
+          }
+          if (!approvedEstimate && initialEstimate > 0) {
+            approvedEstimate = initialEstimate;
           }
 
-          // Fetch quote breakdown if available
-          let activeQuote: any = res.quote || (res.quotes && res.quotes.length > 0 ? res.quotes[0] : null);
-          try {
-            const quotesRes = await fetchApi<any[]>(`/repair-requests/${id}/quotes`);
-            if (quotesRes && quotesRes.length > 0) {
-              activeQuote = quotesRes[0];
-            }
-          } catch { }
-
-          if (!activeQuote && typeof window !== "undefined") {
-            try {
-              const localQuote = sessionStorage.getItem("quoteData");
-              if (localQuote) {
-                activeQuote = JSON.parse(localQuote);
-              }
-            } catch { }
-          }
-
+          // Active quote to inspect
+          const activeQuote = pendingQuote || res.quote || (quotesList.length > 0 ? quotesList[0] : null);
           if (isMounted) setQuoteData(activeQuote);
 
-          const effectiveTotal = activeQuote?.estimated_price
-            ? Number(activeQuote.estimated_price)
-            : activeQuote?.total_amount
-              ? Number(activeQuote.total_amount)
-              : res.total_amount
-                ? Number(res.total_amount)
-                : 0;
+          // Check if this is a supplementary quote (i.e. already has an accepted quote and now a pending quote)
+          const isSupplementaryQuote = Boolean(pendingQuote && (acceptedQuotes.length > 0 || approvedEstimate > 0));
+          const additionalAmount = isSupplementaryQuote ? Number(pendingQuote?.estimated_price || 0) : 0;
 
-          // Phân loại linh kiện và tiền công
+          // In completed state, res.total_amount IS the final cost!
+          const isCompleted = status === "completed" || res.status === "COMPLETED" || res.status === "PAID";
+          const finalCost = isCompleted && res.total_amount !== null && res.total_amount !== undefined
+            ? Number(res.total_amount)
+            : undefined;
+
+          let effectiveTotal = 0;
+          if (isCompleted && finalCost !== undefined) {
+            effectiveTotal = finalCost;
+          } else if (res.total_amount && Number(res.total_amount) > 0) {
+            effectiveTotal = Number(res.total_amount);
+          } else if (activeQuote?.estimated_price) {
+            effectiveTotal = Number(activeQuote.estimated_price);
+          }
+
+          // Phân loại linh kiện và tiền công — ưu tiên item_type từ backend thay vì regex tên
           let parsedParts: Array<{ name: string; quantity: number; unitPrice: number; subtotal: number }> = [];
           let parsedLaborCost = 0;
           let parsedPartsCost = 0;
 
+          // Helper: kiểm tra item có phải tiền công hay không
+          const isLaborItem = (it: any): boolean => {
+            // Ưu tiên item_type nếu backend trả về
+            if (it.item_type) return it.item_type === "LABOR";
+            // Fallback: regex tên cho dữ liệu cũ
+            const name = (it.item_name || it.name || "").toLowerCase();
+            return name.includes("tiền công") || name.includes("công sửa") || name.includes("công kỹ thuật");
+          };
+
           if (activeQuote && activeQuote.items && activeQuote.items.length > 0) {
-            const rawParts = activeQuote.items.filter(
-              (it: any) =>
-                !it.item_name?.toLowerCase().includes("tiền công") &&
-                !it.item_name?.toLowerCase().includes("công sửa") &&
-                !it.item_name?.toLowerCase().includes("công kỹ thuật")
-            );
-            parsedParts = rawParts.map((it: any) => ({
+            // Tách items thành labor vs parts/service
+            const partsItems = activeQuote.items.filter((it: any) => !isLaborItem(it));
+            const laborItems = activeQuote.items.filter((it: any) => isLaborItem(it));
+
+            parsedParts = partsItems.map((it: any) => ({
               name: it.item_name || it.name || "Linh kiện",
               quantity: Number(it.quantity || 1),
               unitPrice: Number(it.unit_price || it.price || 0),
               subtotal: Number(it.subtotal || (Number(it.unit_price || it.price || 0) * Number(it.quantity || 1))),
             }));
-            parsedPartsCost = parsedParts.reduce((sum, p) => sum + p.subtotal, 0);
+            parsedPartsCost = parsedParts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
 
-            const laborIt = activeQuote.items.find(
-              (it: any) =>
-                it.item_name?.toLowerCase().includes("tiền công") ||
-                it.item_name?.toLowerCase().includes("công sửa") ||
-                it.item_name?.toLowerCase().includes("công kỹ thuật")
+            // Tổng hợp tất cả mục tiền công (có thể > 1 item LABOR)
+            parsedLaborCost = laborItems.reduce(
+              (sum: number, it: any) => sum + Number(it.subtotal || it.unit_price || it.price || 0),
+              0
             );
-            if (laborIt) {
-              parsedLaborCost = Number(laborIt.subtotal || laborIt.unit_price || laborIt.price || 0);
-            } else if (activeQuote.labor_fee) {
+
+            // Nếu không tìm thấy labor item nào, dùng labor_fee từ quote record
+            if (parsedLaborCost === 0 && activeQuote.labor_fee) {
               parsedLaborCost = Number(activeQuote.labor_fee);
-            } else if (activeQuote.laborCost) {
-              parsedLaborCost = Number(activeQuote.laborCost);
             }
           } else if (activeQuote) {
+            // Quote không có items chi tiết → dùng trực tiếp labor_fee / parts_cost từ backend
             parsedLaborCost = Number(activeQuote.labor_fee || activeQuote.laborCost || 0);
             parsedPartsCost = Number(activeQuote.parts_cost || activeQuote.partsCost || 0);
           }
 
+          // Fallback cuối: nếu có quote với labor_fee/parts_cost nhưng items parsing ra 0
+          // → ưu tiên dùng giá trị từ quote record thay vì bịa số
+          if (parsedLaborCost === 0 && parsedPartsCost === 0 && activeQuote) {
+            if (activeQuote.labor_fee) parsedLaborCost = Number(activeQuote.labor_fee);
+            if (activeQuote.parts_cost) parsedPartsCost = Number(activeQuote.parts_cost);
+          }
+
+          if (parsedParts.length === 0 && parsedPartsCost > 0) {
+            parsedParts = [
+              {
+                name: "Linh kiện thay thế",
+                quantity: 1,
+                unitPrice: parsedPartsCost,
+                subtotal: parsedPartsCost,
+              },
+            ];
+          }
+
+          // Fallback khi đơn hàng có tổng tiền (effectiveTotal > 0) nhưng chưa có danh sách bóc tách chi tiết (ví dụ đơn seed mẫu REQ0000001)
           if (parsedLaborCost === 0 && parsedPartsCost === 0 && effectiveTotal > 0) {
-            if (effectiveTotal === 1800000) {
-              parsedLaborCost = 300000;
-              parsedPartsCost = 1500000;
-              parsedParts = [
-                {
-                  name: "Pin xe lăn điện",
-                  quantity: 1,
-                  unitPrice: 1500000,
-                  subtotal: 1500000,
-                },
-              ];
-            } else if (effectiveTotal === 450000) {
+            if (effectiveTotal === 450000) {
               parsedLaborCost = 200000;
               parsedPartsCost = 250000;
               parsedParts = [
@@ -240,13 +451,30 @@ export function HistoryDetail() {
                   subtotal: 250000,
                 },
               ];
-            } else if (effectiveTotal >= 300000) {
+            } else if (effectiveTotal === 1800000) {
               parsedLaborCost = 300000;
-              parsedPartsCost = effectiveTotal - 300000;
-            } else if (effectiveTotal >= 200000) {
+              parsedPartsCost = 1500000;
+              parsedParts = [
+                {
+                  name: "Pin xe lăn điện",
+                  quantity: 1,
+                  unitPrice: 1500000,
+                  subtotal: 1500000,
+                },
+              ];
+            } else if (effectiveTotal >= 300000) {
               parsedLaborCost = 200000;
               parsedPartsCost = effectiveTotal - 200000;
+              parsedParts = [
+                {
+                  name: "Phụ tùng & vật tư sửa chữa",
+                  quantity: 1,
+                  unitPrice: parsedPartsCost,
+                  subtotal: parsedPartsCost,
+                },
+              ];
             } else {
+              // Dưới 300k coi như phí công thợ / phí kiểm tra xử lý sự cố trọn gói
               parsedLaborCost = effectiveTotal;
               parsedPartsCost = 0;
             }
@@ -256,19 +484,17 @@ export function HistoryDetail() {
             setDetail({
               id: res.id,
               orderCode: res.request_code || res.id,
-              title: res.is_sos
-                ? "Cứu hộ khẩn cấp (SOS)"
-                : `Sửa chữa ${res.issue_type || "thiết bị"}`,
+              title: getServiceTitle(Boolean(res.is_sos), res.issue_type, res.issue_description),
               status,
               rawStatus: res.status || "REQUESTED",
               dateTime: res.created_at
                 ? new Date(res.created_at).toLocaleDateString("vi-VN", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
                 : "N/A",
               location: res.location_address || "Địa chỉ không xác định",
               technician: tech,
@@ -282,6 +508,11 @@ export function HistoryDetail() {
               partsCost: parsedPartsCost,
               paymentMethod: res.payment_method || null,
               total: effectiveTotal,
+              initialEstimate,
+              approvedEstimate,
+              finalCost,
+              isSupplementaryQuote,
+              additionalAmount,
               images: (res.images || []).map((img: any) => img.image_url),
             });
             setError("");
@@ -292,14 +523,20 @@ export function HistoryDetail() {
       } catch (err: any) {
         console.warn("Failed to fetch detail:", err);
       } finally {
+        isFetchingRef.current = false;
         if (isMounted) setLoading(false);
       }
     }
 
     fetchDetail();
+
+    // Background refresh every 8s (only if in progress and tab is visible)
     const interval = setInterval(() => {
-      if (detail?.status === "in_progress") fetchDetail();
-    }, 4000);
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (detail?.status === "in_progress") {
+        fetchDetail();
+      }
+    }, 8000);
 
     return () => {
       isMounted = false;
@@ -308,29 +545,43 @@ export function HistoryDetail() {
   }, [id, detail?.status]);
 
   const [isApprovingQuote, setIsApprovingQuote] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("Không đồng ý");
+  const [customRejectText, setCustomRejectText] = useState("");
 
-  const handleApproveQuote = async (approved: boolean) => {
+  const handleApproveQuote = async (approved: boolean, customReason?: string) => {
     setIsApprovingQuote(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const nextStatus = approved ? "ESTIMATE_APPROVED" : "ESTIMATE_REJECTED";
+      const finalReason = approved
+        ? null
+        : (customReason || (rejectReason === "OTHER" ? customRejectText : rejectReason) || "Không đồng ý");
+
       await fetchApi(`/repair-requests/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({
           status: nextStatus,
-          cancel_reason: approved ? null : "Khách hàng từ chối báo giá",
+          cancel_reason: finalReason,
+          reject_reason: finalReason,
         }),
       });
 
-      setDetail((prev) =>
-        prev
-          ? {
-            ...prev,
-            rawStatus: nextStatus,
-            status: approved ? "in_progress" : "cancelled",
-          }
-          : null
-      );
+      setIsRejectModalOpen(false);
+      setDetail((prev) => {
+        if (!prev) return null;
+        const newApproved = approved && prev.isSupplementaryQuote
+          ? (prev.approvedEstimate || 0) + (prev.additionalAmount || 0)
+          : prev.approvedEstimate;
+        return {
+          ...prev,
+          rawStatus: nextStatus,
+          status: approved ? "in_progress" : (prev.isSupplementaryQuote ? "in_progress" : "cancelled"),
+          approvedEstimate: newApproved,
+          total: approved && prev.isSupplementaryQuote ? (newApproved || prev.total) : prev.total,
+          isSupplementaryQuote: false,
+        };
+      });
     } catch (err: any) {
       alert(err.message || "Lỗi khi xử lý phản hồi báo giá");
     } finally {
@@ -430,21 +681,25 @@ export function HistoryDetail() {
           <div className="bg-sky-50/60 border border-sky-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
             <div className="flex items-start gap-2.5">
               <span className="material-symbols-outlined text-sky-800" style={{ fontSize: 26 }}>
-                receipt_long
+                {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
               </span>
               <div>
-                <h3 className="text-sm font-bold text-sky-950">Bảng Báo Giá Chi Tiết Từ Kỹ Thuật Viên</h3>
+                <h3 className="text-sm font-bold text-sky-950">
+                  {detail.isSupplementaryQuote ? "Yêu Cầu Duyệt Chi Phí Phát Sinh Bổ Sung" : "Bảng Báo Giá Chi Tiết Từ Kỹ Thuật Viên"}
+                </h3>
                 <p className="text-xs text-sky-800/80 mt-0.5">
-                  KTV đã kiểm tra thiết bị và gửi bảng kê chi phí linh kiện & tiền công. Vui lòng xác nhận để KTV bắt đầu sửa chữa.
+                  {detail.isSupplementaryQuote
+                    ? "Kỹ thuật viên đã kiểm tra và ghi nhận các hạng mục linh kiện/vật tư phát sinh trong quá trình sửa chữa. Vui lòng xác nhận để tiếp tục."
+                    : "KTV đã kiểm tra thiết bị và gửi bảng kê chi phí linh kiện & tiền công. Vui lòng xác nhận để KTV bắt đầu sửa chữa."}
                 </p>
               </div>
             </div>
 
-            {/* 1. Linh kiện & Phụ tùng thay thế */}
+            {/* Chi tiết linh kiện & Phụ tùng phát sinh / thay thế */}
             <div className="space-y-2">
               <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-sky-700 text-sm">settings</span>
-                <span>Linh kiện & Vật tư thay thế</span>
+                <span>{detail.isSupplementaryQuote ? "Linh kiện & Hạng mục phát sinh" : "Linh kiện & Vật tư thay thế"}</span>
               </div>
               {detail.parts && detail.parts.length > 0 ? (
                 <div className="space-y-2">
@@ -477,7 +732,7 @@ export function HistoryDetail() {
               )}
             </div>
 
-            {/* 2. Tiền công kỹ thuật viên */}
+            {/* Tiền công kỹ thuật viên */}
             <div className="bg-white rounded-2xl p-3.5 border border-sky-100 flex items-center justify-between shadow-2xs">
               <div>
                 <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
@@ -493,18 +748,33 @@ export function HistoryDetail() {
             {/* Ghi chú KTV nếu có */}
             {quoteData?.diagnosis_note && (
               <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-sky-100">
-                <span className="font-bold text-sky-950">Ghi chú sửa chữa:</span> {quoteData.diagnosis_note}
+                <span className="font-bold text-sky-950">Ghi chú phát sinh / sửa chữa:</span> {quoteData.diagnosis_note}
               </div>
             )}
 
-            {/* 3. Tổng chi phí báo giá */}
-            <div className="bg-sky-900 text-white rounded-2xl p-4 shadow-md space-y-1">
+            {/* Tổng chi phí phát sinh & báo giá */}
+            <div className="bg-sky-900 text-white rounded-2xl p-4 shadow-md space-y-2">
+              {detail.isSupplementaryQuote && (
+                <div className="space-y-1.5 pb-2 border-b border-sky-800/80 text-xs">
+                  <div className="flex justify-between items-center text-sky-200">
+                    <span>Báo giá đã duyệt trước đó:</span>
+                    <span className="font-bold text-white">{formatCurrency(detail.approvedEstimate || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-amber-300 font-bold">
+                    <span>Chi phí phát sinh bổ sung:</span>
+                    <span className="text-amber-300 font-black text-sm">+{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold uppercase tracking-wider text-sky-200">
-                  Tổng chi phí báo giá
+                  {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
                 </span>
                 <span className="text-lg font-black text-amber-300">
-                  {formatCurrency(detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0)))}
+                  {formatCurrency(detail.isSupplementaryQuote
+                    ? ((detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0))
+                    : (detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0))))}
                 </span>
               </div>
               <div className="text-[11px] text-sky-200/90 italic">
@@ -516,17 +786,17 @@ export function HistoryDetail() {
             <div className="flex gap-2 pt-1">
               <button
                 disabled={isApprovingQuote}
-                onClick={() => handleApproveQuote(false)}
+                onClick={() => setIsRejectModalOpen(true)}
                 className="flex-1 py-3 bg-white border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition cursor-pointer"
               >
-                Từ chối & Hủy
+                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối & Hủy"}
               </button>
               <button
                 disabled={isApprovingQuote}
                 onClick={() => handleApproveQuote(true)}
                 className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
               >
-                {isApprovingQuote ? "Đang xử lý..." : "Duyệt báo giá ngay ✓"}
+                {isApprovingQuote ? "Đang xử lý..." : detail.isSupplementaryQuote ? `Duyệt phát sinh (+${formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)})` : "Duyệt báo giá ngay ✓"}
               </button>
             </div>
           </div>
@@ -652,6 +922,210 @@ export function HistoryDetail() {
           )}
         </div>
 
+        {/* Đánh Giá Kỹ Thuật Viên (Khi đơn đã hoàn thành) */}
+        {(detail.status === "completed" || detail.rawStatus === "COMPLETED" || detail.rawStatus === "PAID") && (
+          <div
+            id="rating-section"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-4 scroll-mt-20 transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="rd-section-label" style={{ marginBottom: 0 }}>
+                ĐÁNH GIÁ KỸ THUẬT VIÊN
+              </span>
+              {isRated && !isEditingRating && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>
+                  Đã gửi đánh giá
+                </span>
+              )}
+            </div>
+
+            {ratingSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
+                <span>{ratingSuccessMsg}</span>
+              </div>
+            )}
+
+            {isRated && !isEditingRating ? (
+              /* Already Rated Summary View */
+              <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-1 text-amber-500">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          className="material-symbols-outlined"
+                          style={{
+                            fontSize: 22,
+                            fontVariationSettings: `'FILL' ${star <= ratingStars ? 1 : 0}, 'wght' 600`,
+                          }}
+                        >
+                          star
+                        </span>
+                      ))}
+                      <span className="ml-1.5 text-xs font-black text-slate-800">
+                        {ratingStars}/5
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold text-amber-700 mt-1">
+                      {RATING_LABELS[ratingStars] || "Hài lòng"}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingRating(true)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                    <span>Sửa đánh giá</span>
+                  </button>
+                </div>
+
+                {ratingTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {ratingTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {ratingComment && (
+                  <div className="bg-white p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700 italic">
+                    "{ratingComment}"
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Interactive Rating Form */
+              <form onSubmit={handleSubmitRating} className="space-y-4">
+                <div className="text-center py-2 space-y-2">
+                  <p className="text-xs text-slate-600 font-medium">
+                    Bạn thấy thế nào về kỹ thuật viên{" "}
+                    <b>{detail.technician?.name || "phụ trách"}</b>?
+                  </p>
+
+                  {/* Star Rating Buttons */}
+                  <div className="flex items-center justify-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const active = (ratingHover || ratingStars) >= star;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onMouseEnter={() => setRatingHover(star)}
+                          onMouseLeave={() => setRatingHover(0)}
+                          onClick={() => setRatingStars(star)}
+                          className="p-1 text-slate-300 hover:scale-110 transition-transform cursor-pointer focus:outline-none"
+                          title={`${star} sao`}
+                        >
+                          <span
+                            className="material-symbols-outlined"
+                            style={{
+                              fontSize: 34,
+                              color: active ? "#F59E0B" : "#CBD5E1",
+                              fontVariationSettings: `'FILL' ${active ? 1 : 0}, 'wght' 600`,
+                              transition: "color 0.15s ease",
+                            }}
+                          >
+                            star
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-xs font-bold text-amber-700 min-h-[18px]">
+                    {RATING_LABELS[ratingHover || ratingStars] || "Chọn mức đánh giá"}
+                  </div>
+                </div>
+
+                {/* Quick Tags */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Điểm bạn hài lòng
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {AVAILABLE_RATING_TAGS.map((tag) => {
+                      const isSelected = ratingTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setRatingTags(ratingTags.filter((t) => t !== tag));
+                            } else {
+                              setRatingTags([...ratingTags, tag]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "bg-amber-50 border-amber-300 text-amber-900 font-bold shadow-2xs"
+                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Comment Textarea */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Nhận xét thêm (không bắt buộc)
+                  </label>
+                  <textarea
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                    rows={3}
+                    placeholder="Chia sẻ cảm nhận của bạn về thái độ phục vụ và tay nghề của kỹ thuật viên..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Submit & Cancel Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  {isEditingRating && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRating(false)}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingRating}
+                    className="flex-1 py-2.5 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      send
+                    </span>
+                    <span>
+                      {isSubmittingRating
+                        ? "Đang gửi đánh giá..."
+                        : isEditingRating
+                        ? "Lưu đánh giá"
+                        : "Gửi đánh giá kỹ thuật viên"}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
         {/* 1. KHỐI CHI TIẾT CÔNG VIỆC: LOẠI SỰ CỐ, MÔ TẢ SỰ CỐ & THAY GÌ */}
         <div className="rd-jobs-section">
           <span className="rd-section-label">CHI TIẾT CÔNG VIỆC THỰC HIỆN</span>
@@ -769,6 +1243,77 @@ export function HistoryDetail() {
               </span>
             </div>
 
+            {/* Đối soát Báo giá ước tính (Estimate) & Chi phí thực tế (Final Cost) */}
+            {(Boolean(detail.initialEstimate || detail.approvedEstimate) || detail.status === "completed" || detail.rawStatus === "COMPLETED") && (
+              <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/80 space-y-2 mt-2">
+                <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                  <span className="material-symbols-outlined text-slate-500 text-sm">balance</span>
+                  <span>Báo giá ước tính & Nghiệm thu thực tế</span>
+                </div>
+
+                <div className="flex justify-between items-center text-slate-700">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span className="material-symbols-outlined text-blue-600 text-sm">request_quote</span>
+                    Báo giá ước tính ban đầu (Estimate):
+                  </span>
+                  <span className="font-bold text-slate-900 text-xs">
+                    {formatCurrency(detail.initialEstimate || detail.approvedEstimate || detail.total)}
+                  </span>
+                </div>
+
+                {Boolean(detail.approvedEstimate && detail.initialEstimate && detail.approvedEstimate > detail.initialEstimate) && (
+                  <div className="flex justify-between items-center text-amber-700">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="material-symbols-outlined text-amber-600 text-sm">add_circle</span>
+                      Chi phí phát sinh đã duyệt:
+                    </span>
+                    <span className="font-bold text-amber-800 text-xs">
+                      +{formatCurrency((detail.approvedEstimate || 0) - (detail.initialEstimate || 0))}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 text-slate-800">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-emerald-600 text-sm">verified</span>
+                    Chi phí thực tế nghiệm thu (Final Cost):
+                  </span>
+                  <span className="font-black text-emerald-800 text-sm">
+                    {formatCurrency(detail.finalCost !== undefined ? detail.finalCost : detail.total)}
+                  </span>
+                </div>
+
+                {/* Badge so sánh chi phí theo test matrix */}
+                {(() => {
+                  const est = detail.initialEstimate || detail.approvedEstimate || 0;
+                  const finalVal = detail.finalCost !== undefined ? detail.finalCost : detail.total;
+                  if (!est || !finalVal) return null;
+                  const diff = finalVal - est;
+                  if (diff < 0) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded-xl font-semibold">
+                        <span className="material-symbols-outlined text-xs">savings</span>
+                        <span>Thấp hơn dự toán ban đầu: Tiết kiệm {formatCurrency(Math.abs(diff))}</span>
+                      </div>
+                    );
+                  } else if (diff > 0) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 p-2 rounded-xl font-semibold">
+                        <span className="material-symbols-outlined text-xs">check_circle</span>
+                        <span>Đã bao gồm chi phí phát sinh khách hàng phê duyệt: +{formatCurrency(diff)}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-white border border-slate-200 p-2 rounded-xl font-medium">
+                      <span className="material-symbols-outlined text-xs">check</span>
+                      <span>Chi phí thực tế nghiệm thu khớp với báo giá ban đầu</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* Tổng cộng */}
             <div className="bg-blue-50/80 border border-blue-200/80 p-3.5 rounded-xl flex justify-between items-center mt-2">
               <div>
@@ -776,7 +1321,7 @@ export function HistoryDetail() {
                   Tổng cộng thanh toán
                 </span>
                 <span className="text-[10px] text-blue-700 italic">
-                  * Đã gồm tiền công ({formatCurrency(detail.laborCost || 0)}) + linh kiện ({formatCurrency(detail.partsCost || 0)})
+                  * Giá thanh toán cuối cùng (Final Cost) đã được xác nhận
                 </span>
               </div>
               <span className="font-black text-lg text-blue-800">
@@ -814,6 +1359,29 @@ export function HistoryDetail() {
 
         {/* Action Buttons */}
         <div className="rd-actions">
+          {(detail.status === "completed" || detail.rawStatus === "COMPLETED" || detail.rawStatus === "PAID") && (
+            <button
+              type="button"
+              id="btn-rate-technician"
+              onClick={() => {
+                const el = document.getElementById("rating-section");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+              className="rd-action-primary"
+              style={{
+                background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                color: "#ffffff",
+                boxShadow: "0 4px 14px rgba(245, 158, 11, 0.35)",
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                star
+              </span>
+              {isRated ? "Xem lại đánh giá KTV" : "Đánh giá kỹ thuật viên"}
+            </button>
+          )}
           {detail.total > 0 && detail.status !== "completed" && (
             <button
               className="rd-action-primary"
@@ -1158,6 +1726,119 @@ export function HistoryDetail() {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal từ chối báo giá / chi phí phát sinh */}
+        {isRejectModalOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 24,
+                padding: 24,
+                maxWidth: 420,
+                width: "100%",
+                boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              }}
+              className="space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                    <span className="material-symbols-outlined text-base">cancel</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {detail.isSupplementaryQuote ? "Từ chối chi phí phát sinh" : "Từ chối báo giá sửa chữa"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {detail.isSupplementaryQuote
+                  ? `Bạn đang từ chối khoản phát sinh +${formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}. Kỹ thuật viên sẽ tiếp tục thực hiện theo mức giá đã duyệt trước đó (${formatCurrency(detail.approvedEstimate || detail.initialEstimate || 0)}).`
+                  : "Bạn có chắc chắn muốn từ chối bảng báo giá này? Vui lòng chọn lý do:"}
+              </p>
+
+              {/* Danh sách lý do từ chối */}
+              <div className="space-y-2 text-xs">
+                {[
+                  { value: "Không đồng ý", label: "Không đồng ý với chi phí phát sinh này" },
+                  { value: "Chi phí vượt quá dự toán", label: "Chi phí vượt quá khả năng / dự toán ngân sách" },
+                  { value: "Không cần thiết", label: "Chưa cần thay thế các hạng mục linh kiện này" },
+                  { value: "OTHER", label: "Lý do khác (nhập bên dưới)" },
+                ].map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                      rejectReason === opt.value
+                        ? "border-red-300 bg-red-50/50 text-red-900 font-semibold"
+                        : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rejectReason"
+                      value={opt.value}
+                      checked={rejectReason === opt.value}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      className="mt-0.5 accent-red-600"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {rejectReason === "OTHER" && (
+                <textarea
+                  value={customRejectText}
+                  onChange={(e) => setCustomRejectText(e.target.value)}
+                  placeholder="Nhập lý do từ chối cụ thể..."
+                  className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-red-500 focus:outline-none resize-none h-20"
+                />
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isApprovingQuote}
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  disabled={isApprovingQuote}
+                  onClick={() => {
+                    const finalReason = rejectReason === "OTHER" ? (customRejectText || "Không đồng ý") : rejectReason;
+                    handleApproveQuote(false, finalReason);
+                  }}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                >
+                  {isApprovingQuote ? "Đang xử lý..." : "Xác nhận từ chối"}
+                </button>
+              </div>
             </div>
           </div>
         )}

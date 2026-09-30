@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Task } from "@/types/task";
-import { ArrowLeft, MapPin, Clock, FileText, Phone } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, FileText, Phone, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 
 interface QuoteStatusScreenProps {
   task: Task;
@@ -25,7 +25,11 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
     quoteObj = savedQuote ? JSON.parse(savedQuote) : null;
   } catch {}
 
+  const isRejected = task.status === "ESTIMATE_REJECTED" || quoteObj?.status === "REJECTED";
+  const effectivelyApproved = !isRejected && (isApproved || task.status === "ESTIMATE_APPROVED" || quoteObj?.status === "APPROVED" || quoteObj?.status === "ACCEPTED");
+
   const displayTotal = task.totalAmount || quoteObj?.totalCost || quoteObj?.estimated_price || task.quote?.estimated_price || 0;
+  const rejectReason = (task as any)?.cancel_reason || (task as any)?.reject_reason || quoteObj?.reject_reason || "Khách hàng không đồng ý chi phí phát sinh";
 
   return (
     <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between">
@@ -47,10 +51,22 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
             <span className="text-xs font-semibold px-2.5 py-1 bg-sky-50 text-sky-700 rounded-md">
               Mã đơn: {task.code}
             </span>
-            <span className="text-xs font-medium px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-              Chờ phê duyệt
-            </span>
+            {isRejected ? (
+              <span className="text-xs font-medium px-2.5 py-1 bg-red-50 text-red-700 rounded-full flex items-center gap-1 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                Từ chối báo giá
+              </span>
+            ) : effectivelyApproved ? (
+              <span className="text-xs font-medium px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full flex items-center gap-1 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Đã phê duyệt
+              </span>
+            ) : (
+              <span className="text-xs font-medium px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                Chờ phê duyệt
+              </span>
+            )}
           </div>
           <h2 className="text-base font-bold text-slate-900">
             {task.serviceName}
@@ -63,17 +79,34 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
 
         
         <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm text-center space-y-3">
-          <div className="w-16 h-16 bg-sky-50 border border-sky-100 rounded-2xl mx-auto flex items-center justify-center">
-            <Clock className="w-8 h-8 text-sky-500 animate-spin-slow" />
-          </div>
+          {isRejected ? (
+            <div className="w-16 h-16 bg-red-50 border border-red-100 rounded-2xl mx-auto flex items-center justify-center">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+          ) : effectivelyApproved ? (
+            <div className="w-16 h-16 bg-emerald-50 border border-emerald-100 rounded-2xl mx-auto flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-emerald-600" />
+            </div>
+          ) : (
+            <div className="w-16 h-16 bg-sky-50 border border-sky-100 rounded-2xl mx-auto flex items-center justify-center">
+              <Clock className="w-8 h-8 text-sky-500 animate-spin-slow" />
+            </div>
+          )}
+
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-slate-900">
-              Đã gửi báo giá tới khách hàng
+              {isRejected
+                ? "Khách hàng từ chối báo giá bổ sung"
+                : effectivelyApproved
+                ? "Khách hàng đã đồng ý báo giá"
+                : "Đã gửi báo giá tới khách hàng"}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed px-4">
-              Hệ thống đang chờ Khách hàng xác nhận và phê duyệt báo giá trên
-              ứng dụng{" "}
-              <span className="font-semibold text-sky-600">Customer App</span>.
+              {isRejected
+                ? `Lý do từ chối: "${rejectReason}". Bạn có thể tiếp tục sửa chữa theo phạm vi báo giá ban đầu.`
+                : effectivelyApproved
+                ? "Báo giá đã được khách hàng phê duyệt. Bạn có thể tiếp tục tiến hành sửa chữa."
+                : "Hệ thống đang chờ Khách hàng xác nhận và phê duyệt báo giá trên ứng dụng Customer App."}
             </p>
           </div>
 
@@ -109,33 +142,35 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
 
         
         <div className="space-y-3 pt-2">
-          <p className="text-xs font-semibold text-slate-600 text-center">
-            Chỉnh sửa báo giá
-          </p>
-
-          <button className="w-full py-3 bg-white border border-sky-700 text-sky-700 hover:bg-sky-50 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm">
-            <Phone className="w-4 h-4 text-sky-600" />
-            Gọi/Nhắc khách hàng
-          </button>
+          {!effectivelyApproved && !isRejected && (
+            <button className="w-full py-3 bg-white border border-sky-700 text-sky-700 hover:bg-sky-50 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm">
+              <Phone className="w-4 h-4 text-sky-600" />
+              Gọi/Nhắc khách hàng
+            </button>
+          )}
 
           <button
             type="button"
-            disabled={!isApproved}
+            disabled={!effectivelyApproved && !isRejected}
             onClick={() => {
-              if (!isApproved) return;
+              if (!effectivelyApproved && !isRejected) return;
               onContinueRepair();
             }}
-            className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm ${
-              isApproved
-                ? "bg-sky-800 hover:bg-sky-900 text-white cursor-pointer"
+            className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer ${
+              isRejected
+                ? "bg-amber-600 hover:bg-amber-700 text-white"
+                : effectivelyApproved
+                ? "bg-sky-800 hover:bg-sky-900 text-white"
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             }`}
           >
-            Bắt đầu sửa chữa
+            {isRejected ? "Tiếp tục sửa theo báo giá ban đầu" : "Bắt đầu / Tiếp tục sửa chữa"}
           </button>
           <p className="text-[11px] text-center font-medium">
-            {isApproved ? (
-              <span className="text-emerald-600">Khách hàng đã đồng ý báo giá. Có thể bắt đầu sửa chữa.</span>
+            {isRejected ? (
+              <span className="text-amber-700">Khách từ chối phát sinh. Bấm nút trên để tiếp tục sửa theo giá cũ.</span>
+            ) : effectivelyApproved ? (
+              <span className="text-emerald-600">Khách hàng đã đồng ý báo giá. Có thể tiếp tục sửa chữa.</span>
             ) : (
               <span className="text-slate-400">Đang chờ khách hàng xác nhận báo giá...</span>
             )}

@@ -11,12 +11,12 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "H-solutions",
-  description: "Hệ thống sửa chữa xe lăn thông minh & xe ga tốc độ thấp - H-solutions",
+  title: "H-Mobility Care - Cứu Hộ & Chăm Sóc Xe Máy Điện Thông Minh",
+  description: "H-Mobility Care - Nền tảng cứu hộ khẩn cấp SOS, sửa chữa tận nơi và chăm sóc xe máy điện thông minh.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "H-solutions",
+    title: "H-Mobility Care",
   },
   formatDetection: {
     telephone: false,
