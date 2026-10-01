@@ -45,7 +45,7 @@ function Avatar({ avatar, large = false }: { avatar: string; large?: boolean }) 
   return (
     <div className={`profile-avatar ${large ? "profile-avatar--large" : ""}`}>
       {avatar ? (
-        <Image src={avatar} alt="Profile photo" fill sizes={large ? "96px" : "76px"} unoptimized />
+        <Image src={avatar} alt="Ảnh đại diện" fill sizes={large ? "96px" : "76px"} unoptimized />
       ) : (
         <UserRound aria-hidden="true" />
       )}
@@ -60,14 +60,14 @@ async function resizeAvatar(file: File) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Unable to read that image."));
+    reader.onerror = () => reject(new Error("Không thể đọc tệp hình ảnh này."));
     reader.readAsDataURL(file);
   });
 
   const source = await new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Unable to open that image."));
+    image.onerror = () => reject(new Error("Không thể mở hình ảnh này."));
     image.src = dataUrl;
   });
 
@@ -76,7 +76,7 @@ async function resizeAvatar(file: File) {
   canvas.width = 360;
   canvas.height = 360;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Your browser cannot process this image.");
+  if (!context) throw new Error("Trình duyệt không thể xử lý hình ảnh này.");
   context.drawImage(
     source,
     (source.width - size) / 2,
@@ -100,6 +100,13 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
+  const [primaryDevice, setPrimaryDevice] = useState<{
+    id: string;
+    model: string;
+    serialNumber?: string;
+    image?: string;
+  } | null>(null);
+
   useEffect(() => {
     async function loadCustomerProfile() {
       try {
@@ -115,6 +122,26 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
             avatar: data.avatar_url || data.avatar || initialProfile.avatar,
             notifications: initialProfile.notifications ?? true,
           });
+        }
+
+        try {
+          const list = await fetchApi<any[]>("/devices");
+          if (Array.isArray(list) && list.length > 0) {
+            const item = list.find((d: any) => d.is_default) || list[0];
+            const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
+            const modelName = item.model_name || item.model || "";
+            const fullModel = brand && modelName ? `${brand} ${modelName}` : (modelName || brand || "Xe máy điện");
+            setPrimaryDevice({
+              id: item.id,
+              model: fullModel,
+              serialNumber: item.serial_number || item.serialNumber || item.id,
+              image: item.image_url || "/electric-scooter.jpg",
+            });
+          } else {
+            setPrimaryDevice(null);
+          }
+        } catch {
+          setPrimaryDevice(null);
         }
       } catch {
         // Fallback to initialProfile gracefully
@@ -206,22 +233,22 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
       <main className="profile-stage">
         <section className="profile-phone profile-phone--edit">
           <header className="profile-topbar profile-topbar--centered">
-            <Link href="/home/profile" className="profile-icon-button" aria-label="Back to profile">
+            <Link href="/home/profile" className="profile-icon-button" aria-label="Quay lại trang hồ sơ">
               <ArrowLeft />
             </Link>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <EMobiCareLogoIcon size={20} />
-              <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Chỉnh sửa hồ sơ H-Mobi Care</h1>
+              <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Chỉnh sửa hồ sơ H-Mobility Care</h1>
             </div>
           </header>
 
           <form className="profile-edit-form" onSubmit={handleSubmit}>
             <div className="profile-edit-avatar">
-              <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Change profile photo">
+              <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Thay đổi ảnh đại diện">
                 <Avatar avatar={profile.avatar} large />
               </button>
               <button type="button" className="profile-change-photo" onClick={() => fileInputRef.current?.click()}>
-                Change photo
+                Đổi ảnh đại diện
               </button>
               <input
                 ref={fileInputRef}
@@ -233,44 +260,47 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
             </div>
 
             <div className="profile-form-section">
-              <h2><UserRound /> Account Information</h2>
+              <h2><UserRound /> Thông tin tài khoản</h2>
               <div className="profile-form-card">
                 <label>
-                  <span>Full Name</span>
+                  <span>Họ và tên</span>
                   <input
                     value={profile.name}
                     autoComplete="name"
                     maxLength={100}
                     required
+                    placeholder="Nhập họ và tên"
                     onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))}
                   />
                 </label>
                 <label>
-                  <span>Phone Number</span>
+                  <span>Số điện thoại</span>
                   <input
                     value={profile.phone}
                     autoComplete="tel"
                     inputMode="tel"
                     maxLength={30}
+                    placeholder="VD: 0912345678"
                     onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))}
                   />
                 </label>
                 <label>
-                  <span>Email</span>
+                  <span>Địa chỉ Email</span>
                   <input value={profile.email} type="email" readOnly aria-readonly="true" />
                 </label>
               </div>
             </div>
 
             <div className="profile-form-section">
-              <h2><IdCard /> Personal Identification</h2>
+              <h2><IdCard /> Thông tin cá nhân &amp; Địa chỉ</h2>
               <div className="profile-form-card">
                 <label>
-                  <span>Address</span>
+                  <span>Địa chỉ liên hệ</span>
                   <input
                     value={profile.address}
                     autoComplete="street-address"
                     maxLength={200}
+                    placeholder="Nhập địa chỉ nơi ở của bạn"
                     onChange={(event) => setProfile((current) => ({ ...current, address: event.target.value }))}
                   />
                 </label>
@@ -281,7 +311,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
             <div className="profile-save-wrap">
               <button className="profile-save-button" type="submit" disabled={isSaving}>
-                {isSaving ? <><LoaderCircle className="profile-spinner" /> Saving...</> : notice?.type === "success" ? <><Check /> Saved</> : "Save Changes"}
+                {isSaving ? <><LoaderCircle className="profile-spinner" /> Đang lưu...</> : notice?.type === "success" ? <><Check /> Đã lưu</> : "Lưu thay đổi"}
               </button>
             </div>
           </form>
@@ -294,14 +324,14 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     <main className="profile-stage">
       <section className="profile-phone">
         <header className="profile-topbar">
-          <Link href="/home" className="profile-icon-button" aria-label="Back to home">
+          <Link href="/home" className="profile-icon-button" aria-label="Quay lại trang chủ">
             <ArrowLeft />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <EMobiCareLogoIcon size={20} />
             <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Hồ sơ H-Mobility Care</h1>
           </div>
-          <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Edit profile">
+          <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Chỉnh sửa hồ sơ">
             <Pencil />
           </Link>
         </header>
@@ -315,40 +345,40 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
           <section className="profile-section">
             <div className="profile-section-heading">
-              <h3>Account Information</h3>
-              <Link href="/home/profile/edit">Edit <ChevronDown /></Link>
+              <h3>Thông tin tài khoản</h3>
+              <Link href="/home/profile/edit">Chỉnh sửa <ChevronDown /></Link>
             </div>
             <div className="profile-info-card">
               <div className="profile-info-row">
                 <span className="profile-row-icon"><UserRound /></span>
-                <div><strong>Full Name</strong><small>{profile.name}</small></div>
+                <div><strong>Họ và tên</strong><small>{profile.name || "Chưa cập nhật"}</small></div>
               </div>
               <div className="profile-info-row">
                 <span className="profile-row-icon"><Phone /></span>
-                <div><strong>Phone Number</strong><small>{profile.phone || "Not provided"}</small></div>
+                <div><strong>Số điện thoại</strong><small>{profile.phone || "Chưa cập nhật"}</small></div>
               </div>
               <div className="profile-info-row">
                 <span className="profile-row-icon"><Mail /></span>
-                <div><strong>Email</strong><small>{profile.email}</small></div>
+                <div><strong>Địa chỉ Email</strong><small>{profile.email || "Chưa cập nhật"}</small></div>
               </div>
               <div className="profile-info-row">
                 <span className="profile-row-icon"><MapPin /></span>
-                <div><strong>Address</strong><small>{profile.address || "Not provided"}</small></div>
+                <div><strong>Địa chỉ liên hệ</strong><small>{profile.address || "Chưa cập nhật"}</small></div>
               </div>
             </div>
           </section>
 
           <section className="profile-section">
-            <div className="profile-section-heading"><h3>Settings</h3></div>
+            <div className="profile-section-heading"><h3>Cài đặt</h3></div>
             <div className="profile-single-card">
               <span className="profile-row-icon profile-row-icon--neutral"><Bell /></span>
-              <strong>Notifications</strong>
+              <strong>Thông báo hệ thống</strong>
               <button
                 type="button"
                 className={`profile-switch ${profile.notifications ? "profile-switch--on" : ""}`}
                 role="switch"
                 aria-checked={profile.notifications}
-                aria-label="Notifications"
+                aria-label="Bật/tắt thông báo"
                 onClick={toggleNotifications}
               ><span /></button>
             </div>
@@ -356,21 +386,33 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
           <section className="profile-section">
             <div className="profile-section-heading"><h3>Phương tiện của tôi</h3></div>
-            <Link href="/home/device" className="profile-vehicle-card">
-              <div className="profile-vehicle-image">
-                <Image src="/electric-scooter.jpg" alt="VinFast Evo 200" fill sizes="100px" style={{ objectFit: "cover" }} />
-                <span>29MD-88291</span>
-              </div>
-              <div className="profile-vehicle-copy">
-                <small>Dòng xe hiện tại</small>
-                <strong>VinFast Evo 200</strong>
-                <span>Đổi phương tiện <RefreshCw /></span>
-              </div>
-            </Link>
+            {primaryDevice ? (
+              <Link href="/home/device" className="profile-vehicle-card">
+                <div className="profile-vehicle-image">
+                  <Image src={primaryDevice.image || "/electric-scooter.jpg"} alt={primaryDevice.model} fill sizes="100px" style={{ objectFit: "cover" }} unoptimized />
+                  {primaryDevice.serialNumber && <span>{primaryDevice.serialNumber}</span>}
+                </div>
+                <div className="profile-vehicle-copy">
+                  <small>Dòng xe hiện tại</small>
+                  <strong>{primaryDevice.model}</strong>
+                  <span>Đổi phương tiện <RefreshCw /></span>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/home/device/new" className="profile-vehicle-card profile-vehicle-card--empty">
+                <div className="profile-vehicle-copy" style={{ width: "100%", padding: "4px 6px" }}>
+                  <small>Phương tiện liên kết</small>
+                  <strong>Chưa có phương tiện nào</strong>
+                  <span style={{ color: "#0782a7", fontWeight: 700, marginTop: "6px" }}>
+                    + Đăng ký phương tiện mới
+                  </span>
+                </div>
+              </Link>
+            )}
           </section>
 
           <section className="profile-section profile-support-section">
-            <div className="profile-section-heading"><h3>Support</h3></div>
+            <div className="profile-section-heading"><h3>Hỗ trợ &amp; Tài khoản</h3></div>
             <button
               type="button"
               className="profile-single-card profile-logout-button"

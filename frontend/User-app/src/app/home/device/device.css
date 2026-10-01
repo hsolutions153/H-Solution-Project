@@ -33,6 +33,11 @@
 .device-register-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 4px; border-radius: 50%; color: #077b9e; background: #dcf2f6; }
 .device-register-card strong { font-size: 20px; }
 .device-register-card > span:last-child { color: #788b93; font-size: 12px; }
+.device-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 56px 24px; background: white; border: 1.5px dashed #b9d8e2; border-radius: 24px; box-shadow: 0 8px 30px rgba(17, 62, 80, 0.04); }
+.device-empty-icon { width: 80px; height: 80px; border-radius: 50%; display: grid; place-items: center; background: #e6f5f8; color: #077da1; margin-bottom: 18px; }
+.device-empty-state h2 { font-size: 20px; color: #113e50; margin: 0 0 8px; font-weight: 700; }
+.device-empty-state p { font-size: 14px; color: #697e88; max-width: 480px; line-height: 1.5; margin: 0 0 24px; }
+.device-empty-action { padding: 0 24px; min-height: 46px; font-size: 14px; }
 .device-fab { position: fixed; z-index: 30; right: max(24px, calc((100vw - 1200px)/2 + 28px)); bottom: 28px; width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px; color: white; background: linear-gradient(145deg, #0587aa, #075e81); box-shadow: 0 12px 28px rgba(5, 103, 138, .3); }
 
 .device-subheader { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; margin-bottom: 24px; }

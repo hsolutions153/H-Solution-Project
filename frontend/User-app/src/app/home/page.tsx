@@ -96,33 +96,75 @@ export default function HomePage() {
         </button>
 
         {/* My Vehicle Card */}
-        <section className="chair-card">
-          <div className="chair-card-image">
-            <Image
-              src={device?.image || "/electric-scooter.jpg"}
-              alt={device?.name || "Xe máy điện của tôi"}
-              width={1024}
-              height={1024}
-              unoptimized
-            />
-            <div className="chair-label">
-              <span className="chair-name">{device?.name || "Xe máy điện"}</span>
-              <span className="chair-model">{device?.model || "VinFast Feliz S"}</span>
-            </div>
-          </div>
-          <div className="chair-card-info">
-            <div className="battery-section">
-              <div className="battery-icon-row">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15.67 4H14V2H10V4H8.33C7.6 4 7 4.6 7 5.33V20.67C7 21.4 7.6 22 8.33 22H15.67C16.4 22 17 21.4 17 20.67V5.33C17 4.6 16.4 4 15.67 4Z" fill="#0D2137"/>
-                </svg>
-                <span className="battery-percent">82%</span>
+        {device ? (
+          <section className="chair-card" onClick={() => router.push("/home/device")} style={{ cursor: "pointer" }}>
+            <div className="chair-card-image">
+              <Image
+                src={device.image || "/electric-scooter.jpg"}
+                alt={device.name || "Xe máy điện của tôi"}
+                width={1024}
+                height={1024}
+                unoptimized
+              />
+              <div className="chair-label">
+                <span className="chair-name">{device.name}</span>
+                <span className="chair-model">{device.model}</span>
               </div>
-              <span className="battery-label">Pin</span>
-              <span className="battery-range">Còn khoảng 19 km</span>
             </div>
-          </div>
-        </section>
+            <div className="chair-card-info">
+              <div className="battery-section">
+                <div className="battery-icon-row">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.67 4H14V2H10V4H8.33C7.6 4 7 4.6 7 5.33V20.67C7 21.4 7.6 22 8.33 22H15.67C16.4 22 17 21.4 17 20.67V5.33C17 4.6 16.4 4 15.67 4Z" fill="#0D2137"/>
+                  </svg>
+                  <span className="battery-percent">82%</span>
+                </div>
+                <span className="battery-label">Pin</span>
+                <span className="battery-range">Còn khoảng 19 km</span>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section
+            className="chair-card"
+            onClick={() => router.push("/home/device/new")}
+            style={{
+              cursor: "pointer",
+              padding: "16px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              border: "1.5px dashed #b8dbe5",
+              background: "#f7fbfc",
+              borderRadius: "16px",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: "#113e50" }}>
+                Chưa có phương tiện
+              </span>
+              <span style={{ fontSize: "12px", color: "#6f828a" }}>
+                Đăng ký xe máy điện để theo dõi &amp; nhận hỗ trợ cứu hộ
+              </span>
+            </div>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "8px 14px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #077da1, #05678a)",
+                color: "white",
+                fontSize: "12px",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              + Thêm xe
+            </span>
+          </section>
+        )}
 
         {/* Repair History */}
         <button className="repair-history-btn" onClick={() => router.push("/home/history")}>

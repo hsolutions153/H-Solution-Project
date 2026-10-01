@@ -405,9 +405,6 @@ export function HistoryList() {
           </div>
         ) : filteredData.length === 0 ? (
           <div className="rh-empty-state">
-            <div className="rh-empty-icon-wrap">
-              <span className="material-symbols-outlined rh-empty-icon">history_toggle_drop</span>
-            </div>
             <h3 className="rh-empty-title">Không tìm thấy lịch sử nào</h3>
             <p className="rh-empty-desc">
               {searchQuery ? "Thử tìm kiếm với từ khóa khác" : "Bạn chưa có đơn sửa chữa hoặc cứu hộ nào"}

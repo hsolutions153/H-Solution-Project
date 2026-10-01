@@ -138,11 +138,6 @@ def authenticate_or_register_google_user(payload):
         if not user:
             raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
 
-        try:
-            from app.repair_requests.repository import create_default_device_for_customer
-            create_default_device_for_customer(user["id"])
-        except Exception:
-            pass
     else:
         if not user.get("is_active", True):
             raise AppException(ErrorCode.USER_LOCKED)

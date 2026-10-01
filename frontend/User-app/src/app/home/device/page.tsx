@@ -119,6 +119,19 @@ export default function DevicesPage() {
 
         {loading ? (
           <div className="device-loading">Đang tải phương tiện…</div>
+        ) : devices.length === 0 ? (
+          <div className="device-empty-state">
+            <div className="device-empty-icon">
+              <Bike size={44} />
+            </div>
+            <h2>Chưa có phương tiện nào</h2>
+            <p>
+              Tài khoản của bạn hiện chưa có xe máy điện nào được liên kết. Hãy đăng ký phương tiện để dễ dàng nhận hỗ trợ cứu hộ khẩn cấp SOS và đặt lịch bảo dưỡng.
+            </p>
+            <Link href="/home/device/new" className="device-primary-button device-empty-action">
+              <Plus size={18} /> Đăng ký phương tiện ngay
+            </Link>
+          </div>
         ) : (
           <div className="device-grid">
             {devices.map((device) => (
