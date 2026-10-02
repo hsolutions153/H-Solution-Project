@@ -160,7 +160,7 @@ export const CreateOrderModal = ({
         {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div>
-            <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+            <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
               Quản trị đơn
             </span>
             <h3 className="text-xl font-black mt-1">Tạo Yêu Cầu Sửa Chữa Mới</h3>
@@ -176,7 +176,7 @@ export const CreateOrderModal = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
             </div>
           )}
@@ -186,14 +186,14 @@ export const CreateOrderModal = ({
             onClick={() => setIsSos(!isSos)}
             className={`p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               isSos
-                ? "bg-red-50 border-red-300 text-red-700"
+                ? "bg-rose-50 border-rose-300 text-rose-700"
                 : "bg-slate-50 border-slate-200 text-slate-700"
             }`}
           >
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  isSos ? "bg-red-500 text-white" : "bg-slate-200 text-slate-500"
+                  isSos ? "bg-rose-500 text-white" : "bg-slate-200 text-slate-500"
                 }`}
               >
                 <AlertTriangle className="w-5 h-5" />
@@ -213,7 +213,7 @@ export const CreateOrderModal = ({
               type="checkbox"
               checked={isSos}
               onChange={() => {}}
-              className="w-5 h-5 accent-red-600 cursor-pointer"
+              className="w-5 h-5 accent-rose-600 cursor-pointer"
             />
           </div>
 
@@ -221,7 +221,7 @@ export const CreateOrderModal = ({
           <div className="relative" ref={customerDropdownRef}>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
-                <User className="w-4 h-4 text-sky-700" />
+                <User className="w-4 h-4 text-brand-700" />
                 Khách hàng
               </label>
               <span className="text-[11px] text-slate-400 font-medium">
@@ -240,7 +240,7 @@ export const CreateOrderModal = ({
                   setIsCustomerDropdownOpen(true);
                 }}
                 placeholder="Nhập tên hoặc SĐT khách hàng để tìm..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-20 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 focus:bg-white transition outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-20 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-brand-800 focus:bg-white transition outline-none"
               />
               <div className="absolute right-2 top-2 flex items-center gap-1">
                 {customerSearch && (
@@ -290,8 +290,8 @@ export const CreateOrderModal = ({
                           setCustomerSearch(cName);
                           setIsCustomerDropdownOpen(false);
                         }}
-                        className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition cursor-pointer hover:bg-sky-50 ${
-                          isSelected ? "bg-sky-50/80 font-bold text-sky-900" : "text-slate-700"
+                        className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition cursor-pointer hover:bg-brand-50 ${
+                          isSelected ? "bg-brand-50/80 font-bold text-brand-900" : "text-slate-700"
                         }`}
                       >
                         <div>
@@ -301,7 +301,7 @@ export const CreateOrderModal = ({
                           </div>
                         </div>
                         {isSelected && (
-                          <div className="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center shrink-0">
                             <Check className="w-3.5 h-3.5" />
                           </div>
                         )}
@@ -314,9 +314,9 @@ export const CreateOrderModal = ({
 
             {/* Currently Selected Customer Badge */}
             {selectedCustomer && (
-              <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-sky-50/50 border border-sky-100 px-3 py-1.5 rounded-lg">
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-brand-50/50 border border-brand-100 px-3 py-1.5 rounded-lg">
                 <span>
-                  Đang chọn: <b className="text-sky-900">{selectedCustomer.full_name || selectedCustomer.name}</b> ({selectedCustomer.phone || "Không SĐT"})
+                  Đang chọn: <b className="text-brand-900">{selectedCustomer.full_name || selectedCustomer.name}</b> ({selectedCustomer.phone || "Không SĐT"})
                 </span>
                 <span className="font-mono text-slate-400 text-[10px]">{selectedCustomer.id}</span>
               </div>
@@ -326,13 +326,13 @@ export const CreateOrderModal = ({
           {/* Device selection */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <Wrench className="w-4 h-4 text-sky-700" />
+              <Wrench className="w-4 h-4 text-brand-700" />
               Thiết bị cần sửa
             </label>
             <select
               value={deviceId}
               onChange={(e) => setDeviceId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-brand-800 outline-none"
             >
               {filteredDevices.length > 0 ? (
                 filteredDevices.map((d) => (
@@ -354,7 +354,7 @@ export const CreateOrderModal = ({
             <select
               value={issueType}
               onChange={(e) => setIssueType(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-brand-800 outline-none"
             >
               {Object.entries(ISSUE_TYPE_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -376,7 +376,7 @@ export const CreateOrderModal = ({
               value={locationAddress}
               onChange={(e) => setLocationAddress(e.target.value)}
               placeholder="VD: 123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -391,7 +391,7 @@ export const CreateOrderModal = ({
               value={issueDescription}
               onChange={(e) => setIssueDescription(e.target.value)}
               placeholder="Mô tả hiện tượng: xe không lên nguồn, bánh bị kẹt, có mùi khét..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -407,7 +407,7 @@ export const CreateOrderModal = ({
             <button
               type="submit"
               disabled={submitting || loadingInitial}
-              className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-sky-900/20 disabled:opacity-50 cursor-pointer"
+              className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-brand-900/20 disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <span>Đang xử lý...</span>

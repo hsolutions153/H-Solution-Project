@@ -182,7 +182,7 @@ export default function CompleteProfilePage() {
     return (
       <div className="responsive-container bg-background">
         <div className="flex flex-col items-center gap-3">
-          <LoaderCircle className="size-8 animate-spin text-sky-500" />
+          <LoaderCircle className="size-8 animate-spin text-brand-500" />
           <p className="text-sm font-medium text-on-surface-variant">
             Đang tải thông tin tài khoản...
           </p>
@@ -193,12 +193,12 @@ export default function CompleteProfilePage() {
 
   return (
     <div className="responsive-container bg-background text-on-background font-sans selection:bg-primary/20 selection:text-primary">
-      <main className="responsive-card px-margin-mobile py-lg md:py-xl w-full">
+      <main className="responsive-card px-margin-mobile py-lg w-full">
         {/* Header Bar */}
         <div className="flex flex-col items-center mb-lg text-center responsive-header w-full">
-          <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 rounded-full">
+          <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 rounded-full">
             <EMobiCareLogoIcon size={20} />
-            <span className="text-xs font-extrabold tracking-wider text-sky-900 dark:text-sky-300 uppercase">
+            <span className="text-xs font-extrabold tracking-wider text-brand-900 dark:text-brand-300 uppercase">
               H-MOBILITY CARE
             </span>
           </div>
@@ -212,7 +212,7 @@ export default function CompleteProfilePage() {
 
         {/* Alerts */}
         {errorMessage && (
-          <div className="mb-md p-sm bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 w-full">
+          <div className="mb-md p-sm bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-medium flex items-start gap-2.5 w-full">
             <span className="material-symbols-outlined text-rose-500 text-[18px] shrink-0 mt-0.5">
               error
             </span>
@@ -221,7 +221,7 @@ export default function CompleteProfilePage() {
         )}
 
         {success && (
-          <div className="mb-md p-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2.5 w-full">
+          <div className="mb-md p-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-2.5 w-full">
             <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
             <span>Cập nhật thành công! Đang chuyển vào ứng dụng...</span>
           </div>
@@ -335,7 +335,7 @@ export default function CompleteProfilePage() {
             <button
               type="submit"
               disabled={submitting || success}
-              className="w-full h-[52px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold shadow-lg shadow-sky-500/25 transition active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
+              className="w-full h-[52px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-semibold shadow-lg shadow-brand-500/25 transition active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
             >
               {submitting ? (
                 <>

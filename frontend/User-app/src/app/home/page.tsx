@@ -72,8 +72,8 @@ export default function HomePage() {
         <section className="status-card">
           <div className="status-icon">
             <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M16 3L5.5 7.2V14.8C5.5 21.3 9.9 26.8 16 29C22.1 26.8 26.5 21.3 26.5 14.8V7.2L16 3Z" fill="#00607D"/>
-              <path d="M11.5 15.8L14.6 18.9L20.9 12.6" stroke="#A7E7EF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 3L5.5 7.2V14.8C5.5 21.3 9.9 26.8 16 29C22.1 26.8 26.5 21.3 26.5 14.8V7.2L16 3Z" fill="#114567"/>
+              <path d="M11.5 15.8L14.6 18.9L20.9 12.6" stroke="#b2d5ea" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           <div className="status-info">
@@ -115,7 +115,7 @@ export default function HomePage() {
               <div className="battery-section">
                 <div className="battery-icon-row">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M15.67 4H14V2H10V4H8.33C7.6 4 7 4.6 7 5.33V20.67C7 21.4 7.6 22 8.33 22H15.67C16.4 22 17 21.4 17 20.67V5.33C17 4.6 16.4 4 15.67 4Z" fill="#0D2137"/>
+                    <path d="M15.67 4H14V2H10V4H8.33C7.6 4 7 4.6 7 5.33V20.67C7 21.4 7.6 22 8.33 22H15.67C16.4 22 17 21.4 17 20.67V5.33C17 4.6 16.4 4 15.67 4Z" fill="#0a2540"/>
                   </svg>
                   <span className="battery-percent">82%</span>
                 </div>
@@ -134,13 +134,13 @@ export default function HomePage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              border: "1.5px dashed #b8dbe5",
-              background: "#f7fbfc",
+              border: "1.5px dashed #b2d5ea",
+              background: "#eef6fb",
               borderRadius: "16px",
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <span style={{ fontSize: "15px", fontWeight: 700, color: "#113e50" }}>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: "#0f3a56" }}>
                 Chưa có phương tiện
               </span>
               <span style={{ fontSize: "12px", color: "#6f828a" }}>
@@ -154,7 +154,7 @@ export default function HomePage() {
                 gap: "4px",
                 padding: "8px 14px",
                 borderRadius: "10px",
-                background: "linear-gradient(135deg, #077da1, #05678a)",
+                background: "linear-gradient(135deg, #156495, #12537d)",
                 color: "white",
                 fontSize: "12px",
                 fontWeight: 700,
@@ -173,7 +173,7 @@ export default function HomePage() {
             <span className="repair-history-text">Lịch sử sửa chữa</span>
           </div>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 5L21 12L14 19" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M14 5L21 12L14 19" stroke="#0a2540" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
       </div>

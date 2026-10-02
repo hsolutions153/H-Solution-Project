@@ -71,7 +71,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
     };
 
     return (
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6 text-center">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6 text-center">
         
         <div className="mb-5">
           <h2 className="text-base font-bold text-slate-800 mb-2">
@@ -98,7 +98,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
                 onChange={(e) => handleChange(e.target.value, index)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 onPaste={handlePaste}
-                className="w-10 h-12 text-center text-base font-bold bg-white border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all shadow-sm"
+                className="w-10 h-12 text-center text-base font-bold bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all shadow-sm"
               />
             ))}
           </div>
@@ -108,7 +108,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
             <button
               type="button"
               onClick={onResendOtp}
-              className="text-xs font-bold text-sky-800 hover:underline inline-block"
+              className="text-xs font-bold text-brand-800 hover:underline inline-block"
             >
               Gửi lại mã
             </button>
@@ -117,7 +117,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
           
           <button
             type="submit"
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
+            className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
           >
             Xác nhận
           </button>

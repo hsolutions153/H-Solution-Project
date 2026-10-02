@@ -1,7 +1,7 @@
 from app.customers.models import ROLES_TABLE, USERS_TABLE
 from app.db.database import supabase
 
-CUSTOMER_COLUMNS = "id,full_name,phone,email,address,is_active,created_at,updated_at"
+CUSTOMER_COLUMNS = "id,full_name,phone,email,address,avatar_url,is_active,created_at,updated_at"
 
 
 def get_role_by_code(code: str):

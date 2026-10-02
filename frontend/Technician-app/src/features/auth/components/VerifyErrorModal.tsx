@@ -19,14 +19,14 @@ export const VerifyErrorModal = ({ isOpen, onClose, onRetry }: VerifyErrorModalP
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100">
-          <X className="h-8 w-8 text-red-500" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-100">
+          <X className="h-8 w-8 text-rose-500" />
         </div>
 
         
@@ -39,7 +39,7 @@ export const VerifyErrorModal = ({ isOpen, onClose, onRetry }: VerifyErrorModalP
         <button
           type="button"
           onClick={onRetry}
-          className="w-full rounded-xl bg-sky-900 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-950 transition-colors"
+          className="w-full rounded-xl bg-brand-900 py-3 text-xs font-bold text-white shadow-md hover:bg-brand-950 transition-colors"
         >
           Thử lại
         </button>

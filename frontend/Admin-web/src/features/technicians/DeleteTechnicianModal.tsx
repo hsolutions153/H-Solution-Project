@@ -50,13 +50,13 @@ export const DeleteTechnicianModal = ({
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header cảnh báo đỏ */}
-        <div className="p-6 bg-red-600 text-white flex justify-between items-center">
+        <div className="p-6 bg-rose-600 text-white flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="text-xs font-bold tracking-wider text-red-200 uppercase">
+              <span className="text-xs font-bold tracking-wider text-rose-200 uppercase">
                 Cảnh báo nguy hiểm
               </span>
               <h3 className="text-lg font-black mt-0.5">Xác nhận xóa Kỹ thuật viên</h3>
@@ -74,7 +74,7 @@ export const DeleteTechnicianModal = ({
         {/* Nội dung Popup */}
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
             </div>
           )}
@@ -105,7 +105,7 @@ export const DeleteTechnicianModal = ({
               type="button"
               onClick={handleDelete}
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm shadow-red-200"
+              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm shadow-rose-200"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />

@@ -251,7 +251,7 @@ export function HistoryDetail() {
                     phone: "",
                     rating: 4.9,
                     reviews: 25,
-                    avatar: "/images/s1.jpg",
+                    avatar: "",
                     specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
                     verified: true,
                   }
@@ -298,6 +298,7 @@ export function HistoryDetail() {
   const [momoData, setMomoData] = useState<any>(null);
 
   const isFetchingRef = useRef(false);
+  const refreshDetailRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -315,7 +316,7 @@ export function HistoryDetail() {
         if (res && res.id) {
           let status: "completed" | "cancelled" | "in_progress" = "in_progress";
           if (res.status === "completed" || res.status === "COMPLETED" || res.status === "PAID") status = "completed";
-          else if (res.status === "cancelled" || res.status === "CANCELLED" || res.status === "REJECTED" || res.status === "ESTIMATE_REJECTED") status = "cancelled";
+          else if (res.status === "cancelled" || res.status === "CANCELLED" || res.status === "REJECTED") status = "cancelled";
 
           const tech = res.technician
             ? {
@@ -325,7 +326,7 @@ export function HistoryDetail() {
                 reviews: res.technician.reviews || 25,
                 specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
                 experience_years: res.technician.experience_years || 3,
-                avatar: res.technician.avatar || "/images/s1.jpg",
+                avatar: res.technician.avatar || "",
                 verified: true,
               }
             : null;
@@ -350,17 +351,19 @@ export function HistoryDetail() {
           if (!approvedEstimate && acceptedQuotes.length > 0) {
             approvedEstimate = acceptedQuotes.reduce((sum: number, q: any) => sum + Number(q.estimated_price || 0), 0);
           }
-          if (!approvedEstimate && initialEstimate > 0) {
-            approvedEstimate = initialEstimate;
-          }
-
           // Active quote to inspect
           const activeQuote = pendingQuote || res.quote || (quotesList.length > 0 ? quotesList[0] : null);
           if (isMounted) setQuoteData(activeQuote);
 
           // Check if this is a supplementary quote (i.e. already has an accepted quote and now a pending quote)
-          const isSupplementaryQuote = Boolean(pendingQuote && (acceptedQuotes.length > 0 || approvedEstimate > 0));
+          const isSupplementaryQuote = Boolean(activeQuote && activeQuote.status !== "ACCEPTED" && acceptedQuotes.length > 0);
           const additionalAmount = isSupplementaryQuote ? Number(pendingQuote?.estimated_price || 0) : 0;
+          const detailQuote = !pendingQuote && acceptedQuotes.length > 0 ? {
+            ...acceptedQuotes[0],
+            items: acceptedQuotes.flatMap((quote: any) => quote.items || []),
+            labor_fee: acceptedQuotes.reduce((sum: number, quote: any) => sum + Number(quote.labor_fee || 0), 0),
+            parts_cost: acceptedQuotes.reduce((sum: number, quote: any) => sum + Number(quote.parts_cost || 0), 0),
+          } : activeQuote;
 
           // In completed state, res.total_amount IS the final cost!
           const isCompleted = status === "completed" || res.status === "COMPLETED" || res.status === "PAID";
@@ -391,10 +394,10 @@ export function HistoryDetail() {
             return name.includes("tiền công") || name.includes("công sửa") || name.includes("công kỹ thuật");
           };
 
-          if (activeQuote && activeQuote.items && activeQuote.items.length > 0) {
+          if (detailQuote && detailQuote.items && detailQuote.items.length > 0) {
             // Tách items thành labor vs parts/service
-            const partsItems = activeQuote.items.filter((it: any) => !isLaborItem(it));
-            const laborItems = activeQuote.items.filter((it: any) => isLaborItem(it));
+            const partsItems = detailQuote.items.filter((it: any) => !isLaborItem(it));
+            const laborItems = detailQuote.items.filter((it: any) => isLaborItem(it));
 
             parsedParts = partsItems.map((it: any) => ({
               name: it.item_name || it.name || "Linh kiện",
@@ -411,20 +414,20 @@ export function HistoryDetail() {
             );
 
             // Nếu không tìm thấy labor item nào, dùng labor_fee từ quote record
-            if (parsedLaborCost === 0 && activeQuote.labor_fee) {
-              parsedLaborCost = Number(activeQuote.labor_fee);
+            if (parsedLaborCost === 0 && detailQuote.labor_fee) {
+              parsedLaborCost = Number(detailQuote.labor_fee);
             }
-          } else if (activeQuote) {
+          } else if (detailQuote) {
             // Quote không có items chi tiết → dùng trực tiếp labor_fee / parts_cost từ backend
-            parsedLaborCost = Number(activeQuote.labor_fee || activeQuote.laborCost || 0);
-            parsedPartsCost = Number(activeQuote.parts_cost || activeQuote.partsCost || 0);
+            parsedLaborCost = Number(detailQuote.labor_fee || detailQuote.laborCost || 0);
+            parsedPartsCost = Number(detailQuote.parts_cost || detailQuote.partsCost || 0);
           }
 
           // Fallback cuối: nếu có quote với labor_fee/parts_cost nhưng items parsing ra 0
           // → ưu tiên dùng giá trị từ quote record thay vì bịa số
-          if (parsedLaborCost === 0 && parsedPartsCost === 0 && activeQuote) {
-            if (activeQuote.labor_fee) parsedLaborCost = Number(activeQuote.labor_fee);
-            if (activeQuote.parts_cost) parsedPartsCost = Number(activeQuote.parts_cost);
+          if (parsedLaborCost === 0 && parsedPartsCost === 0 && detailQuote) {
+            if (detailQuote.labor_fee) parsedLaborCost = Number(detailQuote.labor_fee);
+            if (detailQuote.parts_cost) parsedPartsCost = Number(detailQuote.parts_cost);
           }
 
           if (parsedParts.length === 0 && parsedPartsCost > 0) {
@@ -501,8 +504,8 @@ export function HistoryDetail() {
               jobs: [],
               issueType: res.issue_type,
               issueDescription: res.issue_description,
-              diagnosisNote: activeQuote?.diagnosis_note,
-              repairDesc: activeQuote?.diagnosis_note || res.issue_description || "Kiểm tra và sửa chữa sự cố thiết bị theo yêu cầu",
+              diagnosisNote: detailQuote?.diagnosis_note,
+              repairDesc: detailQuote?.diagnosis_note || res.issue_description || "Kiểm tra và sửa chữa sự cố thiết bị theo yêu cầu",
               parts: parsedParts,
               laborCost: parsedLaborCost,
               partsCost: parsedPartsCost,
@@ -528,6 +531,7 @@ export function HistoryDetail() {
       }
     }
 
+    refreshDetailRef.current = fetchDetail;
     fetchDetail();
 
     // Background refresh every 8s (only if in progress and tab is visible)
@@ -540,6 +544,9 @@ export function HistoryDetail() {
 
     return () => {
       isMounted = false;
+      if (refreshDetailRef.current === fetchDetail) refreshDetailRef.current = null;
+      // Let the next effect run fetch again; otherwise a cancelled run (e.g. StrictMode) leaves the page loading forever.
+      isFetchingRef.current = false;
       clearInterval(interval);
     };
   }, [id, detail?.status]);
@@ -558,7 +565,7 @@ export function HistoryDetail() {
         ? null
         : (customReason || (rejectReason === "OTHER" ? customRejectText : rejectReason) || "Không đồng ý");
 
-      await fetchApi(`/repair-requests/${id}/status`, {
+      const updatedRequest = await fetchApi<any>(`/repair-requests/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({
           status: nextStatus,
@@ -568,20 +575,28 @@ export function HistoryDetail() {
       });
 
       setIsRejectModalOpen(false);
+      setQuoteData((prev: any) => updatedRequest.quote || (prev ? {
+        ...prev,
+        status: approved ? "ACCEPTED" : "REJECTED",
+        reject_reason: finalReason,
+      } : null));
       setDetail((prev) => {
         if (!prev) return null;
-        const newApproved = approved && prev.isSupplementaryQuote
-          ? (prev.approvedEstimate || 0) + (prev.additionalAmount || 0)
+        const newApproved = approved
+          ? prev.isSupplementaryQuote
+            ? (prev.approvedEstimate || 0) + (prev.additionalAmount || 0)
+            : Number(quoteData?.estimated_price ?? prev.total)
           : prev.approvedEstimate;
         return {
           ...prev,
-          rawStatus: nextStatus,
-          status: approved ? "in_progress" : (prev.isSupplementaryQuote ? "in_progress" : "cancelled"),
-          approvedEstimate: newApproved,
-          total: approved && prev.isSupplementaryQuote ? (newApproved || prev.total) : prev.total,
-          isSupplementaryQuote: false,
+          rawStatus: updatedRequest.status || nextStatus,
+          status: "in_progress",
+          approvedEstimate: Number(updatedRequest.approved_estimate ?? newApproved ?? 0),
+          total: Number(updatedRequest.total_amount ?? (approved && prev.isSupplementaryQuote ? (newApproved || prev.total) : prev.total)),
+          isSupplementaryQuote: !approved && prev.isSupplementaryQuote,
         };
       });
+      await refreshDetailRef.current?.();
     } catch (err: any) {
       alert(err.message || "Lỗi khi xử lý phản hồi báo giá");
     } finally {
@@ -600,6 +615,7 @@ export function HistoryDetail() {
     const s = detail.rawStatus;
     if (["COMPLETED"].includes(s)) return 5;
     if (["ESTIMATE_APPROVED", "REPAIRING"].includes(s)) return 4;
+    if (s === "ESTIMATE_REJECTED") return detail.isSupplementaryQuote ? 4 : 3;
     if (["DIAGNOSING", "DIAGNOSED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"].includes(s)) return 3;
     if (["ACCEPTED", "EN_ROUTE", "ARRIVED"].includes(s)) return 2;
     return 1;
@@ -649,9 +665,9 @@ export function HistoryDetail() {
                   <div key={st.num} className="flex flex-col items-center z-10">
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isCurrent
-                          ? "bg-blue-600 text-white ring-4 ring-blue-100 scale-110"
+                          ? "bg-brand-600 text-white ring-4 ring-brand-100 scale-110"
                           : isActive
-                            ? "bg-blue-600 text-white"
+                            ? "bg-brand-600 text-white"
                             : "bg-slate-100 text-slate-400"
                         }`}
                     >
@@ -664,7 +680,7 @@ export function HistoryDetail() {
                       )}
                     </div>
                     <span
-                      className={`text-[10px] mt-1 font-medium ${isActive ? "text-blue-900 font-bold" : "text-slate-400"
+                      className={`text-[10px] mt-1 font-medium ${isActive ? "text-brand-900 font-bold" : "text-slate-400"
                         }`}
                     >
                       {st.label}
@@ -676,18 +692,34 @@ export function HistoryDetail() {
           </div>
         )}
 
+        {detail.rawStatus === "ESTIMATE_REJECTED" && (
+          <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5 mb-4 space-y-2">
+            <h3 className="text-sm font-bold text-rose-900">
+              {detail.isSupplementaryQuote ? "Đã từ chối chi phí phát sinh" : "Đã từ chối báo giá sửa chữa"}
+            </h3>
+            {quoteData?.reject_reason && (
+              <p className="text-xs text-rose-800">Lý do: {quoteData.reject_reason}</p>
+            )}
+            <p className="text-xs text-slate-700">
+              {detail.isSupplementaryQuote
+                ? `Kỹ thuật viên chỉ tiếp tục các hạng mục đã được duyệt (${formatCurrency(detail.approvedEstimate || 0)}). Khoản phát sinh bị từ chối không được cộng vào chi phí.`
+                : "Kỹ thuật viên cần điều chỉnh và gửi lại báo giá để bạn duyệt trước khi sửa chữa."}
+            </p>
+          </div>
+        )}
+
         {/* Khối Duyệt Báo Giá khi status = WAITING_FOR_APPROVAL / ESTIMATE_SUBMITTED / DIAGNOSED */}
         {["WAITING_FOR_APPROVAL", "ESTIMATE_SUBMITTED", "DIAGNOSED"].includes(detail.rawStatus) && (
-          <div className="bg-sky-50/60 border border-sky-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
+          <div className="bg-brand-50/60 border border-brand-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
             <div className="flex items-start gap-2.5">
-              <span className="material-symbols-outlined text-sky-800" style={{ fontSize: 26 }}>
+              <span className="material-symbols-outlined text-brand-800" style={{ fontSize: 26 }}>
                 {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
               </span>
               <div>
-                <h3 className="text-sm font-bold text-sky-950">
+                <h3 className="text-sm font-bold text-brand-950">
                   {detail.isSupplementaryQuote ? "Yêu Cầu Duyệt Chi Phí Phát Sinh Bổ Sung" : "Bảng Báo Giá Chi Tiết Từ Kỹ Thuật Viên"}
                 </h3>
-                <p className="text-xs text-sky-800/80 mt-0.5">
+                <p className="text-xs text-brand-800/80 mt-0.5">
                   {detail.isSupplementaryQuote
                     ? "Kỹ thuật viên đã kiểm tra và ghi nhận các hạng mục linh kiện/vật tư phát sinh trong quá trình sửa chữa. Vui lòng xác nhận để tiếp tục."
                     : "KTV đã kiểm tra thiết bị và gửi bảng kê chi phí linh kiện & tiền công. Vui lòng xác nhận để KTV bắt đầu sửa chữa."}
@@ -698,7 +730,7 @@ export function HistoryDetail() {
             {/* Chi tiết linh kiện & Phụ tùng phát sinh / thay thế */}
             <div className="space-y-2">
               <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-sky-700 text-sm">settings</span>
+                <span className="material-symbols-outlined text-brand-700 text-sm">settings</span>
                 <span>{detail.isSupplementaryQuote ? "Linh kiện & Hạng mục phát sinh" : "Linh kiện & Vật tư thay thế"}</span>
               </div>
               {detail.parts && detail.parts.length > 0 ? (
@@ -706,7 +738,7 @@ export function HistoryDetail() {
                   {detail.parts.map((p, idx) => (
                     <div
                       key={idx}
-                      className="bg-white rounded-2xl p-3.5 border border-sky-100 flex items-center justify-between shadow-2xs"
+                      className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs"
                     >
                       <div>
                         <div className="font-bold text-xs text-slate-900">{p.name}</div>
@@ -718,7 +750,7 @@ export function HistoryDetail() {
                         <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block">
                           SL: {p.quantity}
                         </div>
-                        <div className="text-xs font-black text-sky-950 mt-1">
+                        <div className="text-xs font-black text-brand-950 mt-1">
                           {formatCurrency(p.subtotal)}
                         </div>
                       </div>
@@ -726,20 +758,20 @@ export function HistoryDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-sky-100 text-center">
+                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-brand-100 text-center">
                   Không thay thế linh kiện (chỉ thực hiện kiểm tra, bảo dưỡng & căn chỉnh)
                 </div>
               )}
             </div>
 
             {/* Tiền công kỹ thuật viên */}
-            <div className="bg-white rounded-2xl p-3.5 border border-sky-100 flex items-center justify-between shadow-2xs">
+            <div className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs">
               <div>
                 <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">Kiểm tra & lắp ráp tại chỗ</div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-black text-sky-950">
+                <div className="text-xs font-black text-brand-950">
                   {formatCurrency(detail.laborCost !== undefined ? detail.laborCost : 0)}
                 </div>
               </div>
@@ -747,16 +779,16 @@ export function HistoryDetail() {
 
             {/* Ghi chú KTV nếu có */}
             {quoteData?.diagnosis_note && (
-              <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-sky-100">
-                <span className="font-bold text-sky-950">Ghi chú phát sinh / sửa chữa:</span> {quoteData.diagnosis_note}
+              <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-brand-100">
+                <span className="font-bold text-brand-950">{detail.isSupplementaryQuote ? "Ghi chú phát sinh:" : "Ghi chú sửa chữa:"}</span> {quoteData.diagnosis_note}
               </div>
             )}
 
             {/* Tổng chi phí phát sinh & báo giá */}
-            <div className="bg-sky-900 text-white rounded-2xl p-4 shadow-md space-y-2">
+            <div className="bg-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2">
               {detail.isSupplementaryQuote && (
-                <div className="space-y-1.5 pb-2 border-b border-sky-800/80 text-xs">
-                  <div className="flex justify-between items-center text-sky-200">
+                <div className="space-y-1.5 pb-2 border-b border-brand-800/80 text-xs">
+                  <div className="flex justify-between items-center text-brand-200">
                     <span>Báo giá đã duyệt trước đó:</span>
                     <span className="font-bold text-white">{formatCurrency(detail.approvedEstimate || 0)}</span>
                   </div>
@@ -768,7 +800,7 @@ export function HistoryDetail() {
               )}
 
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-sky-200">
+                <span className="text-xs font-bold uppercase tracking-wider text-brand-200">
                   {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
                 </span>
                 <span className="text-lg font-black text-amber-300">
@@ -777,7 +809,7 @@ export function HistoryDetail() {
                     : (detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0))))}
                 </span>
               </div>
-              <div className="text-[11px] text-sky-200/90 italic">
+              <div className="text-[11px] text-brand-200/90 italic">
                 ⓘ Chi phí gồm {detail.parts && detail.parts.length > 0 ? `${detail.parts.length} linh kiện (${formatCurrency(detail.partsCost || 0)})` : "0 linh kiện"} + tiền công kỹ thuật ({formatCurrency(detail.laborCost || 0)}).
               </div>
             </div>
@@ -787,14 +819,14 @@ export function HistoryDetail() {
               <button
                 disabled={isApprovingQuote}
                 onClick={() => setIsRejectModalOpen(true)}
-                className="flex-1 py-3 bg-white border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition cursor-pointer"
+                className="flex-1 py-3 bg-white border border-rose-200 text-rose-600 font-bold text-xs rounded-xl hover:bg-rose-50 transition cursor-pointer"
               >
-                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối & Hủy"}
+                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối báo giá"}
               </button>
               <button
                 disabled={isApprovingQuote}
                 onClick={() => handleApproveQuote(true)}
-                className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                className="flex-1 py-3 bg-brand-900 hover:bg-brand-950 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
               >
                 {isApprovingQuote ? "Đang xử lý..." : detail.isSupplementaryQuote ? `Duyệt phát sinh (+${formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)})` : "Duyệt báo giá ngay ✓"}
               </button>
@@ -806,7 +838,7 @@ export function HistoryDetail() {
         <div className="rd-info-card">
           <div className="rd-info-row">
             <div className="rd-info-icon-wrap">
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#1565C0" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>
                 schedule
               </span>
             </div>
@@ -818,7 +850,7 @@ export function HistoryDetail() {
           <div className="rd-info-divider" />
           <div className="rd-info-row">
             <div className="rd-info-icon-wrap">
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#1565C0" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>
                 location_on
               </span>
             </div>
@@ -843,19 +875,19 @@ export function HistoryDetail() {
           {detail.technician ? (
             <div className="space-y-3.5 mt-1">
               <div className="rd-tech-profile">
-                <div className="rd-tech-avatar overflow-hidden flex items-center justify-center font-bold text-white bg-blue-600">
-                  {detail.technician.avatar && detail.technician.avatar.startsWith("http") ? (
+                <div className="rd-tech-avatar relative overflow-hidden flex items-center justify-center font-bold text-white bg-brand-600">
+                  {detail.technician.name.charAt(0).toUpperCase()}
+                  {detail.technician.avatar ? (
                     <img
                       src={detail.technician.avatar}
-                      alt={detail.technician.name}
-                      className="w-full h-full object-cover"
+                      alt={`Ảnh kỹ thuật viên ${detail.technician.name}`}
+                      className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                        // Broken link: hide the photo so the initial underneath shows.
+                        e.currentTarget.style.display = "none";
                       }}
                     />
-                  ) : (
-                    detail.technician.name.charAt(0).toUpperCase()
-                  )}
+                  ) : null}
                 </div>
                 <div className="rd-tech-info flex-1">
                   <span className="rd-tech-name font-bold text-slate-900 text-base">{detail.technician.name}</span>
@@ -872,7 +904,7 @@ export function HistoryDetail() {
               {/* KTV Specs & Experience */}
               <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-600" style={{ fontSize: 18 }}>workspace_premium</span>
+                  <span className="material-symbols-outlined text-brand-600" style={{ fontSize: 18 }}>workspace_premium</span>
                   <div>
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Kinh nghiệm</span>
                     <span className="font-bold text-slate-800">{detail.technician.experience_years || 3} năm</span>
@@ -892,7 +924,7 @@ export function HistoryDetail() {
                 <div className="flex gap-2 pt-1">
                   <a
                     href={`tel:${detail.technician.phone}`}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-xs"
+                    className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-xs"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>call</span>
                     Gọi KTV ({detail.technician.phone})
@@ -901,7 +933,7 @@ export function HistoryDetail() {
                     href={`https://zalo.me/${detail.technician.phone}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="py-2.5 px-4 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition"
+                    className="py-2.5 px-4 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chat</span>
                     Zalo
@@ -999,7 +1031,7 @@ export function HistoryDetail() {
 
                 {ratingComment && (
                   <div className="bg-white p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700 italic">
-                    "{ratingComment}"
+                    &quot;{ratingComment}&quot;
                   </div>
                 )}
               </div>
@@ -1133,11 +1165,11 @@ export function HistoryDetail() {
             {/* 1. Loại sự cố gặp phải */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <span className="material-symbols-outlined text-blue-600 text-base">report_problem</span>
+                <span className="material-symbols-outlined text-brand-600 text-base">report_problem</span>
                 <span>Loại sự cố gặp phải:</span>
               </div>
-              <div className="text-xs text-slate-800 pl-4 bg-blue-50/70 p-2.5 rounded-xl border border-blue-100/80 font-bold flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+              <div className="text-xs text-slate-800 pl-4 bg-brand-50/70 p-2.5 rounded-xl border border-brand-100/80 font-bold flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-brand-600"></span>
                 <span>
                   {(() => {
                     const map: Record<string, string> = {
@@ -1157,7 +1189,7 @@ export function HistoryDetail() {
             {/* 2. Mô tả chi tiết sự cố */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <span className="material-symbols-outlined text-indigo-600 text-base">description</span>
+                <span className="material-symbols-outlined text-brand-600 text-base">description</span>
                 <span>Mô tả chi tiết sự cố:</span>
               </div>
               <div className="text-xs text-slate-700 pl-4 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed font-medium">
@@ -1189,7 +1221,7 @@ export function HistoryDetail() {
             {/* Tiền công kỹ thuật viên */}
             <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-blue-600 text-base">engineering</span>
+                <span className="material-symbols-outlined text-brand-600 text-base">engineering</span>
                 <div>
                   <span className="font-bold text-slate-800 block">Tiền công kỹ thuật viên</span>
                   <span className="text-[11px] text-slate-400">Kiểm tra, tháo lắp & căn chỉnh</span>
@@ -1253,7 +1285,7 @@ export function HistoryDetail() {
 
                 <div className="flex justify-between items-center text-slate-700">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="material-symbols-outlined text-blue-600 text-sm">request_quote</span>
+                    <span className="material-symbols-outlined text-brand-600 text-sm">request_quote</span>
                     Báo giá ước tính ban đầu (Estimate):
                   </span>
                   <span className="font-bold text-slate-900 text-xs">
@@ -1298,7 +1330,7 @@ export function HistoryDetail() {
                     );
                   } else if (diff > 0) {
                     return (
-                      <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 p-2 rounded-xl font-semibold">
+                      <div className="flex items-center gap-1.5 text-[11px] text-brand-700 bg-brand-50 border border-brand-200 p-2 rounded-xl font-semibold">
                         <span className="material-symbols-outlined text-xs">check_circle</span>
                         <span>Đã bao gồm chi phí phát sinh khách hàng phê duyệt: +{formatCurrency(diff)}</span>
                       </div>
@@ -1315,16 +1347,16 @@ export function HistoryDetail() {
             )}
 
             {/* Tổng cộng */}
-            <div className="bg-blue-50/80 border border-blue-200/80 p-3.5 rounded-xl flex justify-between items-center mt-2">
+            <div className="bg-brand-50/80 border border-brand-200/80 p-3.5 rounded-xl flex justify-between items-center mt-2">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-brand-900 block">
                   Tổng cộng thanh toán
                 </span>
-                <span className="text-[10px] text-blue-700 italic">
+                <span className="text-[10px] text-brand-700 italic">
                   * Giá thanh toán cuối cùng (Final Cost) đã được xác nhận
                 </span>
               </div>
-              <span className="font-black text-lg text-blue-800">
+              <span className="font-black text-lg text-brand-800">
                 {formatCurrency(detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0)))}
               </span>
             </div>
@@ -1385,7 +1417,7 @@ export function HistoryDetail() {
           {detail.total > 0 && detail.status !== "completed" && (
             <button
               className="rd-action-primary"
-              style={{ background: "linear-gradient(135deg, #2563EB, #1D4ED8)" }}
+              style={{ background: "linear-gradient(135deg, #4896c4, #4896c4)" }}
               onClick={async () => {
                 setShowQrModal(true);
                 setIsQrLoading(true);
@@ -1447,7 +1479,7 @@ export function HistoryDetail() {
               }}
             >
               <div className="flex justify-between items-center mb-3">
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A" }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0a2540" }}>
                   Chọn Phương Thức Thanh Toán
                 </h3>
                 <button
@@ -1455,7 +1487,7 @@ export function HistoryDetail() {
                   onClick={() => setShowQrModal(false)}
                   style={{
                     border: "none",
-                    background: "#F1F5F9",
+                    background: "#eef6fb",
                     borderRadius: "50%",
                     width: 32,
                     height: 32,
@@ -1486,7 +1518,7 @@ export function HistoryDetail() {
                       setIsQrLoading(false);
                     }
                   }}
-                  className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "VIETQR" ? "bg-white text-blue-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                  className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "VIETQR" ? "bg-white text-brand-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
                   📲 VietQR
@@ -1568,7 +1600,7 @@ export function HistoryDetail() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Số tài khoản:</span>
-                          <span className="font-bold text-blue-700">09123456789</span>
+                          <span className="font-bold text-brand-700">09123456789</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Chủ tài khoản:</span>
@@ -1714,7 +1746,7 @@ export function HistoryDetail() {
                 style={{
                   width: "100%",
                   padding: "10px 0",
-                  backgroundColor: "#F1F5F9",
+                  backgroundColor: "#eef6fb",
                   color: "#334155",
                   border: "none",
                   borderRadius: 12,
@@ -1758,7 +1790,7 @@ export function HistoryDetail() {
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
                     <span className="material-symbols-outlined text-base">cancel</span>
                   </div>
                   <h3 className="text-sm font-bold text-slate-900">
@@ -1783,7 +1815,7 @@ export function HistoryDetail() {
               {/* Danh sách lý do từ chối */}
               <div className="space-y-2 text-xs">
                 {[
-                  { value: "Không đồng ý", label: "Không đồng ý với chi phí phát sinh này" },
+                  { value: "Không đồng ý", label: detail.isSupplementaryQuote ? "Không đồng ý với chi phí phát sinh này" : "Không đồng ý với báo giá này" },
                   { value: "Chi phí vượt quá dự toán", label: "Chi phí vượt quá khả năng / dự toán ngân sách" },
                   { value: "Không cần thiết", label: "Chưa cần thay thế các hạng mục linh kiện này" },
                   { value: "OTHER", label: "Lý do khác (nhập bên dưới)" },
@@ -1792,7 +1824,7 @@ export function HistoryDetail() {
                     key={opt.value}
                     className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
                       rejectReason === opt.value
-                        ? "border-red-300 bg-red-50/50 text-red-900 font-semibold"
+                        ? "border-rose-300 bg-rose-50/50 text-rose-900 font-semibold"
                         : "border-slate-200 hover:bg-slate-50 text-slate-700"
                     }`}
                   >
@@ -1802,7 +1834,7 @@ export function HistoryDetail() {
                       value={opt.value}
                       checked={rejectReason === opt.value}
                       onChange={(e) => setRejectReason(e.target.value)}
-                      className="mt-0.5 accent-red-600"
+                      className="mt-0.5 accent-rose-600"
                     />
                     <span>{opt.label}</span>
                   </label>
@@ -1814,7 +1846,7 @@ export function HistoryDetail() {
                   value={customRejectText}
                   onChange={(e) => setCustomRejectText(e.target.value)}
                   placeholder="Nhập lý do từ chối cụ thể..."
-                  className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-red-500 focus:outline-none resize-none h-20"
+                  className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-rose-500 focus:outline-none resize-none h-20"
                 />
               )}
 
@@ -1834,7 +1866,7 @@ export function HistoryDetail() {
                     const finalReason = rejectReason === "OTHER" ? (customRejectText || "Không đồng ý") : rejectReason;
                     handleApproveQuote(false, finalReason);
                   }}
-                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
                 >
                   {isApprovingQuote ? "Đang xử lý..." : "Xác nhận từ chối"}
                 </button>

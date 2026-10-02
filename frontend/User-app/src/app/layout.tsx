@@ -4,15 +4,26 @@ import "./globals.css";
 import "./onboarding.css";
 import "./password-reset.css";
 
-const beVietnamPro = Be_Vietnam_Pro({
-  variable: "--font-sans",
+const brandFont = Be_Vietnam_Pro({
+  variable: "--font-brand",
   subsets: ["vietnamese", "latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "H-Mobility Care - Cứu Hộ & Chăm Sóc Xe Máy Điện Thông Minh",
+  title: {
+    default: "H-Mobility Care - Cứu Hộ & Chăm Sóc Xe Máy Điện Thông Minh",
+    template: "%s | H-Mobility Care",
+  },
   description: "H-Mobility Care - Nền tảng cứu hộ khẩn cấp SOS, sửa chữa tận nơi và chăm sóc xe máy điện thông minh.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -30,7 +41,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f9f9fc" },
+    { media: "(prefers-color-scheme: light)", color: "#eef6fb" },
     { media: "(prefers-color-scheme: dark)", color: "#1a1c1e" },
   ],
 };
@@ -43,7 +54,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${beVietnamPro.variable} h-full antialiased`}
+      className={`${brandFont.variable} h-full antialiased`}
     >
       <head>
         {/* Material Symbols is an icon font and is intentionally loaded as a stylesheet. */}
@@ -54,8 +65,8 @@ export default function RootLayout({
         />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
-        {children}
+      <body className="text-slate-900 dark:text-slate-50">
+        <div className="app-shell flex flex-col">{children}</div>
       </body>
     </html>
   );

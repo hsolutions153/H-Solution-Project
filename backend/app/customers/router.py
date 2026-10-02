@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
 from app.customers.schemas import (
@@ -19,6 +19,7 @@ from app.customers.service import (
     update_customer,
     update_customer_status,
     update_own_customer,
+    upload_own_avatar,
 )
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
@@ -32,6 +33,14 @@ def get_my_customer(current_user: dict = Depends(get_current_user)):
 @router.patch("/me", response_model=CustomerResponse, dependencies=[Depends(require_customer)])
 def modify_my_customer(data: CustomerUpdate, current_user: dict = Depends(get_current_user)):
     return update_own_customer(current_user, data)
+
+
+@router.post("/me/avatar", response_model=CustomerResponse, dependencies=[Depends(require_customer)])
+def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return upload_own_avatar(current_user, file)
 
 
 @router.get("", response_model=CustomerListResponse, dependencies=[Depends(require_admin)])

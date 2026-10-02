@@ -133,7 +133,7 @@
 
 .onboarding-brand-icon {
   font-size: 17px !important;
-  color: #0052cc;
+  color: #2479ad;
   font-weight: 800;
 }
 
@@ -382,7 +382,7 @@
   border-radius: 16px;
   border: none;
   background: rgba(255, 255, 255, 0.95);
-  color: #004e9f;
+  color: #156495;
   font-size: 17px;
   font-weight: 700;
   cursor: pointer;
@@ -512,23 +512,6 @@
 }
 
 /* Desktop nicety */
-@media (min-width: 768px) {
-  .onboarding-title {
-    font-size: 40px;
-  }
-  .onboarding-subtitle {
-    font-size: 18px;
-    max-width: 400px;
-  }
-  .onboarding-icon-circle {
-    width: 140px;
-    height: 140px;
-  }
-  .onboarding-icon {
-    font-size: 64px !important;
-  }
-}
-
 /* Safe area inset for notched phones */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .onboarding-bottom {

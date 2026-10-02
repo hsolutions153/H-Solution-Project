@@ -38,11 +38,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  useEffect(() => {
+    const tabName = TAB_TITLES[activeTab] || "Bảng điều khiển";
+    document.title = `${tabName} | H-Mobility Care Admin`;
+  }, [activeTab]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>

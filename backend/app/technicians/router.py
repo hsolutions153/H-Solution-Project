@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
 from app.technicians.schemas import (
@@ -19,6 +19,7 @@ from app.technicians.service import (
     review_technician_kyc,
     update_my_presence,
     update_technician,
+    upload_my_avatar,
 )
 
 router = APIRouter(prefix="/technicians", tags=["Technicians"])
@@ -27,6 +28,14 @@ router = APIRouter(prefix="/technicians", tags=["Technicians"])
 @router.get("/me", response_model=TechnicianResponse, dependencies=[Depends(require_technician)])
 def get_my_technician(current_user: dict = Depends(get_current_user)):
     return fetch_my_technician(current_user)
+
+
+@router.post("/me/avatar", response_model=TechnicianResponse, dependencies=[Depends(require_technician)])
+def upload_my_technician_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return upload_my_avatar(current_user, file)
 
 
 @router.patch("/me/presence", response_model=TechnicianResponse, dependencies=[Depends(require_technician)])

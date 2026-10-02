@@ -17,7 +17,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6">
       
       <div className="mb-5">
         <h2 className="text-base font-bold text-slate-800 mb-2">
@@ -44,7 +44,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
               value={identity}
               onChange={(e) => setIdentity(e.target.value)}
               placeholder="Nhập thông tin của bạn"
-              className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all"
+              className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all"
             />
           </div>
         </div>
@@ -52,7 +52,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
         
         <button
           type="submit"
-          className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
+          className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
         >
           <span>Gửi mã xác thực</span>
           <ArrowRight className="w-4 h-4" />

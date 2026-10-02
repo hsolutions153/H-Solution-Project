@@ -10,6 +10,7 @@ import { CreateTaskScreen } from "./components/CreateTaskScreen";
 
 import { MOCK_TASKS } from "@/constants/mockTasks";
 import { Task, TaskStatus, HistoryTask } from "@/types/task";
+import { mapApiTask } from "./mapApiTask";
 import { Plus } from "lucide-react";
 import { createPortal } from "react-dom";
 
@@ -88,86 +89,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         const { fetchApi } = await import("@/lib/api-client");
         const res = await fetchApi<any>("/repair-requests/technician/me");
         if (res && Array.isArray(res.items)) {
-          const apiTasks: Task[] = res.items.map((item: any) => {
-            let status: TaskStatus = "PENDING";
-            let statusText = "Chưa bắt đầu";
-            if (item.status === "ASSIGNED") {
-              status = "WAITING_ACCEPT";
-              statusText = "Chờ phản hồi";
-            } else if (item.status === "ACCEPTED") {
-              status = "PENDING";
-              statusText = "Chờ di chuyển";
-            } else if (item.status === "EN_ROUTE") {
-              status = "MOVING";
-              statusText = "Đang di chuyển";
-            } else if (item.status === "ARRIVED") {
-              status = "ARRIVED";
-              statusText = "Đã đến nơi";
-            } else if (item.status === "DIAGNOSING") {
-              status = "DIAGNOSING";
-              statusText = "Đang chẩn đoán";
-            } else if (item.status === "WAITING_FOR_APPROVAL" || item.status === "ESTIMATE_SUBMITTED") {
-              status = "WAITING_FOR_APPROVAL";
-              statusText = "Chờ khách duyệt báo giá";
-            } else if (item.status === "ESTIMATE_APPROVED") {
-              status = "ESTIMATE_APPROVED";
-              statusText = "Báo giá đã duyệt";
-            } else if (item.status === "ESTIMATE_REJECTED") {
-              status = "ESTIMATE_REJECTED";
-              statusText = "Báo giá bị từ chối";
-            } else if (item.status === "REPAIRING") {
-              status = "REPAIRING";
-              statusText = "Đang sửa chữa";
-            } else if (item.status === "COMPLETED") {
-              status = "COMPLETED";
-              statusText = "Hoàn thành";
-            } else if (item.status === "CANCELLED" || item.status === "REJECTED") {
-              status = "CANCELLED";
-              statusText = "Đã từ chối";
-            }
-
-            const cust = item.customer || {};
-            const dev = item.device || {};
-            const imgList = (item.images || []).map((img: any) => typeof img === "string" ? img : (img.image_url || img.url)).filter(Boolean);
-
-            const isSystemId = (str: string) => /^[0-9A-F]{8,12}$/i.test(str) || /^(USR|TCH|DEV|ADM)\d+$/i.test(str);
-            const customerName = cust.full_name || item.customer_name || (item.customer_id && !isSystemId(item.customer_id) ? item.customer_id : "Khách hàng");
-            const customerPhone = cust.phone || item.customer_phone || item.phone || "0912 345 678";
-
-            const bookingDate = item.booking_date || (item.is_sos ? "Khẩn cấp (SOS)" : "Hôm nay");
-            let bookingSlot = item.booking_slot || "Ngay bây giờ";
-            if (item.issue_description && item.issue_description.includes("[Hẹn:")) {
-              const match = item.issue_description.match(/\[Hẹn:\s*([^\]]+)\]/);
-              if (match) {
-                bookingSlot = match[1];
-              }
-            }
-
-            return {
-              id: item.id,
-              code: item.request_code || item.id,
-              serviceName: item.is_sos ? "Cứu hộ khẩn cấp (SOS)" : `Sửa chữa ${item.issue_type || "thiết bị"}`,
-              deviceInfo: dev.model_name ? `${dev.manufacturer || ""} ${dev.model_name}` : `Xe lăn điện ${dev.device_type || ""}`,
-              customerName,
-              customerPhone,
-              address: item.location_address || cust.address || "Địa chỉ không xác định",
-              distance: "2.5 km",
-              time: item.created_at ? new Date(item.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "Vừa xong",
-              isEmergency: item.is_sos || false,
-              status,
-              statusText,
-              description: item.issue_description || "Khách hàng yêu cầu kiểm tra sửa chữa thiết bị.",
-              images: imgList,
-              bookingDate,
-              bookingSlot,
-              totalAmount: item.total_amount
-                ? Number(item.total_amount)
-                : item.quote?.estimated_price
-                ? Number(item.quote.estimated_price)
-                : 0,
-              quote: item.quote,
-            };
-          });
+          const apiTasks: Task[] = res.items.map(mapApiTask);
 
           if (isMounted) {
             setTasks((prev) => {
@@ -180,6 +102,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
                     pt.status === nt.status &&
                     pt.statusText === nt.statusText &&
                     pt.quote?.status === nt.quote?.status &&
+                    pt.quote?.id === nt.quote?.id &&
+                    pt.quote?.reject_reason === nt.quote?.reject_reason &&
+                    pt.approvedEstimate === nt.approvedEstimate &&
                     pt.totalAmount === nt.totalAmount
                   );
                 });
@@ -319,9 +244,17 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
 
     if (backendStatus) {
       import("@/lib/api-client").then(({ fetchApi }) => {
-        fetchApi(`/repair-requests/${taskId}/status`, {
+        fetchApi<any>(`/repair-requests/${taskId}/status`, {
           method: "PATCH",
           body: JSON.stringify({ status: backendStatus }),
+        }).then((updatedRequest) => {
+          const updatedTask = mapApiTask(updatedRequest);
+          setTasks((prev) => prev.map((task) => task.id === taskId ? updatedTask : task));
+          setSelectedTask((prev) => {
+            if (prev?.id !== taskId) return prev;
+            sessionStorage.setItem("selectedTask", JSON.stringify(updatedTask));
+            return updatedTask;
+          });
         }).catch((err) => console.warn("Error syncing status to backend:", err));
       });
     }
@@ -430,10 +363,10 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
               sessionStorage.setItem("currentView", "create");
               setCurrentView("create");
             }}
-            className="w-12 h-12 bg-sky-700 hover:bg-sky-800 rounded-2xl shadow-xl flex items-center justify-center transition-all cursor-pointer active:scale-95 text-sky-200"
+            className="w-12 h-12 bg-brand-700 hover:bg-brand-800 rounded-2xl shadow-xl flex items-center justify-center transition-all cursor-pointer active:scale-95 text-brand-200"
             title="Tạo công việc mới"
           >
-            <Plus className="w-6 h-6 text-sky-200" strokeWidth={2.5} />
+            <Plus className="w-6 h-6 text-brand-200" strokeWidth={2.5} />
           </button>,
           document.getElementById("fab-container")!
         )
@@ -443,10 +376,10 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             sessionStorage.setItem("currentView", "create");
             setCurrentView("create");
           }}
-          className="absolute bottom-20 right-4 w-12 h-12 bg-sky-700 hover:bg-sky-800 rounded-2xl shadow-xl flex items-center justify-center z-30 transition-all cursor-pointer active:scale-95 text-sky-200"
+          className="absolute bottom-20 right-4 w-12 h-12 bg-brand-700 hover:bg-brand-800 rounded-2xl shadow-xl flex items-center justify-center z-30 transition-all cursor-pointer active:scale-95 text-brand-200"
           title="Tạo công việc mới"
         >
-          <Plus className="w-6 h-6 text-sky-200" strokeWidth={2.5} />
+          <Plus className="w-6 h-6 text-brand-200" strokeWidth={2.5} />
         </button>
       )}
 

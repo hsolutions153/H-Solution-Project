@@ -41,6 +41,11 @@ export interface Task {
   bookingSlot?: string;
   totalAmount?: number;
   quote?: any;
+  quotes?: any[];
+  approvedEstimate?: number;
+  /** Backend status code (e.g. "ACCEPTED"), kept alongside the app-level status. */
+  rawStatus?: string;
+  createdAt?: string;
 }
 
 export interface HistoryTask {
@@ -81,4 +86,4 @@ export interface QuotePayload {
   total_amount: number;
   diagnosis_note?: string;
   estimatedTime?: string;
-}
+}

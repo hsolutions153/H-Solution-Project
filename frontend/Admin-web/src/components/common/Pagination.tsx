@@ -80,7 +80,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -98,7 +98,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage <= 1}
-          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-sky-50 hover:border-sky-400 hover:text-sky-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
           title="Trang đầu tiên"
           aria-label="Trang đầu tiên"
         >
@@ -109,7 +109,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-sky-50 hover:border-sky-400 hover:text-sky-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
           title="Trang trước"
           aria-label="Trang trước"
         >
@@ -139,8 +139,8 @@ export const Pagination: React.FC<PaginationProps> = ({
                 onClick={() => onPageChange(pageNum)}
                 className={`min-w-[36px] h-9 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none flex items-center justify-center ${
                   isActive
-                    ? "bg-sky-900 text-white shadow-sm border border-sky-950 ring-2 ring-sky-900/20 font-black"
-                    : "bg-white border border-slate-300 text-slate-700 hover:bg-sky-50 hover:border-sky-400 hover:text-sky-900 shadow-2xs"
+                    ? "bg-brand-900 text-white shadow-sm border border-brand-950 ring-2 ring-brand-900/20 font-black"
+                    : "bg-white border border-slate-300 text-slate-700 hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 shadow-2xs"
                 }`}
                 title={`Trang ${pageNum}`}
                 aria-label={`Trang ${pageNum}`}
@@ -156,7 +156,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= safeTotalPages}
-          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-sky-50 hover:border-sky-400 hover:text-sky-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
           title="Trang sau"
           aria-label="Trang sau"
         >
@@ -167,7 +167,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(safeTotalPages)}
           disabled={currentPage >= safeTotalPages}
-          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-sky-50 hover:border-sky-400 hover:text-sky-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer select-none font-bold text-slate-700 bg-white border-slate-300 shadow-2xs hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 active:scale-95 disabled:opacity-40 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:active:scale-100"
           title="Trang cuối cùng"
           aria-label="Trang cuối cùng"
         >

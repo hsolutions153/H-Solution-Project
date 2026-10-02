@@ -74,7 +74,7 @@ function getStyleForService(title: string, isSos?: boolean) {
   if (t.includes("pin") || t.includes("battery") || t.includes("lfp")) {
     return {
       icon: "battery_charging_full",
-      gradient: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+      gradient: "linear-gradient(135deg, #2479ad 0%, #156495 100%)",
       shadow: "0 4px 14px rgba(2, 132, 199, 0.32)",
       color: "#ffffff",
     };
@@ -82,7 +82,7 @@ function getStyleForService(title: string, isSos?: boolean) {
   if (t.includes("lốp") || t.includes("bánh") || t.includes("tire") || t.includes("wheel")) {
     return {
       icon: "settings",
-      gradient: "linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)",
+      gradient: "linear-gradient(135deg, #2479ad 0%, #156495 100%)",
       shadow: "0 4px 14px rgba(6, 182, 212, 0.32)",
       color: "#ffffff",
     };
@@ -106,14 +106,14 @@ function getStyleForService(title: string, isSos?: boolean) {
   if (t.includes("ecu") || t.includes("điều khiển") || t.includes("điện")) {
     return {
       icon: "memory",
-      gradient: "linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)",
+      gradient: "linear-gradient(135deg, #7fb8da 0%, #4896c4 100%)",
       shadow: "0 4px 14px rgba(139, 92, 246, 0.32)",
       color: "#ffffff",
     };
   }
   return {
     icon: "handyman",
-    gradient: "linear-gradient(135deg, #0077B6 0%, #0096C7 100%)",
+    gradient: "linear-gradient(135deg, #156495 0%, #2479ad 100%)",
     shadow: "0 4px 14px rgba(0, 119, 182, 0.32)",
     color: "#ffffff",
   };
@@ -145,6 +145,8 @@ function getStatusBadge(status: RepairStatus, rawStatus?: string) {
       return { label: "Chờ duyệt báo giá", className: "rh-badge--pending", dotClass: "rh-dot--pulse-amber" };
     case "ESTIMATE_APPROVED":
       return { label: "Đã duyệt báo giá", className: "rh-badge--info", dotClass: "rh-dot--pulse-blue" };
+    case "ESTIMATE_REJECTED":
+      return { label: "Đã từ chối báo giá", className: "rh-badge--pending", dotClass: "rh-dot--pulse-amber" };
     case "REPAIRING":
       return { label: "Đang sửa chữa", className: "rh-badge--info", dotClass: "rh-dot--pulse-blue" };
     case "COMPLETED":
@@ -152,7 +154,6 @@ function getStatusBadge(status: RepairStatus, rawStatus?: string) {
       return { label: "Hoàn thành", className: "rh-badge--completed", dotClass: "rh-dot--green" };
     case "CANCELLED":
     case "REJECTED":
-    case "ESTIMATE_REJECTED":
       return { label: "Đã hủy", className: "rh-badge--cancelled", dotClass: "rh-dot--gray" };
     default:
       return { label: "Đang xử lý", className: "rh-badge--info", dotClass: "rh-dot--pulse-blue" };
@@ -208,7 +209,7 @@ export function HistoryList() {
         let status: RepairStatus = "in_progress";
         const st = (item.status || "").toUpperCase();
         if (st === "COMPLETED" || st === "PAID") status = "completed";
-        else if (st === "CANCELLED" || st === "REJECTED" || st === "ESTIMATE_REJECTED") status = "cancelled";
+        else if (st === "CANCELLED" || st === "REJECTED") status = "cancelled";
 
         const isSos = Boolean(item.is_sos);
         const title = getServiceTitle(isSos, item.issue_type, item.issue_description);
@@ -238,11 +239,7 @@ export function HistoryList() {
           issueType: item.issue_type,
           isSos,
           location,
-          total: item.total_amount
-            ? Number(item.total_amount)
-            : item.quote?.estimated_price
-              ? Number(item.quote.estimated_price)
-              : 0,
+          total: Number(item.total_amount ?? item.quote?.estimated_price ?? 0),
         };
       });
 

@@ -1,6 +1,7 @@
 import secrets
 import uuid
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 
@@ -48,6 +49,13 @@ def _payload(data):
     if hasattr(data, "dict"):
         return data.dict()
     return dict(data)
+
+
+def _submitted_final_cost(payload: dict):
+    for field in ("final_cost", "total_amount", "totalCost"):
+        if payload.get(field) is not None:
+            return float(payload[field])
+    return None
 
 
 def _role_id(code: str) -> str:
@@ -129,15 +137,15 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
         except Exception:
             pass
 
-    quotes_map = {}
+    quotes_map = defaultdict(list)
     if repair_ids:
         try:
-            quotes_resp = supabase.table("repair_quotes").select("id,repair_id,estimated_price,parts_cost,labor_fee,status,diagnosis_note,created_at").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
+            quotes_resp = supabase.table("repair_quotes").select("id,repair_id,estimated_price,parts_cost,labor_fee,status,reject_reason,diagnosis_note,created_at").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
             if quotes_resp and quotes_resp.data:
                 for q in quotes_resp.data:
                     rid = q.get("repair_id")
-                    if rid and rid not in quotes_map:
-                        quotes_map[rid] = q
+                    if rid:
+                        quotes_map[rid].append(q)
         except Exception:
             pass
 
@@ -151,10 +159,17 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
             item["technician"] = techs_map.get(item["technician_id"])
 
         item["payment_method"] = item.get("payment_method") or payments_map.get(item["id"])
-        q = quotes_map.get(item["id"])
-        if q:
+        quotes = quotes_map.get(item["id"], [])
+        if quotes:
+            q = quotes[0]
             item["quote"] = q
-            if (item.get("total_amount") is None or float(item.get("total_amount") or 0) == 0) and q.get("estimated_price"):
+            item["quotes"] = quotes
+            item["initial_estimate"] = float(quotes[-1].get("estimated_price") or 0)
+            item["approved_estimate"] = sum(
+                float(quote.get("estimated_price") or 0)
+                for quote in quotes if quote.get("status") == "ACCEPTED"
+            )
+            if item.get("status") != "COMPLETED" and (item.get("total_amount") is None or float(item.get("total_amount") or 0) == 0) and q.get("estimated_price"):
                 item["total_amount"] = float(q["estimated_price"])
 
     return items
@@ -184,7 +199,7 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
 
     if missing_ids:
         try:
-            u_resp = supabase.table("users").select("id,full_name,phone,email").in_("id", missing_ids).execute()
+            u_resp = supabase.table("users").select("id,full_name,phone,email,avatar_url").in_("id", missing_ids).execute()
             users_by_id = {u["id"]: u for u in (u_resp.data or [])}
 
             p_resp = (
@@ -203,7 +218,7 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
                         "id": tu["id"],
                         "name": tu.get("full_name") or "Kỹ thuật viên",
                         "phone": tu.get("phone") or "0912 345 678",
-                        "avatar": "/images/s1.jpg",
+                        "avatar": tu.get("avatar_url") or "",
                         "specialization": (tp and tp.get("specialization")) or "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
                         "rating": float(tp.get("rating_avg")) if (tp and tp.get("rating_avg")) else 4.9,
                         "reviews": int(tp.get("total_jobs_done")) if (tp and tp.get("total_jobs_done")) else 25,
@@ -216,6 +231,11 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
             logger.warning(f"Failed to batch fetch technicians: {err}")
 
     return techs_map
+
+
+def invalidate_technician_cache(technician_id: str) -> None:
+    """Drop a technician's cached card so profile changes (e.g. a new avatar) show up immediately."""
+    _TECH_CACHE.pop(technician_id, None)
 
 
 def _list(customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int):
@@ -641,13 +661,17 @@ def fetch_request(request_id: str, current_user: dict):
         if accepted_quotes:
             request_data["approved_estimate"] = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
         else:
-            request_data["approved_estimate"] = float(latest_quote.get("estimated_price") or 0)
+            request_data["approved_estimate"] = 0.0
         request_data["pending_quote"] = pending_quotes[0] if pending_quotes else None
 
         if request_data.get("status") == "COMPLETED":
             request_data["final_cost"] = float(request_data.get("total_amount") or 0)
         elif (request_data.get("total_amount") is None or float(request_data.get("total_amount") or 0) == 0):
-            request_data["total_amount"] = request_data["approved_estimate"]
+            request_data["total_amount"] = (
+                request_data["approved_estimate"]
+                if accepted_quotes
+                else float(latest_quote.get("estimated_price") or 0)
+            )
 
     # 4. Payment method
     try:
@@ -705,7 +729,8 @@ def fetch_request_status_sync(request_id: str, current_user: dict):
                 "id": tech_user.get("id"),
                 "name": tech_user.get("full_name", ""),
                 "phone": tech_user.get("phone", ""),
-                "avatar": (tech_profile.get("certificate_img") or tech_profile.get("id_card_front") or "") if tech_profile else "",
+                # Only the public profile photo; KYC documents must never reach customers.
+                "avatar": tech_user.get("avatar_url") or "",
                 "rating": float(tech_profile.get("rating_avg", 5.0)) if tech_profile else 5.0,
             }
 
@@ -758,6 +783,13 @@ def update_request_status(request_id: str, current_user: dict, data):
 
     if not allowed:
         raise AppException(ErrorCode.INVALID_STATUS_TRANSITION)
+
+    if new_status == "REPAIRING" and request["status"] in {
+        "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED"
+    }:
+        quotes = repository.get_quotes_by_repair_id(request_id) or []
+        if not any(quote.get("status") == "ACCEPTED" for quote in quotes):
+            raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
 
     now = datetime.now(timezone.utc).isoformat()
     if new_status == "REJECTED":
@@ -845,15 +877,20 @@ def update_request_status(request_id: str, current_user: dict, data):
         elif new_status == "ESTIMATE_APPROVED":
             try:
                 from app.db.database import supabase
-                supabase.table("repair_quotes").update({
+                quote_response = supabase.table("repair_quotes").update({
                     "status": "ACCEPTED",
                     "replied_by": current_user["sub"],
                     "replied_at": now,
                     "updated_by": current_user["sub"],
                     "updated_at": now,
                 }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+                if not quote_response or not quote_response.data:
+                    raise AppException(ErrorCode.QUOTE_NOT_FOUND)
+            except AppException:
+                raise
             except Exception as q_err:
                 logger.warning(f"Failed to update quote to ACCEPTED: {q_err}")
+                raise AppException(ErrorCode.DATABASE_ERROR) from q_err
 
             try:
                 quotes = repository.get_quotes_by_repair_id(request_id) or []
@@ -863,11 +900,12 @@ def update_request_status(request_id: str, current_user: dict, data):
                     update_data["total_amount"] = approved_total
             except Exception as sum_err:
                 logger.warning(f"Failed to sum accepted quotes: {sum_err}")
+                raise AppException(ErrorCode.DATABASE_ERROR) from sum_err
         elif new_status == "ESTIMATE_REJECTED":
             reject_reason = payload.get("cancel_reason") or payload.get("reject_reason") or "Không đồng ý"
             try:
                 from app.db.database import supabase
-                supabase.table("repair_quotes").update({
+                quote_response = supabase.table("repair_quotes").update({
                     "status": "REJECTED",
                     "reject_reason": reject_reason,
                     "replied_by": current_user["sub"],
@@ -875,42 +913,50 @@ def update_request_status(request_id: str, current_user: dict, data):
                     "updated_by": current_user["sub"],
                     "updated_at": now,
                 }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+                if not quote_response or not quote_response.data:
+                    raise AppException(ErrorCode.QUOTE_NOT_FOUND)
+            except AppException:
+                raise
             except Exception as q_err:
                 logger.warning(f"Failed to update quote to REJECTED: {q_err}")
+                raise AppException(ErrorCode.DATABASE_ERROR) from q_err
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
-            total_amt = payload.get("total_amount") if payload.get("total_amount") is not None else payload.get("totalCost")
+            total_amt = _submitted_final_cost(payload)
             try:
-                quotes = repository.get_quotes_by_repair_id(request_id)
-                if quotes:
-                    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
-                    if accepted_quotes:
-                        est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
-                    else:
-                        est_price = float(quotes[0].get("estimated_price") or 0)
-
-                    final_cost = float(total_amt) if total_amt is not None else float(request.get("total_amount") or 0)
-                    if est_price > 0 and final_cost > est_price:
-                        raise AppException(
-                            ErrorCode.VALIDATION_ERROR,
-                            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
-                        )
+                quotes = repository.get_quotes_by_repair_id(request_id) or []
+                if any(q.get("status") == "PENDING" for q in quotes):
+                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
+                accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+                if not accepted_quotes:
+                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
+                est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+                final_cost = total_amt if total_amt is not None else est_price
+                if final_cost > est_price:
+                    raise AppException(
+                        ErrorCode.VALIDATION_ERROR,
+                        message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+                    )
+                update_data["total_amount"] = final_cost
             except AppException:
                 raise
             except Exception as check_err:
                 logger.warning(f"Error checking quote vs final cost: {check_err}")
+                raise AppException(ErrorCode.DATABASE_ERROR) from check_err
 
             update_data["completed_at"] = now
         elif new_status == "CANCELLED":
             update_data["cancelled_at"] = now
             update_data["cancel_reason"] = payload.get("cancel_reason")
 
-        total_amt = payload.get("total_amount") if payload.get("total_amount") is not None else payload.get("totalCost")
-        if total_amt is not None:
+        total_amt = _submitted_final_cost(payload)
+        if total_amt is not None and new_status not in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED"}:
             update_data["total_amount"] = float(total_amt)
 
-        repository.update_repair_request(request_id, update_data)
+        updated_request = repository.update_repair_request(request_id, update_data)
+        if not updated_request:
+            raise AppException(ErrorCode.DATABASE_ERROR)
 
         history_note = payload.get("cancel_reason")
         if not history_note:
@@ -1090,15 +1136,20 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ACCEPTED", "REPAIRING"}
+    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED", "ACCEPTED", "REPAIRING"}
     if request.get("status") not in allowed_statuses:
         raise AppException(
             ErrorCode.INVALID_STATUS_TRANSITION,
             message="Yêu cầu không ở trạng thái cho phép tạo báo giá.",
         )
 
+    previous_quotes = repository.get_quotes_by_repair_id(request_id) or []
+    if any(quote.get("status") == "PENDING" for quote in previous_quotes):
+        raise AppException(ErrorCode.QUOTE_ALREADY_EXISTS, message="Đã có báo giá đang chờ khách hàng duyệt. Vui lòng xử lý báo giá đó trước.")
+    accepted_quotes = [quote for quote in previous_quotes if quote.get("status") == "ACCEPTED"]
+    is_supplementary = bool(accepted_quotes)
     items = data.get("items") or []
-    diagnosis_note = data.get("diagnosis_note") or ("Báo giá bổ sung / Chi phí phát sinh" if request.get("status") == "REPAIRING" else "Báo giá sửa chữa")
+    diagnosis_note = data.get("diagnosis_note") or ("Báo giá bổ sung / Chi phí phát sinh" if is_supplementary else "Báo giá sửa chữa")
     severity = data.get("severity") or "MINOR"
     if severity not in {"MINOR", "MAJOR"}:
         severity = "MINOR"
@@ -1112,6 +1163,8 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         qty = float(it.get("quantity") or 1)
         price = float(it.get("price") or it.get("unit_price") or 0)
         subtotal = float(it.get("subtotal") or (qty * price))
+        if not math.isclose(subtotal, qty * price, abs_tol=0.01):
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Thành tiền hạng mục phải bằng số lượng nhân đơn giá.")
         total += subtotal
 
         name = str(it.get("name") or it.get("item_name") or "Linh kiện").strip()
@@ -1144,12 +1197,13 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     labor_fee = float(data.get("labor_fee") or data.get("laborCost") or computed_labor_fee)
     parts_cost = float(data.get("parts_cost") or data.get("partsCost") or computed_parts_cost)
 
-    if data.get("total_amount"):
-        total = float(data.get("total_amount"))
-    elif data.get("estimated_price"):
-        total = float(data.get("estimated_price"))
-    elif labor_fee + parts_cost > 0:
-        total = labor_fee + parts_cost
+    if items and (not math.isclose(labor_fee, computed_labor_fee, abs_tol=0.01) or not math.isclose(parts_cost, computed_parts_cost, abs_tol=0.01)):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Tiền công và chi phí linh kiện phải khớp với các hạng mục báo giá.")
+    supplied_total = data.get("total_amount") if data.get("total_amount") is not None else data.get("estimated_price")
+    calculated_total = labor_fee + parts_cost
+    if supplied_total is not None and (items or calculated_total > 0) and not math.isclose(float(supplied_total), calculated_total, abs_tol=0.01):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Tổng báo giá phải khớp với chi phí các hạng mục. Báo giá bổ sung chỉ gồm chi phí phát sinh.")
+    total = float(supplied_total) if supplied_total is not None else calculated_total
 
     import secrets
     quote_id = secrets.token_hex(5).upper()[:10]
@@ -1187,19 +1241,22 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
-        is_in_repair = request.get("status") == "REPAIRING"
         update_fields = {
             "status": "WAITING_FOR_APPROVAL",
             "diagnosed_at": now_iso,
             "updated_by": current_user["sub"],
         }
-        if not is_in_repair:
-            update_fields["total_amount"] = total
+        update_fields["total_amount"] = (
+            sum(float(quote.get("estimated_price") or 0) for quote in accepted_quotes)
+            if is_supplementary else total
+        )
 
-        repository.update_repair_request(request_id, update_fields)
+        updated_request = repository.update_repair_request(request_id, update_fields)
+        if not updated_request:
+            raise AppException(ErrorCode.DATABASE_ERROR)
         note_msg = (
             f"Kỹ thuật viên đã tạo báo giá bổ sung (Phát sinh: {total:,.0f} đ), chờ khách hàng duyệt"
-            if is_in_repair
+            if is_supplementary
             else f"Kỹ thuật viên đã lập báo giá (Tổng: {total:,.0f} đ), chờ khách hàng duyệt"
         )
         repository.add_status_history({
@@ -1211,6 +1268,7 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         })
     except Exception as stat_err:
         logger.warning(f"Failed to update repair status on quote create: {stat_err}")
+        raise AppException(ErrorCode.DATABASE_ERROR) from stat_err
 
     if created_quote:
         created_quote["items"] = created_items

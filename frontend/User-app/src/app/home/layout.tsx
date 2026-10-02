@@ -69,6 +69,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
               name: customer.full_name || customer.name || user?.name,
               phone: customer.phone,
               address: customer.address,
+              avatar_url: customer.avatar_url || undefined,
               is_profile_complete: isComplete,
               is_new_user: !isComplete,
             });

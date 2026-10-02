@@ -722,7 +722,7 @@ export default function SosPage() {
         <section className="sos-calling-step">
           <div className="sos-signal-container">
             <div className="sos-signal-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="#1565C0">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="#2479ad">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
               </svg>
             </div>
@@ -774,7 +774,7 @@ export default function SosPage() {
                 />
               </div>
               <div className="sos-map-address-badge">
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#1565C0" }}>place</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#2479ad" }}>place</span>
                 <span>{fullAddress}</span>
               </div>
             </div>
@@ -782,7 +782,7 @@ export default function SosPage() {
 
           <div className="sos-safety-section">
             <h3 className="sos-safety-title">
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#1565C0" }}>shield</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>shield</span>
               Hướng dẫn an toàn
             </h3>
             <ul className="sos-safety-list">
@@ -837,7 +837,7 @@ export default function SosPage() {
           </h2>
 
           <article className="sos-tech-card">
-            <div className="sos-tech-avatar overflow-hidden flex items-center justify-center font-bold text-white bg-blue-600">
+            <div className="sos-tech-avatar overflow-hidden flex items-center justify-center font-bold text-white bg-brand-600">
               {assignedTech && assignedTech.avatar && assignedTech.avatar.startsWith("http") ? (
                 <img src={assignedTech.avatar} alt={assignedTech.name} className="w-full h-full object-cover" />
               ) : (

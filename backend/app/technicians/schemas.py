@@ -9,6 +9,7 @@ class TechnicianUser(BaseModel):
     full_name: str
     email: str
     phone: str | None = None
+    avatar_url: str | None = None
     is_active: bool
 
 

@@ -180,7 +180,7 @@ export const CustomersList = () => {
   return (
     <div className="p-6 space-y-6">
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
@@ -207,7 +207,7 @@ export const CustomersList = () => {
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
+            className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
           >
             <UserPlus className="w-4 h-4 stroke-[2.5]" />
             <span>Thêm khách hàng</span>
@@ -223,7 +223,7 @@ export const CustomersList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo tên khách hàng, số điện thoại, email..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
         </div>
       </div>
@@ -246,7 +246,7 @@ export const CustomersList = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-800" />
                     Đang tải danh sách khách hàng...
                   </td>
                 </tr>
@@ -280,14 +280,14 @@ export const CustomersList = () => {
                     <td className="py-3.5 px-4 max-w-50 text-xs text-slate-600 truncate">
                       {c.address || "Chưa cập nhật"}
                     </td>
-                    <td className="py-3.5 px-4 text-xs font-bold text-sky-900">
+                    <td className="py-3.5 px-4 text-xs font-bold text-brand-900">
                       <button
                         type="button"
                         onClick={() => setSelectedCustomerForDevices(c)}
-                        className="hover:underline flex items-center gap-1.5 cursor-pointer font-bold text-sky-900 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100 transition"
+                        className="hover:underline flex items-center gap-1.5 cursor-pointer font-bold text-brand-900 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100 transition"
                         title="Bấm để xem chi tiết danh sách thiết bị"
                       >
-                        <Bike className="w-3.5 h-3.5 text-sky-700" />
+                        <Bike className="w-3.5 h-3.5 text-brand-700" />
                         <span>{c.device_count || 0} thiết bị</span>
                       </button>
                     </td>
@@ -341,7 +341,7 @@ export const CustomersList = () => {
                         <button
                           type="button"
                           onClick={() => setViewingCustomer(c)}
-                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 hover:text-brand-950 transition cursor-pointer shadow-2xs"
                           title="Xem chi tiết khách hàng"
                           aria-label="Xem chi tiết"
                         >
@@ -363,7 +363,7 @@ export const CustomersList = () => {
                         <button
                           type="button"
                           onClick={() => setDeletingCustomer(c)}
-                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 transition cursor-pointer shadow-2xs"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-800 transition cursor-pointer shadow-2xs"
                           title="Xóa khách hàng"
                           aria-label="Xóa khách hàng"
                         >
@@ -409,7 +409,7 @@ export const CustomersList = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden transform transition-all p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-base">
-                <Bike className="w-5 h-5 text-sky-800" />
+                <Bike className="w-5 h-5 text-brand-800" />
                 <span>
                   Thiết bị của {selectedCustomerForDevices.full_name || selectedCustomerForDevices.name}
                 </span>
@@ -426,7 +426,7 @@ export const CustomersList = () => {
             <div className="max-h-[60vh] overflow-y-auto space-y-2.5">
               {loadingDevices ? (
                 <div className="flex items-center justify-center gap-2 py-8 text-slate-400 text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin text-sky-800" />
+                  <Loader2 className="w-5 h-5 animate-spin text-brand-800" />
                   <span>Đang tải danh sách thiết bị...</span>
                 </div>
               ) : customerDevices.length === 0 ? (

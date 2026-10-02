@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
+import { BrandMark } from "@h-mobility/ui";
 
 export interface SidebarProps {
   activeTab: string;
@@ -62,16 +63,14 @@ export const Sidebar = ({
           } px-1 py-2`}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-sky-900 rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0">
-              <Circle className="w-6 h-6 fill-white" />
-            </div>
+            <BrandMark size={40} />
             {!sidebarCollapsed && (
               <div className="truncate animate-in fade-in duration-200">
-                <h1 className="font-bold text-sky-950 text-lg leading-tight truncate">
-                  AdminRepair
+                <h1 className="font-bold text-brand-950 text-base leading-tight truncate">
+                  H-Mobility Care
                 </h1>
-                <span className="text-[10px] text-slate-400 font-bold tracking-wider block">
-                  GLACIER EDITION
+                <span className="text-xs text-brand-600 font-medium block">
+                  Quản trị hệ thống
                 </span>
               </div>
             )}
@@ -80,7 +79,7 @@ export const Sidebar = ({
           <button
             type="button"
             onClick={toggleSidebar}
-            className="p-2 rounded-xl text-slate-400 hover:text-sky-900 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+            className="p-2 rounded-xl text-slate-400 hover:text-brand-900 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
             title={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
             aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
           >
@@ -96,7 +95,7 @@ export const Sidebar = ({
         <button
           type="button"
           onClick={onOpenCreateOrder}
-          className={`bg-sky-900 hover:bg-sky-950 text-white font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer ${
+          className={`bg-brand-900 hover:bg-brand-950 text-white font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer ${
             sidebarCollapsed
               ? "w-11 h-11 mx-auto rounded-xl p-0"
               : "w-full py-3.5 px-4 rounded-xl"
@@ -124,14 +123,14 @@ export const Sidebar = ({
                     : "gap-3.5 px-3.5 py-3 text-left"
                 } ${
                   isActive
-                    ? "text-sky-950 bg-sky-100/80 font-bold shadow-xs"
+                    ? "text-brand-950 bg-brand-100/80 font-bold shadow-xs"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <Icon
                   className={`w-5 h-5 flex-shrink-0 ${
-                    isActive ? "text-sky-900" : "text-slate-400"
+                    isActive ? "text-brand-900" : "text-slate-400"
                   }`}
                 />
                 {!sidebarCollapsed && (
@@ -165,7 +164,7 @@ export const Sidebar = ({
         <button
           type="button"
           onClick={() => setShowLogoutConfirm(true)}
-          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-red-50 hover:text-red-600 cursor-pointer ${
+          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-rose-50 hover:text-rose-600 cursor-pointer ${
             sidebarCollapsed
               ? "justify-center p-3 h-11"
               : "gap-3.5 px-3.5 py-3 text-left"
@@ -181,7 +180,7 @@ export const Sidebar = ({
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto text-red-600 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-600 shadow-xs">
               <LogOut className="w-6 h-6 stroke-[2.2]" />
             </div>
 
@@ -208,7 +207,7 @@ export const Sidebar = ({
                   setShowLogoutConfirm(false);
                   handleLogout();
                 }}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-red-600/30"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-rose-600/30"
               >
                 Đăng xuất
               </button>

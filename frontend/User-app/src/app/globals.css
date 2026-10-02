@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "@h-mobility/ui/tokens.css";
+@source "../../../shared/src";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -7,9 +9,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-brand);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -106,35 +107,35 @@
 }
 
 :root {
-  --background: #f9f9fc;
-  --foreground: #1a1c1e;
+  --background: #eef6fb;
+  --foreground: #0a2540;
   --card: #ffffff;
   --card-foreground: #1a1c1e;
   --popover: #ffffff;
   --popover-foreground: #1a1c1e;
-  --primary: #004e9f;
+  --primary: #156495;
   --primary-foreground: #ffffff;
-  --secondary: #006a6a;
+  --secondary: #12537d;
   --secondary-foreground: #ffffff;
   --muted: #f3f3f6;
   --muted-foreground: #727784;
-  --accent: #7af2f2;
-  --accent-foreground: #002020;
+  --accent: #d7eaf5;
+  --accent-foreground: #0a2540;
   --destructive: #ba1a1a;
   --destructive-foreground: #ffffff;
   --border: #c1c6d5;
   --input: #c1c6d5;
-  --ring: #004e9f;
+  --ring: #2479ad;
   --radius: 0.75rem;
 
   --sidebar: #f3f3f6;
   --sidebar-foreground: #1a1c1e;
-  --sidebar-primary: #004e9f;
+  --sidebar-primary: #156495;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e2e2e5;
   --sidebar-accent-foreground: #1a1c1e;
   --sidebar-border: #c1c6d5;
-  --sidebar-ring: #004e9f;
+  --sidebar-ring: #2479ad;
 
   /* Custom palette values */
   --inverse-surface: #2f3133;
@@ -144,25 +145,25 @@
   --outline: #727784;
   --surface-dim: #dadadc;
   --surface-bright: #f9f9fc;
-  --primary-fixed: #d7e3ff;
+  --primary-fixed: #d7eaf5;
   --outline-variant: #c1c6d5;
   --on-secondary: #ffffff;
-  --tertiary-fixed: #dae4ee;
-  --on-primary-fixed: #001b3e;
+  --tertiary-fixed: #d7eaf5;
+  --on-primary-fixed: #0a2540;
   --error: #ba1a1a;
-  --inverse-primary: #aac7ff;
+  --inverse-primary: #b2d5ea;
   --on-background: #1a1c1e;
   --on-tertiary-fixed-variant: #3e4850;
   --on-surface: #1a1c1e;
-  --primary-fixed-dim: #aac7ff;
-  --primary-container: #0066cc;
+  --primary-fixed-dim: #b2d5ea;
+  --primary-container: #2479ad;
   --on-secondary-fixed: #002020;
   --on-surface-variant: #414753;
   --surface-container: #eeeef0;
   --secondary-fixed: #7df5f5;
-  --on-primary-container: #dfe8ff;
+  --on-primary-container: #eef6fb;
   --surface-container-high: #e8e8ea;
-  --surface-tint: #005cba;
+  --surface-tint: #156495;
   --error-container: #ffdad6;
   --on-secondary-container: #006e6e;
   --on-primary: #ffffff;
@@ -176,8 +177,8 @@
   --tertiary: #475159;
   --surface-container-lowest: #ffffff;
   --on-secondary-fixed-variant: #004f4f;
-  --on-tertiary-container: #dfe9f3;
-  --on-primary-fixed-variant: #00458e;
+  --on-tertiary-container: #d7eaf5;
+  --on-primary-fixed-variant: #12537d;
   --inverse-on-surface: #f0f0f3;
   --tertiary-fixed-dim: #bec8d1;
   --surface-variant: #e2e2e5;
@@ -200,8 +201,8 @@
   --card-foreground: #f9f9fc;
   --popover: #2f3133;
   --popover-foreground: #f9f9fc;
-  --primary: #aac7ff;
-  --primary-foreground: #001b3e;
+  --primary: #b2d5ea;
+  --primary-foreground: #0a2540;
   --secondary: #7df5f5;
   --secondary-foreground: #002020;
   --muted: #2f3133;
@@ -212,16 +213,16 @@
   --destructive-foreground: #93000a;
   --border: #727784;
   --input: #727784;
-  --ring: #aac7ff;
+  --ring: #b2d5ea;
   
   --sidebar: #2f3133;
   --sidebar-foreground: #f9f9fc;
-  --sidebar-primary: #aac7ff;
-  --sidebar-primary-foreground: #001b3e;
+  --sidebar-primary: #b2d5ea;
+  --sidebar-primary-foreground: #0a2540;
   --sidebar-accent: #414753;
   --sidebar-accent-foreground: #f9f9fc;
   --sidebar-border: #727784;
-  --sidebar-ring: #aac7ff;
+  --sidebar-ring: #b2d5ea;
 }
 
 @layer base {
@@ -290,10 +291,8 @@
   display: block;
 }
 
-@media (max-width: 767px) {
-  .responsive-illustration {
-    display: none !important;
-  }
+.responsive-illustration {
+  display: none !important;
 }
 
 @media (max-height: 780px) {
@@ -355,29 +354,67 @@
 }
 
 /* Responsive padding and icon positioning for grid inputs on small screens */
-@media (max-width: 480px) {
-  .responsive-input {
-    padding-left: 40px !important;
-    padding-right: 12px !important;
-    font-size: 14px !important;
-  }
-  .responsive-input-password {
-    padding-left: 40px !important;
-    padding-right: 36px !important;
-    font-size: 14px !important;
-  }
-  .responsive-icon {
-    left: 12px !important;
-    font-size: 20px !important;
-  }
-  .responsive-eye-btn {
-    right: 8px !important;
-    width: 28px !important;
-    height: 28px !important;
-  }
-  .responsive-eye-btn .material-symbols-outlined {
-    font-size: 18px !important;
-  }
+.responsive-input {
+  padding-left: 40px !important;
+  padding-right: 12px !important;
+  font-size: 14px !important;
+}
+.responsive-input-password {
+  padding-left: 40px !important;
+  padding-right: 36px !important;
+  font-size: 14px !important;
+}
+.responsive-icon {
+  left: 12px !important;
+  font-size: 20px !important;
+}
+.responsive-eye-btn {
+  right: 8px !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.responsive-eye-btn .material-symbols-outlined {
+  font-size: 18px !important;
 }
 
 
+
+/* ── Mobile app frame ──
+   The whole app renders inside a phone-width frame. It is the query container
+   for width-based rules, and the containing block for
+   fixed-position UI (bottom nav, FABs, modals), so tablets and desktops show
+   exactly the phone layout, centered. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #e3e9ef;
+}
+
+.app-shell {
+  container: app / inline-size;
+  contain: layout paint;
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  background: var(--background);
+}
+
+@media (min-width: 431px) {
+  .app-shell {
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 12px 48px rgba(15, 23, 42, 0.12);
+  }
+}
+
+.dark body {
+  background: #0b0c0e;
+}

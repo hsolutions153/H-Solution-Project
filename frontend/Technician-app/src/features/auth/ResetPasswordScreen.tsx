@@ -23,7 +23,7 @@ export const ResetPasswordScreen = ({
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-gray-200/60 p-6 shadow-sm relative flex flex-col justify-between">
+      <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-slate-200/60 p-6 shadow-sm relative flex flex-col justify-between">
         
         <div className="absolute top-4 right-4">
           <LanguageSelector />

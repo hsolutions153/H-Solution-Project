@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { LoginFormData } from "@/types/auth";
 import { User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Button, Field } from "@h-mobility/ui";
 
 interface LoginFormProps {
   onSubmit: (data: LoginFormData) => void;
@@ -57,98 +58,63 @@ export const LoginForm = ({ onSubmit, onForgotPassword }: LoginFormProps) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            Số điện thoại hoặc Email
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center justify-center">
-              <User className="w-4 h-4" />
-            </span>
-            <input
-              type="text"
-              required
-              value={identity}
-              onChange={(e) => setIdentity(e.target.value)}
-              placeholder="tech1@h-solution.local"
-              className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all"
-            />
-          </div>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Field
+        label="Số điện thoại hoặc email"
+        type="text"
+        required
+        autoComplete="username"
+        value={identity}
+        onChange={(e) => setIdentity(e.target.value)}
+        placeholder="tech1@h-solution.local"
+        icon={<User />}
+      />
 
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            Mật khẩu
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center justify-center">
-              <Lock className="w-4 h-4" />
-            </span>
-            <input
-              type={showPassword ? "text" : "password"}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Abc123456@"
-              className="w-full pl-9 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-            >
-              {showPassword ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <p className="text-red-500 text-xs font-medium">{error}</p>
-        )}
-
-        <div className="flex items-center justify-between text-xs pt-1">
-          <label className="flex items-center gap-2 cursor-pointer text-slate-600">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-sky-800 focus:ring-sky-600 cursor-pointer"
-            />
-            <span>Ghi nhớ đăng nhập</span>
-          </label>
+      <Field
+        label="Mật khẩu"
+        type={showPassword ? "text" : "password"}
+        required
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Nhập mật khẩu"
+        icon={<Lock />}
+        error={error || undefined}
+        trailing={
           <button
             type="button"
-            onClick={onForgotPassword}
-            className="font-bold text-sky-800 hover:underline cursor-pointer"
+            onClick={() => setShowPassword(!showPassword)}
+            className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
           >
-            Quên mật khẩu?
+            {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
           </button>
-        </div>
+        }
+      />
 
+      <div className="flex items-center justify-between pt-1 text-sm">
+        <label className="flex items-center gap-2 cursor-pointer text-slate-700 select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="size-4 rounded border-slate-300 accent-brand-600 cursor-pointer"
+          />
+          Ghi nhớ đăng nhập
+        </label>
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-70"
+          type="button"
+          onClick={onForgotPassword}
+          className="font-semibold text-brand-700 hover:underline cursor-pointer"
         >
-          {loading ? (
-            <>
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Đang đăng nhập...</span>
-            </>
-          ) : (
-            <>
-              <span>Đăng nhập</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
+          Quên mật khẩu?
         </button>
-      </form>
-    </div>
+      </div>
+
+      <Button type="submit" size="lg" fullWidth loading={loading} className="mt-2">
+        {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+        {!loading && <ArrowRight className="size-5" />}
+      </Button>
+    </form>
   );
 };

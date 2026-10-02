@@ -34,13 +34,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
           const completedFromApi: HistoryTask[] = res.items
             .filter((item: any) => item.status === "COMPLETED" || item.status === "completed")
             .map((item: any) => {
-              const effectiveTotal = item.total_amount
-                ? Number(item.total_amount)
-                : item.quote?.estimated_price
-                ? Number(item.quote.estimated_price)
-                : item.quote?.total_amount
-                ? Number(item.quote.total_amount)
-                : 0;
+              const effectiveTotal = Number(item.total_amount ?? item.quote?.estimated_price ?? item.quote?.total_amount ?? 0);
 
               const cust = item.customer || {};
               const dev = item.device || {};
@@ -147,7 +141,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             onClick={() => setActiveTab("all")}
             className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
               activeTab === "all"
-                ? "bg-sky-400 text-white font-semibold"
+                ? "bg-brand-400 text-white font-semibold"
                 : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -157,7 +151,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             onClick={() => setActiveTab("this_month")}
             className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
               activeTab === "this_month"
-                ? "bg-sky-400 text-white font-semibold"
+                ? "bg-brand-400 text-white font-semibold"
                 : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -167,7 +161,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             onClick={() => setActiveTab("maintenance")}
             className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
               activeTab === "maintenance"
-                ? "bg-sky-400 text-white font-semibold"
+                ? "bg-brand-400 text-white font-semibold"
                 : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -177,7 +171,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             onClick={() => setActiveTab("repair")}
             className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
               activeTab === "repair"
-                ? "bg-sky-400 text-white font-semibold"
+                ? "bg-brand-400 text-white font-semibold"
                 : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -187,7 +181,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
 
         {loading ? (
           <div className="py-14 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2.5">
-            <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             <p className="font-medium text-slate-500">Đang tải lịch sử công việc...</p>
           </div>
         ) : filteredList.length === 0 ? (
@@ -215,13 +209,13 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                     className="p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-sky-600">
+                      <span className="text-xs font-bold text-brand-600">
                         #{item.code}{" "}
                         <span className="text-slate-400 font-normal">
                           • {item.date} • {item.time}
                         </span>
                       </span>
-                      <span className="px-2.5 py-0.5 bg-sky-100 text-sky-700 font-semibold text-[11px] rounded-full">
+                      <span className="px-2.5 py-0.5 bg-brand-100 text-brand-700 font-semibold text-[11px] rounded-full">
                         {item.serviceType}
                       </span>
                     </div>
@@ -252,7 +246,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                     <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/30 space-y-3 text-xs">
                       {item.diagnosis && (
                         <div>
-                          <p className="font-bold text-sky-900 mb-0.5">
+                          <p className="font-bold text-brand-900 mb-0.5">
                             Chẩn đoán
                           </p>
                           <p className="text-slate-600 leading-relaxed">
@@ -263,7 +257,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
 
                       {item.solution && (
                         <div>
-                          <p className="font-bold text-sky-900 mb-0.5">
+                          <p className="font-bold text-brand-900 mb-0.5">
                             Nội dung xử lý
                           </p>
                           <p className="text-slate-600 leading-relaxed">
@@ -274,7 +268,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
 
                       {(item.images?.before || item.images?.after) && (
                         <div>
-                          <p className="font-bold text-sky-900 mb-1.5">
+                          <p className="font-bold text-brand-900 mb-1.5">
                             Hình ảnh thực tế
                           </p>
                           <div className="grid grid-cols-2 gap-2">
@@ -303,7 +297,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                                     (e.target as HTMLImageElement).src = "/images/s1.jpg";
                                   }}
                                 />
-                                <span className="absolute bottom-1 left-1 bg-sky-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
+                                <span className="absolute bottom-1 left-1 bg-brand-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
                                   Sau khi làm
                                 </span>
                               </div>
@@ -322,7 +316,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                           </p>
                         </div>
 
-                        <button className="flex items-center gap-1 text-sky-700 font-semibold text-xs hover:underline">
+                        <button className="flex items-center gap-1 text-brand-700 font-semibold text-xs hover:underline">
                           <FileText className="w-3.5 h-3.5" /> Xem hóa đơn
                         </button>
                       </div>

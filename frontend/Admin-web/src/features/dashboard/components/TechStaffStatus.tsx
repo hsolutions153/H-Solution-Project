@@ -38,7 +38,7 @@ export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => 
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs text-sm">
       <h4 className="font-bold text-slate-700 mb-3 tracking-wider uppercase text-xs flex items-center justify-between">
         <span>Nhân sự hiện tại</span>
-        <Users className="w-4 h-4 text-sky-800" />
+        <Users className="w-4 h-4 text-brand-800" />
       </h4>
       <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
@@ -63,7 +63,7 @@ export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => 
       <button
         type="button"
         onClick={onNavigateToTechs}
-        className="w-full text-center text-sky-900 font-bold hover:underline border-t border-slate-100 pt-3 block text-xs cursor-pointer"
+        className="w-full text-center text-brand-900 font-bold hover:underline border-t border-slate-100 pt-3 block text-xs cursor-pointer"
       >
         Xem danh sách đội ngũ kỹ thuật viên &rarr;
       </button>

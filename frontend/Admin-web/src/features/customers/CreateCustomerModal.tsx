@@ -56,7 +56,7 @@ export const CreateCustomerModal = ({
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div>
-            <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+            <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
               Quản lý tài khoản
             </span>
             <h3 className="text-xl font-black mt-1">Thêm Khách Hàng Mới</h3>
@@ -71,7 +71,7 @@ export const CreateCustomerModal = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
             </div>
           )}
@@ -86,13 +86,13 @@ export const CreateCustomerModal = ({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="VD: Nguyễn Văn A"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <Phone className="w-4 h-4 text-sky-700" />
+              <Phone className="w-4 h-4 text-brand-700" />
               Số điện thoại
             </label>
             <input
@@ -101,7 +101,7 @@ export const CreateCustomerModal = ({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="VD: 0912345678"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -115,7 +115,7 @@ export const CreateCustomerModal = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="khachhang@example.com"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -129,7 +129,7 @@ export const CreateCustomerModal = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mật khẩu"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -143,7 +143,7 @@ export const CreateCustomerModal = ({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="VD: 45 Lê Duẩn, Quận 1, TP.HCM"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -158,7 +158,7 @@ export const CreateCustomerModal = ({
             <button
               type="submit"
               disabled={loading}
-              className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-sky-900/20 disabled:opacity-50 cursor-pointer"
+              className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-brand-900/20 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <span>Đang lưu...</span>

@@ -9,6 +9,7 @@ export interface UserSession {
   email?: string;
   role?: string;
   address?: string;
+  avatar_url?: string;
   is_new_user?: boolean;
   is_profile_complete?: boolean;
 }

@@ -3,7 +3,7 @@ from app.technicians.models import TECHNICIAN_PROFILES_TABLE
 
 PROFILE_SELECT = (
     "*,user:users!fk_technician_user("
-    "id,full_name,email,phone,is_active)"
+    "id,full_name,email,phone,avatar_url,is_active)"
 )
 
 
@@ -27,7 +27,7 @@ def get_all_technicians(kyc_status: str | None = None):
     user_ids = [item["user_id"] for item in data if item.get("user_id")]
     users_map = {}
     if user_ids:
-        users_resp = supabase.table("users").select("id,full_name,email,phone,is_active").in_("id", user_ids).execute()
+        users_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").in_("id", user_ids).execute()
         if users_resp and users_resp.data:
             users_map = {u["id"]: u for u in users_resp.data}
 
@@ -62,14 +62,14 @@ def get_technician_by_user_id(user_id: str):
     if response and response.data:
         item = response.data
         if item.get("user_id"):
-            user_resp = supabase.table("users").select("id,full_name,email,phone,is_active").eq("id", item["user_id"]).maybe_single().execute()
+            user_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").eq("id", item["user_id"]).maybe_single().execute()
             if user_resp and user_resp.data:
                 item["user"] = user_resp.data
         return item
 
     # Auto-create technician profile if user exists in users table
     try:
-        user_resp = supabase.table("users").select("id,full_name,email,phone,is_active").eq("id", user_id).maybe_single().execute()
+        user_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").eq("id", user_id).maybe_single().execute()
         if user_resp and user_resp.data:
             user_info = user_resp.data
             clean_id = str(user_id).replace("-", "")[:8]

@@ -122,7 +122,7 @@ const EditUserForm = ({
 };
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100";
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-100";
 
 const TextField = ({
   label,
@@ -143,7 +143,7 @@ const TextField = ({
 }) => (
   <label className="block space-y-2">
     <span className="text-base font-bold text-slate-700">
-      {label} {required && <span className="text-red-500">*</span>}
+      {label} {required && <span className="text-rose-500">*</span>}
     </span>
     <span className="relative block">
       {icon && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
@@ -178,7 +178,7 @@ const PasswordField = ({
 const RoleField = ({ roles, value, onChange }: { roles: UserRole[]; value: string; onChange: (value: string) => void }) => (
   <label className="block space-y-2">
     <span className="text-base font-bold text-slate-700">
-      Vai trò <span className="text-red-500">*</span>
+      Vai trò <span className="text-rose-500">*</span>
     </span>
     <span className="relative block">
       <Shield className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />

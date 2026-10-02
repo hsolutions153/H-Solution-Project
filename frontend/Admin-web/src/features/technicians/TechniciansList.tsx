@@ -367,10 +367,10 @@ export const TechniciansList = () => {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
@@ -401,7 +401,7 @@ export const TechniciansList = () => {
               type="button"
               onClick={() => handleViewModeChange("table")}
               className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
-                viewMode === "table" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
+                viewMode === "table" ? "text-brand-950 font-black" : "text-slate-500 hover:text-slate-800"
               }`}
               title="Chuyển sang hiển thị dạng bảng thông tin"
             >
@@ -412,7 +412,7 @@ export const TechniciansList = () => {
               type="button"
               onClick={() => handleViewModeChange("grid")}
               className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
-                viewMode === "grid" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
+                viewMode === "grid" ? "text-brand-950 font-black" : "text-slate-500 hover:text-slate-800"
               }`}
               title="Chuyển sang hiển thị dạng lưới & doanh số"
             >
@@ -424,18 +424,18 @@ export const TechniciansList = () => {
           <button
             onClick={fetchTechniciansAndOrders}
             disabled={loading}
-            className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition cursor-pointer shadow-2xs flex items-center gap-1.5 text-xs font-bold"
-            title="Làm mới dữ liệu"
+            className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition cursor-pointer"
+            title="Làm mới"
+            aria-label="Làm mới"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-sky-800" : ""}`} />
-            <span className="hidden sm:inline">Cập nhật</span>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
 
           {/* Nút Thêm KTV mới (ở chế độ Dạng bảng) */}
           {viewMode === "table" && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
+              className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
             >
               <UserPlus className="w-4 h-4 stroke-[2.5]" />
               <span>Thêm kỹ thuật viên</span>
@@ -458,14 +458,14 @@ export const TechniciansList = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Tìm theo tên thợ, số điện thoại, email, chuyên môn..."
-                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
             </div>
 
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
               <button
                 onClick={() => setStatusFilter("ALL")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ALL"
                     ? "bg-white text-slate-900 shadow-xs font-black"
                     : "text-slate-500 hover:text-slate-900"
@@ -475,30 +475,32 @@ export const TechniciansList = () => {
               </button>
               <button
                 onClick={() => setStatusFilter("ONLINE")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ONLINE"
-                    ? "bg-emerald-600 text-white shadow-xs font-black"
-                    : "text-slate-600 hover:bg-slate-200"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                🟢 Online ({technicians.filter((t) => t.is_online).length})
+                <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+                Online ({technicians.filter((t) => t.is_online).length})
               </button>
               <button
                 onClick={() => setStatusFilter("OFFLINE")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "OFFLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
                     : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                ⚪ Offline
+                <span className="size-2 rounded-full bg-slate-400" aria-hidden />
+                Offline ({technicians.filter((t) => !t.is_online).length})
               </button>
               <button
                 onClick={() => setStatusFilter("KYC_PENDING")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "KYC_PENDING"
-                    ? "bg-amber-500 text-white shadow-xs font-black"
-                    : "text-amber-700 hover:bg-amber-100"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 Chờ duyệt KYC ({technicians.filter((t) => t.kyc_status === "PENDING").length})
@@ -525,7 +527,7 @@ export const TechniciansList = () => {
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-400">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-800" />
                         Đang tải danh sách kỹ thuật viên...
                       </td>
                     </tr>
@@ -556,7 +558,7 @@ export const TechniciansList = () => {
                           {/* Kỹ thuật viên (Avatar, Tên, Liên hệ) */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-sky-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                              <div className="w-9 h-9 rounded-xl bg-brand-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                                 {initial}
                               </div>
                               <div>
@@ -588,7 +590,7 @@ export const TechniciansList = () => {
                             </div>
                             <div className="text-[11px] text-slate-500 mt-0.5">
                               {tech.experience_years || 1} năm KN ·{" "}
-                              <span className="font-semibold text-sky-800">
+                              <span className="font-semibold text-brand-800">
                                 {tech.skills === "BOTH"
                                   ? "Scooter & Xe hỗ trợ"
                                   : tech.skills === "SCOOTER"
@@ -641,20 +643,20 @@ export const TechniciansList = () => {
                           {/* Xác thực KYC */}
                           <td className="py-3.5 px-4">
                             {tech.kyc_status === "APPROVED" ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                                 <CheckCircle2 className="w-3 h-3" /> Đã duyệt
                               </span>
                             ) : tech.kyc_status === "PENDING" ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedKycTech(tech)}
-                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition cursor-pointer whitespace-nowrap"
                                 title="Bấm để xét duyệt KYC"
                               >
                                 <Clock className="w-3 h-3" /> Chờ duyệt
                               </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                                 <XCircle className="w-3 h-3" /> Từ chối
                               </span>
                             )}
@@ -678,7 +680,7 @@ export const TechniciansList = () => {
                               <button
                                 type="button"
                                 onClick={() => setViewingTech(tech)}
-                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 hover:text-brand-950 transition cursor-pointer shadow-2xs"
                                 title="Xem chi tiết hồ sơ kỹ thuật viên"
                                 aria-label="Xem chi tiết"
                               >
@@ -700,7 +702,7 @@ export const TechniciansList = () => {
                               <button
                                 type="button"
                                 onClick={() => setDeletingTech(tech)}
-                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 transition cursor-pointer shadow-2xs"
+                                className="w-8 h-8 rounded-xl flex items-center justify-center border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-800 transition cursor-pointer shadow-2xs"
                                 title="Xóa kỹ thuật viên"
                                 aria-label="Xóa kỹ thuật viên"
                               >
@@ -741,7 +743,7 @@ export const TechniciansList = () => {
           <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="p-2 bg-sky-50 text-sky-900 rounded-xl font-bold">
+                <span className="p-2 bg-brand-50 text-brand-900 rounded-xl font-bold">
                   <BarChart3 className="w-5 h-5" />
                 </span>
                 <div>
@@ -760,7 +762,7 @@ export const TechniciansList = () => {
                   onClick={() => setTimeRange("TODAY")}
                   className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                     timeRange === "TODAY"
-                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      ? "bg-white text-brand-700 shadow-xs font-black"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -771,7 +773,7 @@ export const TechniciansList = () => {
                   onClick={() => setTimeRange("MONTH")}
                   className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                     timeRange === "MONTH"
-                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      ? "bg-white text-brand-700 shadow-xs font-black"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -782,7 +784,7 @@ export const TechniciansList = () => {
                   onClick={() => setTimeRange("YEAR")}
                   className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                     timeRange === "YEAR"
-                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      ? "bg-white text-brand-700 shadow-xs font-black"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -793,7 +795,7 @@ export const TechniciansList = () => {
                   onClick={() => setTimeRange("ALL")}
                   className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                     timeRange === "ALL"
-                      ? "bg-white text-blue-700 shadow-xs font-black"
+                      ? "bg-white text-brand-700 shadow-xs font-black"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -805,12 +807,12 @@ export const TechniciansList = () => {
 
             {/* 4 Cards Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 border border-blue-100 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-50/80 to-brand-50/40 border border-brand-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
                   <DollarSign className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase text-blue-900/70 block tracking-wider">
+                  <span className="text-[11px] font-bold uppercase text-brand-900/70 block tracking-wider">
                     Tổng Doanh Thu (
                     {timeRange === "TODAY"
                       ? "Hôm nay"
@@ -821,13 +823,13 @@ export const TechniciansList = () => {
                       : "Toàn bộ"}
                     )
                   </span>
-                  <span className="text-xl font-black text-blue-950">
+                  <span className="text-xl font-black text-brand-950">
                     {overallTotals.totalRev.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border border-emerald-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-brand-50/40 border border-emerald-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
                   <Wrench className="w-6 h-6" />
                 </div>
@@ -841,21 +843,21 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/80 to-pink-50/40 border border-purple-100 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-sm">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-50/80 to-pink-50/40 border border-brand-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
                   <Activity className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase text-purple-900/70 block tracking-wider">
+                  <span className="text-[11px] font-bold uppercase text-brand-900/70 block tracking-wider">
                     Đang Hoạt Động (Online)
                   </span>
-                  <span className="text-xl font-black text-purple-950">
+                  <span className="text-xl font-black text-brand-950">
                     {technicians.filter((t) => t.is_online).length} / {technicians.length} thợ
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-yellow-50/40 border border-amber-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-amber-50/40 border border-amber-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
                   <Star className="w-6 h-6 fill-white" />
                 </div>
@@ -863,8 +865,8 @@ export const TechniciansList = () => {
                   <span className="text-[11px] font-bold uppercase text-amber-900/70 block tracking-wider">
                     Đánh Giá Trung Bình
                   </span>
-                  <span className="text-xl font-black text-amber-950">
-                    5.0 ⭐ (Xuất sắc)
+                  <span className="flex items-center gap-1.5 text-xl font-black text-amber-950">
+                    5.0 <Star className="w-4 h-4 fill-amber-400 text-amber-400" /> (Xuất sắc)
                   </span>
                 </div>
               </div>
@@ -880,14 +882,14 @@ export const TechniciansList = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
-                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
             </div>
 
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
               <button
                 onClick={() => setStatusFilter("ALL")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ALL"
                     ? "bg-white text-slate-900 shadow-xs font-black"
                     : "text-slate-500 hover:text-slate-900"
@@ -897,30 +899,32 @@ export const TechniciansList = () => {
               </button>
               <button
                 onClick={() => setStatusFilter("ONLINE")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ONLINE"
-                    ? "bg-emerald-600 text-white shadow-xs font-black"
-                    : "text-slate-600 hover:bg-slate-200"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                🟢 Online ({technicians.filter((t) => t.is_online).length})
+                <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+                Online ({technicians.filter((t) => t.is_online).length})
               </button>
               <button
                 onClick={() => setStatusFilter("OFFLINE")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "OFFLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
                     : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                ⚪ Offline
+                <span className="size-2 rounded-full bg-slate-400" aria-hidden />
+                Offline ({technicians.filter((t) => !t.is_online).length})
               </button>
               <button
                 onClick={() => setStatusFilter("KYC_PENDING")}
-                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "KYC_PENDING"
-                    ? "bg-amber-500 text-white shadow-xs font-black"
-                    : "text-amber-700 hover:bg-amber-100"
+                    ? "bg-white text-slate-900 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 Chờ duyệt KYC ({technicians.filter((t) => t.kyc_status === "PENDING").length})
@@ -932,7 +936,7 @@ export const TechniciansList = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {loading ? (
               <div className="col-span-full py-16 text-center text-slate-400">
-                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-sky-800" />
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-brand-800" />
                 Đang tải dữ liệu và tính toán doanh số kỹ thuật viên...
               </div>
             ) : filteredTechs.length === 0 ? (
@@ -960,7 +964,7 @@ export const TechniciansList = () => {
                 return (
                   <div
                     key={techId}
-                    className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-blue-200 transition group"
+                    className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-brand-200 transition group"
                   >
                     <div>
                       {/* Top Badge */}
@@ -981,25 +985,25 @@ export const TechniciansList = () => {
                         </span>
 
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                             isApproved
-                              ? "bg-sky-50 text-sky-700 border-sky-200"
-                              : tech.kyc_status === "PENDING"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : tech.kyc_status === "PENDING" || !tech.kyc_status
                               ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-red-50 text-red-600 border-red-200"
+                              : "bg-rose-50 text-rose-600 border-rose-200"
                           }`}
                         >
-                          KYC: {tech.kyc_status || "PENDING"}
+                          {isApproved ? "KYC đã duyệt" : tech.kyc_status === "PENDING" || !tech.kyc_status ? "KYC chờ duyệt" : "KYC bị từ chối"}
                         </span>
                       </div>
 
                       {/* Info & Avatar */}
                       <div className="flex items-center gap-3.5 mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-sky-900 text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm">
+                        <div className="w-12 h-12 rounded-2xl bg-brand-900 text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm">
                           {name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition">
+                          <h4 className="font-bold text-slate-900 text-base group-hover:text-brand-600 transition">
                             {name}
                           </h4>
                           <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
@@ -1026,7 +1030,8 @@ export const TechniciansList = () => {
                         <div className="flex justify-between text-slate-600">
                           <span className="text-slate-400">Đánh giá:</span>
                           <span className="font-bold text-amber-600 flex items-center gap-1">
-                            ⭐ {Number(tech.rating_avg || 5.0).toFixed(1)} ({stats.allOrders || 12} lượt)
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            {Number(tech.rating_avg || 5.0).toFixed(1)} ({stats.allOrders || 0} lượt)
                           </span>
                         </div>
                       </div>
@@ -1045,7 +1050,7 @@ export const TechniciansList = () => {
                               : "Tất cả"}
                             )
                           </span>
-                          <span className="text-sm font-black text-blue-900">
+                          <span className="text-sm font-black text-brand-900">
                             {(timeRange === "TODAY"
                               ? stats.todayRevenue
                               : timeRange === "MONTH"
@@ -1153,7 +1158,7 @@ export const TechniciansList = () => {
           <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
               <div>
-                <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+                <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                   Báo cáo hiệu suất kỹ thuật viên
                 </span>
                 <h3 className="text-xl font-black mt-1">
@@ -1178,19 +1183,19 @@ export const TechniciansList = () => {
                   <span className="text-lg font-black text-slate-900 block mt-1">
                     {detailStatsTech.stats.todayOrders} đơn
                   </span>
-                  <span className="text-xs font-bold text-blue-900 block">
+                  <span className="text-xs font-bold text-brand-900 block">
                     {detailStatsTech.stats.todayRevenue.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
 
-                <div className="p-3.5 bg-blue-50/50 border border-blue-200/80 rounded-2xl text-center">
-                  <span className="text-[11px] font-bold text-blue-800 uppercase block">
+                <div className="p-3.5 bg-brand-50/50 border border-brand-200/80 rounded-2xl text-center">
+                  <span className="text-[11px] font-bold text-brand-800 uppercase block">
                     Tháng {currentMonth}
                   </span>
-                  <span className="text-lg font-black text-blue-950 block mt-1">
+                  <span className="text-lg font-black text-brand-950 block mt-1">
                     {detailStatsTech.stats.monthOrders} đơn
                   </span>
-                  <span className="text-xs font-bold text-blue-900 block">
+                  <span className="text-xs font-bold text-brand-900 block">
                     {detailStatsTech.stats.monthRevenue.toLocaleString("vi-VN")} đ
                   </span>
                 </div>
@@ -1233,7 +1238,7 @@ export const TechniciansList = () => {
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="font-bold text-blue-900 block">
+                          <span className="font-bold text-brand-900 block">
                             {(ord.total_amount || 350000).toLocaleString("vi-VN")} đ
                           </span>
                           <span className="text-[10px] text-slate-400">
@@ -1265,7 +1270,7 @@ export const TechniciansList = () => {
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
               <div>
-                <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+                <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                   Xác thực danh tính
                 </span>
                 <h3 className="text-xl font-black mt-1">Duyệt Hồ Sơ Kỹ Thuật Viên</h3>
@@ -1291,7 +1296,7 @@ export const TechniciansList = () => {
                 </div>
                 <div className="text-xs text-slate-600">
                   Trạng thái KYC hiện tại:{" "}
-                  <span className="font-bold text-sky-900">
+                  <span className="font-bold text-brand-900">
                     {selectedKycTech.kyc_status || "PENDING"}
                   </span>
                 </div>
@@ -1306,7 +1311,7 @@ export const TechniciansList = () => {
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="VD: Ảnh CCCD mờ, chứng chỉ hết hạn..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500"
                 />
               </div>
 
@@ -1317,7 +1322,7 @@ export const TechniciansList = () => {
                     handleReviewKyc(selectedKycTech.user_id || selectedKycTech.id, "REJECTED")
                   }
                   disabled={kycLoading}
-                  className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Từ chối</span>

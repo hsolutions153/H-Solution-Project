@@ -370,7 +370,7 @@ export default function BookingPage() {
               <EMobiCareLogoIcon size={26} />
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#0077B6", letterSpacing: "0.04em" }}>H-Mobility Care</span>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#156495", letterSpacing: "0.04em" }}>H-Mobility Care</span>
                   {step !== "SUCCESS" && (
                     <span className="booking-header-step" style={{ margin: 0 }}>
                       · Bước {STEP_ORDER.indexOf(step) + 1}/{STEP_ORDER.length}

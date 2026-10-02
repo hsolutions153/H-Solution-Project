@@ -75,13 +75,13 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="text-xs font-bold text-sky-800 hover:underline flex items-center gap-1 cursor-pointer"
+          className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Đăng ký Chẩn đoán
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-1">
         <p className="text-[10px] text-slate-400 font-medium">
           MA ĐƠN: {task.code || `#JOB-2904`}
         </p>
@@ -96,7 +96,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center text-sky-800 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-brand-100 flex items-center justify-center text-brand-800 shrink-0">
               <FileText className="w-4 h-4" />
             </div>
             <div>
@@ -138,14 +138,14 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
             }}
             placeholder="Nhập chi tiết lỗi kiểm tra được và các vấn đề phát sinh (ví dụ: Bình ắc quy bị chai phồng, sụt áp nhanh; cần thay cụm bình mới)..."
             rows={4}
-            className={`w-full p-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 ${
+            className={`w-full p-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 ${
               noteError
-                ? "border-red-500 bg-red-50/20"
-                : "border-slate-200 focus:border-sky-800 focus:bg-white"
-            } rounded-xl focus:outline-none focus:ring-3 focus:ring-sky-800/10 transition-all resize-none leading-relaxed`}
+                ? "border-rose-500 bg-rose-50/20"
+                : "border-slate-200 focus:border-brand-800 focus:bg-white"
+            } rounded-xl focus:outline-none focus:ring-3 focus:ring-brand-800/10 transition-all resize-none leading-relaxed`}
           />
           {noteError && (
-            <p className="text-[11px] text-red-600 font-semibold mt-1 flex items-center gap-1">
+            <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               {noteError}
             </p>
@@ -177,7 +177,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
                     return `${trimmed}, ${tag}`;
                   });
                 }}
-                className="text-[11px] font-semibold px-2.5 py-1 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-300 border border-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer active:scale-95 shadow-2xs"
+                className="text-[11px] font-semibold px-2.5 py-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-900 hover:border-brand-300 border border-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer active:scale-95 shadow-2xs"
               >
                 + {tag}
               </button>
@@ -193,11 +193,11 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           onClick={() => setRepairType("FIX_NOW")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
             repairType === "FIX_NOW"
-              ? "bg-sky-50 border-sky-400 text-sky-900 shadow-xs"
-              : "bg-white border-gray-100 text-slate-700 hover:bg-gray-50"
+              ? "bg-brand-50 border-brand-400 text-brand-900 shadow-xs"
+              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
           }`}
         >
-          <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center text-sky-800">
+          <div className="w-8 h-8 rounded-xl bg-brand-100 flex items-center justify-center text-brand-800">
             <Wrench className="w-4 h-4" />
           </div>
           <span className="text-xs font-bold">Sửa được ngay</span>
@@ -207,11 +207,11 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           onClick={() => setRepairType("BRING_TO_WORKSHOP")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
             repairType === "BRING_TO_WORKSHOP"
-              ? "bg-sky-50 border-sky-400 text-sky-900 shadow-xs"
-              : "bg-white border-gray-100 text-slate-700 hover:bg-gray-50"
+              ? "bg-brand-50 border-brand-400 text-brand-900 shadow-xs"
+              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
           }`}
         >
-          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-slate-700">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
             <Cpu className="w-4 h-4" />
           </div>
           <span className="text-xs font-bold">Cần mang về xưởng</span>
@@ -221,18 +221,18 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           onClick={() => setRepairType("CANT_FIX")}
           className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
             repairType === "CANT_FIX"
-              ? "bg-red-50 border-red-300 text-red-900 shadow-xs"
-              : "bg-white border-gray-100 text-slate-700 hover:bg-gray-50"
+              ? "bg-rose-50 border-rose-300 text-rose-900 shadow-xs"
+              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
           }`}
         >
-          <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
+          <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600">
             <XCircle className="w-4 h-4" />
           </div>
           <span className="text-xs font-bold">Không thể sửa</span>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-800">Chụp ảnh hiện trạng</p>
@@ -241,7 +241,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           <button
             type="button"
             onClick={() => document.getElementById("cameraInput")?.click()}
-            className="bg-sky-900 hover:bg-sky-950 text-white px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+            className="bg-brand-900 hover:bg-brand-950 text-white px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
           >
             <Camera className="w-3.5 h-3.5" />
             Chụp ảnh
@@ -250,7 +250,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
 
         <div className="grid grid-cols-2 gap-2">
           {images.map((imgSrc, index) => (
-            <div key={index} className="rounded-xl overflow-hidden h-20 border border-gray-100 relative group">
+            <div key={index} className="rounded-xl overflow-hidden h-20 border border-slate-100 relative group">
               <img
                 src={imgSrc}
                 className="w-full h-full object-cover"
@@ -271,7 +271,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
 
           <div
             onClick={() => setShowImagePickerModal(true)}
-            className="rounded-xl border-2 border-dashed border-gray-200 h-20 flex flex-col items-center justify-center text-slate-400 hover:border-sky-800 hover:text-sky-800 cursor-pointer transition bg-gray-50/50"
+            className="rounded-xl border-2 border-dashed border-slate-200 h-20 flex flex-col items-center justify-center text-slate-400 hover:border-brand-800 hover:text-brand-800 cursor-pointer transition bg-slate-50/50"
           >
             <Plus className="w-5 h-5 mb-1" />
             <span className="text-[10px] font-bold">Thêm ảnh</span>
@@ -280,7 +280,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
       </div>
 
       <div className="bg-slate-100 rounded-2xl p-3 flex items-start gap-2 text-slate-600">
-        <Info className="w-4 h-4 text-sky-800 shrink-0 mt-0.5" />
+        <Info className="w-4 h-4 text-brand-800 shrink-0 mt-0.5" />
         <p className="text-[11px] leading-relaxed">
           Cần chuẩn bị linh kiện thay thế nếu chuyển về xưởng hoặc tiến hành báo giá trực tiếp.
         </p>
@@ -291,7 +291,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           type="button"
           onClick={onBack}
           disabled={isUploading}
-          className="flex-1 py-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-slate-700 font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50"
+          className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50"
         >
           Hủy bỏ
         </button>
@@ -353,7 +353,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
               updatedTaskResponse
             );
           }}
-          className="flex-1 py-3 bg-sky-900 hover:bg-sky-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm disabled:opacity-50"
+          className="flex-1 py-3 bg-brand-900 hover:bg-brand-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm disabled:opacity-50"
         >
           {isUploading ? (
             <span className="flex items-center gap-1.5">
@@ -367,14 +367,14 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
       </div>
 
       {showImagePickerModal && (
-        <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 animate-fade-in">
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 p-4 animate-fade-in">
           <div className="bg-white w-full max-w-xs rounded-3xl p-4 shadow-xl space-y-3 animate-slide-up">
             <div className="flex items-center justify-between border-b pb-2">
               <h4 className="text-xs font-bold text-slate-800">Thêm hình ảnh hiện trạng</h4>
               <button
                 type="button"
                 onClick={() => setShowImagePickerModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:bg-gray-100 cursor-pointer"
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -387,9 +387,9 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
                   setShowImagePickerModal(false);
                   document.getElementById("cameraInput")?.click();
                 }}
-                className="w-full py-2.5 px-3 bg-sky-50 hover:bg-sky-100 text-sky-900 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
+                className="w-full py-2.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-900 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
               >
-                <Camera className="w-4 h-4 text-sky-800" />
+                <Camera className="w-4 h-4 text-brand-800" />
                 Bật Camera chụp trực tiếp
               </button>
 
@@ -399,7 +399,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
                   setShowImagePickerModal(false);
                   document.getElementById("galleryInput")?.click();
                 }}
-                className="w-full py-2.5 px-3 bg-gray-50 hover:bg-gray-100 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
+                className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-slate-500" />
                 Chọn ảnh từ thư viện thiết bị

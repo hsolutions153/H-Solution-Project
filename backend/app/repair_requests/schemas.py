@@ -40,8 +40,9 @@ class RepairRequestCreate(BaseModel):
 class RepairRequestStatusUpdate(BaseModel):
     status: str
     cancel_reason: str | None = None
-    total_amount: Decimal | float | None = None
-    totalCost: Decimal | float | None = None
+    total_amount: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+    totalCost: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+    final_cost: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 from enum import Enum
@@ -57,10 +58,10 @@ class QuoteItemCreate(BaseModel):
     name: str | None = None
     item_name: str | None = None
     item_type: str | None = None
-    quantity: float = 1.0
-    price: float = 0.0
-    unit_price: float | None = None
-    subtotal: float | None = None
+    quantity: float = Field(default=1.0, gt=0, allow_inf_nan=False)
+    price: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    subtotal: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class QuoteCreateRequest(BaseModel):
@@ -95,6 +96,7 @@ class QuoteResponse(BaseModel):
     parts_cost: float | None = 0
     estimated_price: float
     status: str
+    reject_reason: str | None = None
     created_at: datetime | str
     payment_method: str | None = None
     items: list[QuoteItemResponse] = []
@@ -171,6 +173,8 @@ class RepairRequestResponse(BaseModel):
     cancelled_at: datetime | None = None
     cancel_reason: str | None = None
     total_amount: Decimal | None = None
+    initial_estimate: Decimal | None = None
+    approved_estimate: Decimal = Decimal("0")
     payment_method: str | None = None
     created_at: datetime
     created_by: str

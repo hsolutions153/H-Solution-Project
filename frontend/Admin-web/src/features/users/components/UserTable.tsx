@@ -144,9 +144,9 @@ export const UserTable: React.FC<UserTableProps> = ({
 const RoleBadge = ({ roleCode, roleName }: { roleCode: string; roleName: string }) => {
   const toneClass =
     roleCode === "ADMIN"
-      ? "bg-sky-50 text-sky-700"
+      ? "bg-brand-50 text-brand-700"
       : roleCode === "TECHNICIAN"
-        ? "bg-indigo-50 text-indigo-700"
+        ? "bg-brand-50 text-brand-700"
         : "bg-emerald-50 text-emerald-700";
 
   return <span className={`inline-flex rounded-full px-3 py-1 text-base font-bold ${toneClass}`}>{roleName}</span>;
@@ -175,8 +175,8 @@ const IconButton = ({
     onClick={onClick}
     className={`rounded-xl p-2 transition ${
       danger
-        ? "text-slate-400 hover:bg-red-50 hover:text-red-600"
-        : "text-slate-400 hover:bg-sky-50 hover:text-sky-700"
+        ? "text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+        : "text-slate-400 hover:bg-brand-50 hover:text-brand-700"
     }`}
   >
     {children}

@@ -149,7 +149,7 @@ export const TaskDetailScreen = ({
       return (
         <QuoteStatusScreen
           task={activeTask}
-          isApproved={activeTask.status === "ESTIMATE_APPROVED" || activeTask.quote?.status === "APPROVED" || quoteData?.status === "APPROVED"}
+          isApproved={activeTask.status === "ESTIMATE_APPROVED" || activeTask.quote?.status === "ACCEPTED"}
           onBack={onBack}
           onViewDetailQuote={() => setSubStep("QUOTE")}
           onContinueRepair={() => {
@@ -172,7 +172,6 @@ export const TaskDetailScreen = ({
             }
           }}
           onComplete={(completedData) => {
-            onUpdateStatus(activeTask.id, "COMPLETED", "Hoàn thành", "COMPLETED");
             sessionStorage.removeItem("subStep");
             if (onCompleteRepair) {
               onCompleteRepair(completedData);
@@ -209,7 +208,7 @@ export const TaskDetailScreen = ({
         <button
           type="button"
           onClick={onBack}
-          className="text-xs font-bold text-sky-800 hover:underline flex items-center gap-1 cursor-pointer"
+          className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Quay lại
         </button>
@@ -224,7 +223,7 @@ export const TaskDetailScreen = ({
         </span>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Khách hàng
@@ -238,44 +237,46 @@ export const TaskDetailScreen = ({
 
           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
             <Smartphone className="w-3.5 h-3.5 text-slate-400" />{" "}
-            {task.customerPhone || "0912 345 678"}
+            {task.customerPhone || "Chưa có SĐT"}
           </p>
         </div>
 
-        <a
-          href={`tel:${task.customerPhone || "0912345678"}`}
-          className="w-10 h-10 bg-sky-800 rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-sky-900 transition-colors shadow-sm"
-          title="Gọi cho khách hàng"
-        >
-          <Phone className="w-4 h-4" />
-        </a>
+        {task.customerPhone ? (
+          <a
+            href={`tel:${task.customerPhone}`}
+            className="w-10 h-10 bg-brand-800 rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-brand-900 transition-colors shadow-sm"
+            title="Gọi cho khách hàng"
+          >
+            <Phone className="w-4 h-4" />
+          </a>
+        ) : null}
       </div>
 
-      <div className="bg-linear-to-r from-sky-50 to-blue-50/60 rounded-2xl p-3.5 border border-sky-100 flex items-center gap-3">
-        <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-sky-800 shadow-xs border border-sky-100 shrink-0">
+      <div className="bg-linear-to-r from-brand-50 to-brand-50/60 rounded-2xl p-3.5 border border-brand-100 flex items-center gap-3">
+        <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-brand-800 shadow-xs border border-brand-100 shrink-0">
           <Calendar className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-[10px] font-bold text-sky-800 uppercase tracking-wider">
+          <p className="text-[10px] font-bold text-brand-800 uppercase tracking-wider">
             Thời gian & Khung giờ đặt
           </p>
           <p className="text-xs font-bold text-slate-800 mt-0.5">
             {task.bookingDate} {" "}
-            <span className="text-sky-700">
+            <span className="text-brand-700">
               {task.bookingSlot || task.requestedTime || task.time || ""}
             </span>
           </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3">
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Thiết bị & Lỗi
           </p>
 
           <div className="flex gap-3 mt-2">
-            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-sky-800 shrink-0">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-brand-800 shrink-0">
               <Accessibility className="w-5 h-5" />
             </div>
 
@@ -286,7 +287,7 @@ export const TaskDetailScreen = ({
           </div>
         </div>
 
-        <hr className="border-gray-100" />
+        <hr className="border-slate-100" />
 
         <div>
           <p className="text-[11px] font-bold mb-1">Mô tả chi tiết từ khách hàng</p>
@@ -323,7 +324,7 @@ export const TaskDetailScreen = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 relative shadow-xs">
+      <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 relative shadow-xs">
         <div className="relative h-36 w-full overflow-hidden bg-slate-100">
           <div className="absolute inset-0 w-full h-full pointer-events-none scale-105">
             <iframe
@@ -334,14 +335,14 @@ export const TaskDetailScreen = ({
             />
           </div>
 
-          <div className="absolute top-0.3 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl shadow-md border border-gray-100 pointer-events-none text-center z-10">
+          <div className="absolute top-0.3 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl shadow-md border border-slate-100 pointer-events-none text-center z-10">
             <p className="text-[11px] font-bold text-slate-800 whitespace-nowrap">
               {task.address.split(",")[0]}
             </p>
             <p className="text-[9px] text-slate-500 whitespace-nowrap">
               {task.address.split(",").slice(1).join(",").trim()}
             </p>
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45 border-r border-b border-gray-100"></div>
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45 border-r border-b border-slate-100"></div>
           </div>
 
           <button
@@ -351,7 +352,7 @@ export const TaskDetailScreen = ({
                 "_blank",
               )
             }
-            className="absolute bottom-2 right-2 bg-sky-800 hover:bg-sky-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-colors z-10"
+            className="absolute bottom-2 right-2 bg-brand-800 hover:bg-brand-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md transition-colors z-10"
           >
             <Navigation className="w-3.5 h-3.5" />
             Chỉ đường
@@ -365,7 +366,7 @@ export const TaskDetailScreen = ({
             onClick={() => {
               onUpdateStatus(task.id, "PENDING", task.isEmergency ? "Tiếp nhận đơn" : "Đã xác nhận lịch", "ACCEPTED");
             }}
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
+            className="w-full py-3 bg-brand-800 hover:bg-brand-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
           >
             <CheckCircle2 className="w-4 h-4" />
             {task.isEmergency ? "Tiếp nhận đơn cứu hộ" : "Xác nhận lịch hẹn"}
@@ -378,7 +379,7 @@ export const TaskDetailScreen = ({
               onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển", "EN_ROUTE");
               setIsTravelModalOpen(true);
             }}
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
+            className="w-full py-3 bg-brand-800 hover:bg-brand-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
           >
             <Bike className="w-4 h-4" />
             Xác nhận di chuyển
@@ -389,7 +390,7 @@ export const TaskDetailScreen = ({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setIsTravelModalOpen(true)}
-              className="py-3 bg-sky-800 hover:bg-sky-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
+              className="py-3 bg-brand-800 hover:bg-brand-900 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
             >
               <Bike className="w-4 h-4" />
               {task.status === "WAITING_MOVE" ? "Bản đồ di chuyển" : "Tiếp tục hành trình"}
@@ -412,7 +413,7 @@ export const TaskDetailScreen = ({
               onUpdateStatus(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
               setSubStep("DIAGNOSTIC");
             }}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition"
           >
             <CheckCircle2 className="w-4 h-4" />
             Bắt đầu kiểm tra & Chẩn đoán

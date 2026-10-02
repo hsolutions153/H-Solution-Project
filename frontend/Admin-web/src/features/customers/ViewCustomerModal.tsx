@@ -44,9 +44,9 @@ export const ViewCustomerModal = ({
       value: customer.phone ? (
         <a
           href={`tel:${customer.phone}`}
-          className="text-sky-700 hover:underline font-semibold inline-flex items-center gap-1.5"
+          className="text-brand-700 hover:underline font-semibold inline-flex items-center gap-1.5"
         >
-          <Phone className="w-3.5 h-3.5 text-sky-600" />
+          <Phone className="w-3.5 h-3.5 text-brand-600" />
           {customer.phone}
         </a>
       ) : (
@@ -58,9 +58,9 @@ export const ViewCustomerModal = ({
       value: customer.email ? (
         <a
           href={`mailto:${customer.email}`}
-          className="text-sky-700 hover:underline font-semibold inline-flex items-center gap-1.5"
+          className="text-brand-700 hover:underline font-semibold inline-flex items-center gap-1.5"
         >
-          <Mail className="w-3.5 h-3.5 text-sky-600" />
+          <Mail className="w-3.5 h-3.5 text-brand-600" />
           {customer.email}
         </a>
       ) : (
@@ -81,8 +81,8 @@ export const ViewCustomerModal = ({
     {
       label: "Số thiết bị sở hữu",
       value: (
-        <span className="inline-flex items-center gap-1.5 font-bold text-sky-900 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
-          <Bike className="w-3.5 h-3.5 text-sky-700" />
+        <span className="inline-flex items-center gap-1.5 font-bold text-brand-900 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100">
+          <Bike className="w-3.5 h-3.5 text-brand-700" />
           <span>{customer.device_count ?? customer.total_devices ?? 0} thiết bị</span>
         </span>
       ),
@@ -95,7 +95,7 @@ export const ViewCustomerModal = ({
             <CheckCircle2 className="w-3.5 h-3.5" /> Hoạt động
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
             <XCircle className="w-3.5 h-3.5" /> Bị khóa
           </span>
         ),
@@ -142,11 +142,11 @@ export const ViewCustomerModal = ({
         {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-900/60 border border-sky-400/30 flex items-center justify-center text-sky-400">
+            <div className="w-10 h-10 rounded-2xl bg-brand-900/60 border border-brand-400/30 flex items-center justify-center text-brand-400">
               <User className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+              <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                 Thông tin chi tiết
               </span>
               <h3 className="text-xl font-black mt-0.5">{customerName}</h3>

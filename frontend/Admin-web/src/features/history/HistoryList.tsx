@@ -110,7 +110,7 @@ export const HistoryList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo mã đơn, tên khách hàng..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
         </div>
       </div>
@@ -134,7 +134,7 @@ export const HistoryList = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-800" />
                     Đang tải lịch sử...
                   </td>
                 </tr>
@@ -183,7 +183,7 @@ export const HistoryList = () => {
                       <td className="py-3.5 px-4 text-right">
                         <button
                           onClick={() => setSelectedOrder(o)}
-                          className="p-2 text-sky-800 hover:bg-sky-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-bold cursor-pointer"
+                          className="p-2 text-brand-800 hover:bg-brand-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-bold cursor-pointer"
                         >
                           <Eye className="w-4 h-4" />
                           <span>Chi tiết</span>

@@ -43,9 +43,9 @@ export const ViewTechnicianModal = ({
       value: phone ? (
         <a
           href={`tel:${phone}`}
-          className="text-sky-700 hover:underline font-semibold inline-flex items-center gap-1.5"
+          className="text-brand-700 hover:underline font-semibold inline-flex items-center gap-1.5"
         >
-          <Phone className="w-3.5 h-3.5 text-sky-600" />
+          <Phone className="w-3.5 h-3.5 text-brand-600" />
           {phone}
         </a>
       ) : (
@@ -57,9 +57,9 @@ export const ViewTechnicianModal = ({
       value: email ? (
         <a
           href={`mailto:${email}`}
-          className="text-sky-700 hover:underline font-semibold inline-flex items-center gap-1.5"
+          className="text-brand-700 hover:underline font-semibold inline-flex items-center gap-1.5"
         >
-          <Mail className="w-3.5 h-3.5 text-sky-600" />
+          <Mail className="w-3.5 h-3.5 text-brand-600" />
           {email}
         </a>
       ) : (
@@ -93,7 +93,7 @@ export const ViewTechnicianModal = ({
     {
       label: "Kỹ năng chuyên trách",
       value: (
-        <span className="text-sky-900 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100 inline-block">
+        <span className="text-brand-900 font-semibold bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100 inline-block">
           {skillLabel}
         </span>
       ),
@@ -122,7 +122,7 @@ export const ViewTechnicianModal = ({
             <Clock className="w-3.5 h-3.5" /> Đang chờ duyệt KYC
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
             <XCircle className="w-3.5 h-3.5" /> Từ chối KYC
           </span>
         ),
@@ -152,11 +152,11 @@ export const ViewTechnicianModal = ({
         {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-900/60 border border-sky-400/30 flex items-center justify-center text-sky-400">
+            <div className="w-10 h-10 rounded-2xl bg-brand-900/60 border border-brand-400/30 flex items-center justify-center text-brand-400">
               <User className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+              <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                 Hồ sơ chi tiết
               </span>
               <h3 className="text-xl font-black mt-0.5">{name}</h3>

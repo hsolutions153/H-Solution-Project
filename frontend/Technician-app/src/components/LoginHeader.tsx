@@ -1,19 +1,14 @@
 'use client';
 
 import React from 'react';
+import { BrandLockup } from '@h-mobility/ui';
 
 export const LoginHeader = () => {
   return (
-    <div className="text-center mb-6">
-      <div className="w-14 h-14 bg-sky-800 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-md mb-3">
-        🛠️
-      </div>
-      <h1 className="text-xl font-extrabold text-sky-900 tracking-tight">
-        FieldService Pro
-      </h1>
-      <p className="text-xs text-slate-500 font-medium mt-1">
-        Cổng thông tin Kỹ thuật viên
-      </p>
+    <div className="mb-7">
+      <BrandLockup size={44} product="Kỹ thuật viên" />
+      <h1 className="mt-7 text-2xl font-bold tracking-tight text-ink">Đăng nhập</h1>
+      <p className="mt-1 text-sm text-slate-600">Xem và xử lý các yêu cầu sửa chữa được giao cho bạn.</p>
     </div>
   );
 };

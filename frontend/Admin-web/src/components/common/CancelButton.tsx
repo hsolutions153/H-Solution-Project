@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "@h-mobility/ui";
 
 interface CancelButtonProps {
   onCancel: () => void;
@@ -12,13 +13,8 @@ export const CancelButton: React.FC<CancelButtonProps> = ({
   disabled = false,
 }) => {
   return (
-    <button
-      type="button"
-      onClick={onCancel}
-      disabled={disabled}
-      className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
-    >
+    <Button variant="secondary" onClick={onCancel} disabled={disabled}>
       {label}
-    </button>
+    </Button>
   );
 };

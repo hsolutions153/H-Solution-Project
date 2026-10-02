@@ -19,7 +19,7 @@ export const VerifySuccessScreen = ({
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       
-      <div className="w-full max-w-sm bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm flex flex-col justify-between">
+      <div className="w-full max-w-sm bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between">
         <div className="my-auto pt-2">
           
           <LoginHeader />
@@ -43,21 +43,21 @@ export const VerifySuccessScreen = ({
             
             <button
               type="submit"
-              className="w-full rounded-xl bg-sky-900 py-3 text-sm font-bold text-white shadow-md hover:bg-sky-950 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full rounded-xl bg-brand-900 py-3 text-sm font-bold text-white shadow-md hover:bg-brand-950 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Đặt lại mật khẩu</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          <hr className="my-6 border-gray-100" />
+          <hr className="my-6 border-slate-100" />
 
           
           <p className="text-[11px] text-center text-slate-500">
             Bạn cần hỗ trợ?{" "}
             <a
               href="tel:1900xxxx"
-              className="font-bold text-sky-800 hover:underline transition-colors"
+              className="font-bold text-brand-800 hover:underline transition-colors"
             >
               Liên hệ tổng đài
             </a>

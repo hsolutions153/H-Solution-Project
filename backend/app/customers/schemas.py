@@ -31,6 +31,7 @@ class CustomerResponse(BaseModel):
     phone: str | None = None
     email: EmailStr
     address: str | None = None
+    avatar_url: str | None = None
     is_active: bool
     is_profile_complete: bool = True
     device_count: int = 0

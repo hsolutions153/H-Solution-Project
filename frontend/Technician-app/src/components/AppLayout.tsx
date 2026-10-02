@@ -27,7 +27,7 @@ export const AppLayout = ({
   };
 
   return (
-    <div className="h-screen bg-slate-50 w-full max-w-sm mx-auto border-x border-gray-200 flex flex-col relative shadow-lg rounded-3xl overflow-hidden font-sans">
+    <div className="h-full bg-slate-50 w-full flex flex-col relative overflow-hidden font-sans">
       
       <Header onLogout={onLogout} />
 

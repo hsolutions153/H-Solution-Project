@@ -93,7 +93,7 @@ export const EditCustomerModal = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
             </div>
           )}
@@ -119,7 +119,7 @@ export const EditCustomerModal = ({
           {/* Họ và tên */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-              Họ và tên <span className="text-red-500">*</span>
+              Họ và tên <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -127,14 +127,14 @@ export const EditCustomerModal = ({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="VD: Nguyễn Văn A"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
           {/* Số điện thoại */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <Phone className="w-4 h-4 text-sky-700" />
+              <Phone className="w-4 h-4 text-brand-700" />
               Số điện thoại
             </label>
             <input
@@ -142,15 +142,15 @@ export const EditCustomerModal = ({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="VD: 0987654321"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
           {/* Email */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <Mail className="w-4 h-4 text-sky-700" />
-              Email <span className="text-red-500">*</span>
+              <Mail className="w-4 h-4 text-brand-700" />
+              Email <span className="text-rose-500">*</span>
             </label>
             <input
               type="email"
@@ -158,14 +158,14 @@ export const EditCustomerModal = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="VD: user@example.com"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
           {/* Địa chỉ */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-sky-700" />
+              <MapPin className="w-4 h-4 text-brand-700" />
               Địa chỉ
             </label>
             <textarea
@@ -173,7 +173,7 @@ export const EditCustomerModal = ({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none resize-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none resize-none"
             />
           </div>
 
@@ -190,7 +190,7 @@ export const EditCustomerModal = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-sky-900 hover:bg-sky-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+              className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />

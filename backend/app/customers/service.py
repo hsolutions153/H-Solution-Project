@@ -1,8 +1,9 @@
 import secrets
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 
 from app.auth.utils import get_current_user, hash_password
+from app.core import storage
 from app.core.exceptions import AppException, ErrorCode
 from app.customers import repository
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
@@ -114,6 +115,15 @@ def update_customer(customer_id: str, data):
 
 def update_own_customer(current_user: dict, data):
     return update_customer(current_user["sub"], data)
+
+
+def upload_own_avatar(current_user: dict, file: UploadFile):
+    """Store a new profile photo for the signed-in customer and save its public URL."""
+    customer_id = current_user["sub"]
+    fetch_customer(customer_id)
+    avatar_url = storage.upload_avatar(file, customer_id)
+    repository.update_customer(customer_id, _customer_role_id(), {"avatar_url": avatar_url})
+    return fetch_customer(customer_id)
 
 
 def update_customer_status(customer_id: str, data):

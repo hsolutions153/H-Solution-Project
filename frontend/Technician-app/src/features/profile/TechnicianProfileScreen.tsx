@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Phone, Mail, Award, CheckCircle2, Star, ShieldCheck, Wrench, ToggleLeft, ToggleRight } from "lucide-react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { Phone, Mail, Award, CheckCircle2, Star, ShieldCheck, Wrench, ToggleLeft, ToggleRight, Camera, LoaderCircle } from "lucide-react";
+import { uploadTechnicianAvatar } from "@/lib/avatar";
 
 export function TechnicianProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProfile = async () => {
     try {
@@ -43,6 +47,23 @@ export function TechnicianProfileScreen() {
     }
   };
 
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setIsUploading(true);
+    setAvatarMessage(null);
+    try {
+      const updated = await uploadTechnicianAvatar<any>(file);
+      setProfile((prev: any) => ({ ...prev, user: { ...(prev?.user || {}), ...(updated.user || {}) } }));
+      setAvatarMessage({ type: "success", text: "Đã cập nhật ảnh đại diện." });
+    } catch (err) {
+      setAvatarMessage({ type: "error", text: err instanceof Error ? err.message : "Không thể tải ảnh lên." });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 text-center text-xs text-slate-500 font-medium pt-12">
@@ -53,7 +74,7 @@ export function TechnicianProfileScreen() {
 
   if (!profile) {
     return (
-      <div className="p-6 text-center text-xs text-red-500 font-medium pt-12">
+      <div className="p-6 text-center text-xs text-rose-500 font-medium pt-12">
         Không thể tải hồ sơ kỹ thuật viên.
       </div>
     );
@@ -65,11 +86,46 @@ export function TechnicianProfileScreen() {
     <div className="p-4 space-y-4 max-w-sm mx-auto">
       
       <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-center relative overflow-hidden">
-        <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl mx-auto shadow-md mb-3">
-          {(user.full_name || "K").charAt(0).toUpperCase()}
-        </div>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="relative mx-auto mb-3 block size-20 rounded-full cursor-pointer disabled:cursor-wait"
+          aria-label="Đổi ảnh đại diện"
+        >
+          <span className="flex size-full items-center justify-center overflow-hidden rounded-full bg-brand-600 text-white text-2xl font-bold shadow-md ring-4 ring-brand-50">
+            {user.avatar_url ? (
+              <img src={user.avatar_url} alt="" className="size-full object-cover" />
+            ) : (
+              (user.full_name || "K").charAt(0).toUpperCase()
+            )}
+          </span>
+          {isUploading ? (
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-950/45 text-white">
+              <LoaderCircle className="size-6 animate-spin" />
+            </span>
+          ) : null}
+          <span className="absolute -bottom-0.5 -right-0.5 flex size-7 items-center justify-center rounded-full border-2 border-white bg-brand-600 text-white shadow-sm">
+            <Camera className="size-3.5" />
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
         <h2 className="text-base font-bold text-slate-900">{user.full_name || "Kỹ thuật viên"}</h2>
         <p className="text-xs text-slate-500 mt-0.5">{profile.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}</p>
+        {avatarMessage ? (
+          <p
+            role="status"
+            className={`mt-2 text-xs font-medium ${avatarMessage.type === "success" ? "text-emerald-700" : "text-rose-700"}`}
+          >
+            {avatarMessage.text}
+          </p>
+        ) : null}
 
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-600">Trạng thái làm việc:</span>
@@ -101,7 +157,7 @@ export function TechnicianProfileScreen() {
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>

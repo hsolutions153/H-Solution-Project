@@ -14,7 +14,7 @@ const slides = [
     title: "Chào mừng đến với\nH-Mobility Care",
     subtitle: "Hệ sinh thái cứu hộ khẩn cấp & dịch vụ chăm sóc toàn diện cho xe máy điện số 1 Việt Nam.",
     features: ["100% Xe máy điện", "KTV chuyên nghiệp", "Hỗ trợ toàn quốc"],
-    gradient: "linear-gradient(135deg, #091e3a 0%, #0d3b66 40%, #0077b6 100%)",
+    gradient: "linear-gradient(135deg, #0a2540 0%, #114567 40%, #156495 100%)",
     accentColor: "#00f2fe",
   },
   {
@@ -41,8 +41,8 @@ const slides = [
     title: "Chăm sóc khối pin\nAn tâm trên mọi nẻo đường",
     subtitle: "Giám sát chu kỳ pin LFP, nhắc lịch bảo dưỡng định kỳ và bảo vệ hành trình xe máy điện cùng H-Mobility Care.",
     features: ["Chuyên sâu pin LFP", "Nhắc lịch bảo dưỡng", "Bảo hành dài hạn"],
-    gradient: "linear-gradient(135deg, #1b164a 0%, #312e81 40%, #4338ca 100%)",
-    accentColor: "#a5b4fc",
+    gradient: "linear-gradient(135deg, #0f3a56 0%, #156495 40%, #4896c4 100%)",
+    accentColor: "#b2d5ea",
   },
 ];
 

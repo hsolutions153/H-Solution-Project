@@ -8,6 +8,7 @@ import { ResetPasswordScreen } from "@/features/auth/ResetPasswordScreen";
 import { TaskListScreen } from "@/features/tasks/TaskListScreen";
 import { TaskHistoryScreen } from "@/features/tasks/components/TaskHistoryScreen";
 import { TechnicianProfileScreen } from "@/features/profile/TechnicianProfileScreen";
+import { ScheduleScreen } from "@/features/schedule/ScheduleScreen";
 import { AppLayout } from "@/components/AppLayout";
 import { HistoryTask } from "@/types/task";
 
@@ -77,9 +78,14 @@ export default function HomePage() {
 
         
         {activeTab === "schedule" && (
-          <div className="p-4 text-center text-xs text-slate-500 pt-10 font-medium">
-            Màn hình Schedule (Lịch trình)
-          </div>
+          <ScheduleScreen
+            onOpenTask={(task) => {
+              // TaskListScreen restores this view when the Home tab mounts.
+              sessionStorage.setItem("selectedTask", JSON.stringify(task));
+              sessionStorage.setItem("currentView", "detail");
+              setActiveTab("home");
+            }}
+          />
         )}
 
         

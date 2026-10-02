@@ -56,7 +56,7 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({
         <select
           value={statusValue}
           onChange={(event) => onStatusChange(event.target.value as UserStatusFilter)}
-          className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 shadow-sm transition focus:border-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100"
+          className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 shadow-sm transition focus:border-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-100"
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động</option>
@@ -66,7 +66,7 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({
         <select
           value={roleValue}
           onChange={(event) => onRoleChange(event.target.value)}
-          className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 shadow-sm transition focus:border-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100"
+          className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-700 shadow-sm transition focus:border-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-100"
         >
           <option value="">Tất cả vai trò</option>
           {roles.map((role) => (
@@ -80,7 +80,7 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({
       <button
         type="button"
         onClick={onOpenAddModal}
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-sky-900 px-5 text-base font-bold text-white shadow-sm transition hover:bg-sky-950"
+        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-900 px-5 text-base font-bold text-white shadow-sm transition hover:bg-brand-950"
       >
         <UserPlus className="h-5 w-5" />
         Thêm user

@@ -67,7 +67,7 @@ export const DevicesList = () => {
   const getDeviceTypeBadge = (deviceType: string) => {
     return {
       label: "Xe máy điện",
-      bg: "bg-blue-50 text-blue-700 border-blue-200",
+      bg: "bg-brand-50 text-brand-700 border-brand-200",
     };
   };
 
@@ -130,7 +130,7 @@ export const DevicesList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm thiết bị theo tên hãng, chủ sở hữu, model, số serial..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-10 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-10 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
           {searchTerm && (
             <button
@@ -163,7 +163,7 @@ export const DevicesList = () => {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-800" />
                     Đang tải danh sách thiết bị...
                   </td>
                 </tr>

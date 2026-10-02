@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Task, HistoryTask } from "@/types/task";
+import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ interface ComponentItem {
   warehouse: string;
   price: number;
   quantity: number;
+  itemType?: "SPARE_PART" | "SERVICE";
 }
 
 let repairPartCounter = 1;
@@ -68,11 +69,17 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newPartName, setNewPartName] = useState("");
   const [newPartPrice, setNewPartPrice] = useState("150000");
+  const [newPartType, setNewPartType] = useState<"SPARE_PART" | "SERVICE">("SPARE_PART");
   const [customLaborCost, setCustomLaborCost] = useState<number>(0);
 
   // Quản lý hạn mức báo giá đã duyệt & chi phí phát sinh
   const [approvedEstimate, setApprovedEstimate] = useState<number>(0);
-  const [initialEstimate, setInitialEstimate] = useState<number>(0);
+  const [hasApprovedQuote, setHasApprovedQuote] = useState(false);
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
+  const [quoteLoadError, setQuoteLoadError] = useState("");
+  const [finalCostOverride, setFinalCostOverride] = useState<number | null>(null);
+  const approvedPartsRef = useRef<ComponentItem[]>([]);
+  const approvedLaborRef = useRef(0);
   const [hasPendingQuote, setHasPendingQuote] = useState<boolean>(false);
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
   const [isSupplementaryModalOpen, setIsSupplementaryModalOpen] = useState<boolean>(false);
@@ -101,121 +108,44 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     return () => clearInterval(interval);
   }, [isStarted, isPaused]);
 
-  // Tự động đồng bộ với Báo giá đã tạo trước đó (từ sessionStorage hoặc API)
+  // Báo giá đã được khách hàng duyệt là căn cứ tính phạm vi sửa chữa.
   useEffect(() => {
+    if (!task?.id) return;
     let isMounted = true;
-
-    // 1. Tải từ sessionStorage nếu có
-    const saved = typeof window !== "undefined" ? sessionStorage.getItem("quoteData") : null;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-          const partItems = parsed.items
-            .filter(
-              (it: any) =>
-                it.item_type !== "LABOR" &&
-                !it.item_name?.toLowerCase().includes("tiền công") &&
-                !it.name?.toLowerCase().includes("tiền công")
-            )
-            .map((it: any, idx: number) => ({
-              id: it.id || `saved-${idx}`,
-              name: it.item_name || it.name || "Linh kiện",
-              warehouse: "Kho kỹ thuật",
-              price: Number(it.unit_price || it.price || 0),
-              quantity: Number(it.quantity || 1),
-            }));
-          if (partItems.length > 0) setComponents(partItems);
-
-          const laborItem = parsed.items.find(
-            (it: any) =>
-              it.item_type === "LABOR" ||
-              it.item_name?.toLowerCase().includes("tiền công") ||
-              it.name?.toLowerCase().includes("tiền công")
-          );
-          if (laborItem) {
-            setCustomLaborCost(Number(laborItem.unit_price || laborItem.price || 200000));
-          } else if (parsed.laborCost || parsed.labor_fee) {
-            setCustomLaborCost(Number(parsed.laborCost || parsed.labor_fee));
-          }
-        }
-        if (parsed.approvedEstimate) {
-          setApprovedEstimate(Number(parsed.approvedEstimate));
-        }
-      } catch {}
-    }
-
-    // 2. Fetch báo giá từ backend nếu có task.id
-    if (task?.id) {
-      import("@/lib/api-client").then(({ fetchApi }) => {
-        fetchApi<any[]>(`/repair-requests/${task.id}/quotes`)
-          .then((quotesRes) => {
-            if (!isMounted) return;
-            if (quotesRes && quotesRes.length > 0) {
-              const accepted = quotesRes.filter((q: any) => q.status === "ACCEPTED");
-              const pending = quotesRes.find((q: any) => q.status === "PENDING");
-              setHasPendingQuote(Boolean(pending));
-
-              let totalAccepted = 0;
-              if (accepted.length > 0) {
-                totalAccepted = accepted.reduce((sum: number, q: any) => sum + Number(q.estimated_price || 0), 0);
-              } else {
-                totalAccepted = Number(quotesRes[0].estimated_price || task?.totalAmount || 0);
-              }
-              setApprovedEstimate(totalAccepted);
-
-              const sortedByDate = [...quotesRes].sort((a: any, b: any) => (a.created_at || "").localeCompare(b.created_at || ""));
-              setInitialEstimate(Number(sortedByDate[0]?.estimated_price || totalAccepted));
-
-              const latestQuote = quotesRes[0];
-              if (latestQuote.items && latestQuote.items.length > 0) {
-                const partItems = latestQuote.items
-                  .filter((it: any) => !it.item_name?.toLowerCase().includes("tiền công"))
-                  .map((it: any, idx: number) => ({
-                    id: it.id || `api-${idx}`,
-                    name: it.item_name,
-                    warehouse: "Kho kỹ thuật",
-                    price: Number(it.unit_price || 0),
-                    quantity: Number(it.quantity || 1),
-                  }));
-                setComponents(partItems);
-
-                const laborItem = latestQuote.items.find((it: any) =>
-                  it.item_name?.toLowerCase().includes("tiền công")
-                );
-                if (laborItem) {
-                  setCustomLaborCost(Number(laborItem.unit_price || 200000));
-                } else if (latestQuote.labor_fee) {
-                  setCustomLaborCost(Number(latestQuote.labor_fee));
-                }
-              } else {
-                if (latestQuote.labor_fee) {
-                  setCustomLaborCost(Number(latestQuote.labor_fee));
-                }
-                if (latestQuote.parts_cost && Number(latestQuote.parts_cost) > 0) {
-                  setComponents([
-                    {
-                      id: "quote-part-1",
-                      name: "Linh kiện thay thế theo báo giá",
-                      warehouse: "Kho kỹ thuật",
-                      price: Number(latestQuote.parts_cost),
-                      quantity: 1,
-                    },
-                  ]);
-                }
-              }
-            } else if (task?.totalAmount) {
-              setApprovedEstimate(Number(task.totalAmount));
-              setInitialEstimate(Number(task.totalAmount));
-            }
-          })
-          .catch(() => {});
+    setIsLoadingQuotes(true);
+    setQuoteLoadError("");
+    fetchApi<any[]>(`/repair-requests/${task.id}/quotes`).then((quotes) => {
+      if (!isMounted) return;
+      const accepted = quotes.filter((quote) => quote.status === "ACCEPTED");
+      setHasPendingQuote(quotes.some((quote) => quote.status === "PENDING"));
+      setHasApprovedQuote(accepted.length > 0);
+      setApprovedEstimate(accepted.reduce((sum, quote) => sum + Number(quote.estimated_price || 0), 0));
+      const approvedParts: ComponentItem[] = accepted.flatMap((quote) => {
+        const parts = (quote.items || []).filter((item: any) => item.item_type !== "LABOR" && !item.item_name?.toLowerCase().includes("tiền công"));
+        if (parts.length > 0) return parts.map((item: any, index: number) => ({
+          id: item.id || `${quote.id}-part-${index}`,
+          name: item.item_name,
+          warehouse: "Kho kỹ thuật",
+          price: Number(item.unit_price || 0),
+          quantity: Number(item.quantity ?? 1),
+          itemType: item.item_type || "SPARE_PART",
+        }));
+        return Number(quote.parts_cost || 0) > 0 ? [{
+          id: `${quote.id}-parts`, name: "Linh kiện theo báo giá đã duyệt", warehouse: "Kho kỹ thuật",
+          price: Number(quote.parts_cost), quantity: 1, itemType: "SPARE_PART",
+        }] : [];
       });
-    }
-
-    return () => {
-      isMounted = false;
-    };
+      const approvedLabor = accepted.reduce((sum, quote) => sum + Number(quote.labor_fee || 0), 0);
+      approvedPartsRef.current = approvedParts;
+      approvedLaborRef.current = approvedLabor;
+      setComponents(approvedParts);
+      setCustomLaborCost(approvedLabor);
+    }).catch((error) => {
+      if (isMounted) setQuoteLoadError(error.message || "Không thể tải báo giá đã duyệt");
+    }).finally(() => {
+      if (isMounted) setIsLoadingQuotes(false);
+    });
+    return () => { isMounted = false; };
   }, [task?.id]);
 
   const laborCost = customLaborCost || 0;
@@ -224,6 +154,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     0
   );
   const totalCost = laborCost + partsCost;
+  const finalCost = finalCostOverride ?? totalCost;
+  const additionalAmount = Math.max(0, finalCost - approvedEstimate);
 
   // Luôn đồng bộ dữ liệu sửa đổi thực tế vào sessionStorage
   useEffect(() => {
@@ -242,6 +174,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       },
     ];
     const payload = {
+      repair_id: task?.id,
       items: formattedItems,
       parts_cost: partsCost,
       labor_fee: laborCost,
@@ -251,7 +184,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       totalCost,
     };
     sessionStorage.setItem("quoteData", JSON.stringify(payload));
-  }, [components, laborCost, partsCost, totalCost]);
+  }, [task?.id, components, laborCost, partsCost, totalCost]);
 
   const formatTime = (totalSeconds: number) => {
     const hrs = Math.floor(totalSeconds / 3600);
@@ -272,6 +205,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   };
 
   const handleQuantityChange = (id: string, delta: number) => {
+    setFinalCostOverride(null);
     setComponents((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -306,9 +240,10 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     setImageFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleAddPart = (name: string, price: number) => {
+  const handleAddPart = (name: string, price: number, itemType: "SPARE_PART" | "SERVICE" = "SPARE_PART") => {
     if (!name.trim()) return;
     const newId = generateRepairPartId();
+    setFinalCostOverride(null);
     setComponents((prev) => [
       ...prev,
       {
@@ -317,61 +252,66 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         warehouse: "Kho kỹ thuật",
         price,
         quantity: 1,
+        itemType,
       },
     ]);
     setIsAddModalOpen(false);
     setNewPartName("");
+    setNewPartType("SPARE_PART");
   };
 
   const handleRemovePart = (id: string) => {
+    setFinalCostOverride(null);
     setComponents((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleCreateSupplementaryQuote = async () => {
-    if (!task?.id) return;
+    if (!task?.id || isSubmittingSupplementary || isLoadingQuotes || quoteLoadError || !hasApprovedQuote || hasPendingQuote || additionalAmount <= 0) return;
     setIsSubmittingSupplementary(true);
     try {
-      const diff = Math.max(0, totalCost - approvedEstimate);
-      const supplementaryAmount = diff > 0 ? diff : totalCost;
-
-      const formattedItems = [
-        ...components.map((it) => ({
-          name: it.name,
-          item_name: it.name,
-          quantity: it.quantity,
-          unit_price: it.price,
-          subtotal: it.price * it.quantity,
-          item_type: "SPARE_PART",
-        })),
-        {
-          name: "Tiền công kỹ thuật viên",
-          item_name: "Tiền công kỹ thuật viên",
-          quantity: 1,
-          unit_price: laborCost,
-          subtotal: laborCost,
-          item_type: "LABOR",
-        },
-      ];
+      let formattedItems: QuoteItem[] = components.flatMap((item) => {
+        const original = approvedPartsRef.current.find((part) => part.id === item.id);
+        const extraCost = item.price * item.quantity - (original ? original.price * original.quantity : 0);
+        if (extraCost <= 0) return [];
+        const quantity = original && original.price === item.price ? item.quantity - original.quantity : original ? 1 : item.quantity;
+        return [{
+          item_name: item.name,
+          quantity,
+          unit_price: extraCost / quantity,
+          subtotal: extraCost,
+          item_type: item.itemType || "SPARE_PART",
+        }];
+      });
+      const extraLabor = Math.max(0, laborCost - approvedLaborRef.current);
+      if (extraLabor > 0) formattedItems.push({
+        item_name: "Tiền công phát sinh", quantity: 1, unit_price: extraLabor, subtotal: extraLabor, item_type: "LABOR",
+      });
+      const itemTotal = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
+      if (itemTotal > additionalAmount) formattedItems = [];
+      const unitemizedCost = additionalAmount - formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
+      if (unitemizedCost > 0) formattedItems.push({
+        item_name: "Chi phí phát sinh sau điều chỉnh", quantity: 1, unit_price: unitemizedCost, subtotal: unitemizedCost, item_type: "SERVICE",
+      });
 
       const payload = {
         items: formattedItems,
-        parts_cost: partsCost,
-        labor_fee: laborCost,
-        estimated_price: supplementaryAmount,
-        total_amount: supplementaryAmount,
+        parts_cost: formattedItems.filter((item) => item.item_type !== "LABOR").reduce((sum, item) => sum + item.subtotal, 0),
+        labor_fee: formattedItems.filter((item) => item.item_type === "LABOR").reduce((sum, item) => sum + item.subtotal, 0),
+        estimated_price: additionalAmount,
+        total_amount: additionalAmount,
         diagnosis_note: supplementaryNote || "Báo giá bổ sung linh kiện & công việc phát sinh",
         severity: "MINOR",
       };
 
-      await fetchApi(`/repair-requests/${task.id}/quotes`, {
+      const createdQuote = await fetchApi<any>(`/repair-requests/${task.id}/quotes`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
       sessionStorage.setItem("quoteData", JSON.stringify({
         ...payload,
-        status: "SENT",
-        totalCost,
+        ...createdQuote,
+        repair_id: task.id,
         approvedEstimate,
       }));
 
@@ -392,10 +332,15 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
   // Xử lý đóng gói dữ liệu và gọi callback khi nhấn nút "Hoàn tất sửa chữa & Báo giá"
   const handleFinishRepair = async () => {
+    if (isUploading || isLoadingQuotes || quoteLoadError) return;
+    if (!hasApprovedQuote || hasPendingQuote) {
+      setValidationWarning(hasPendingQuote ? "Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa." : "Cần khách hàng duyệt báo giá trước khi hoàn tất sửa chữa.");
+      return;
+    }
     // 1. Kiểm tra nếu chi phí thực tế vượt quá báo giá đã duyệt -> CHẶN LẠI và cảnh báo
-    if (approvedEstimate > 0 && totalCost > approvedEstimate) {
+    if (finalCost > approvedEstimate) {
       setValidationWarning(
-        `Chi phí thực tế (${totalCost.toLocaleString("vi-VN")} đ) cao hơn Báo giá được duyệt (${approvedEstimate.toLocaleString("vi-VN")} đ) là +${(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ. Hệ thống không cho phép hoàn tất đơn khi chi phí phát sinh chưa được Khách hàng phê duyệt.`
+        `Chi phí thực tế (${finalCost.toLocaleString("vi-VN")} đ) cao hơn Báo giá được duyệt (${approvedEstimate.toLocaleString("vi-VN")} đ) là +${additionalAmount.toLocaleString("vi-VN")} đ. Cần khách hàng duyệt chi phí phát sinh trước khi hoàn tất.`
       );
       return;
     }
@@ -439,14 +384,14 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         }
 
         // 2. Cập nhật trạng thái hoàn thành với tổng tiền
-        const finalCostToSubmit = totalCost > 0 ? totalCost : (approvedEstimate > 0 ? approvedEstimate : Number(task?.totalAmount || 0));
-        const statusRes = await fetchApi(`/repair-requests/${task.id}/status`, {
+        const statusRes = await fetchApi<any>(`/repair-requests/${task.id}/status`, {
           method: "PATCH",
           body: JSON.stringify({
             status: "COMPLETED",
-            total_amount: finalCostToSubmit,
+            final_cost: finalCost,
           }),
         });
+        if (statusRes.status !== "COMPLETED") throw new Error("Đơn chưa được hoàn tất. Vui lòng thử lại.");
         lastResponse = statusRes;
       } catch (err: any) {
         console.error("Lỗi khi hoàn tất đơn:", err);
@@ -486,7 +431,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       "";
 
     const completedData: HistoryTask = {
-      id: generateHistoryId(),
+      id: lastResponse?.id || task?.id || generateHistoryId(),
       code: task?.code || lastResponse?.request_code || "JOB-8829",
       date: now.toLocaleDateString("vi-VN"),
       time: now.toLocaleTimeString("vi-VN", {
@@ -508,12 +453,12 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         "Kiểm tra và khắc phục lỗi hoạt động của thiết bị theo lịch hẹn.",
       solution:
         note ||
-        `Đã thay thế linh kiện và hoàn tất căn chỉnh thiết bị. Tổng chi phí: ${totalCost.toLocaleString("vi-VN")} đ.`,
+        `Đã thay thế linh kiện và hoàn tất căn chỉnh thiết bị. Tổng chi phí: ${Number(lastResponse?.total_amount ?? finalCost).toLocaleString("vi-VN")} đ.`,
       images: {
         before: beforeImage,
         after: afterImage,
       },
-      totalAmount: totalCost,
+      totalAmount: Number(lastResponse?.total_amount ?? finalCost),
     };
 
     if (onComplete) {
@@ -543,7 +488,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         
         <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md">
               {task?.isEmergency ? "Cứu hộ khẩn cấp" : "Đơn đặt lịch hẹn"}
             </span>
             <span className="text-xs text-slate-400 font-medium">
@@ -559,7 +504,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
         
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center space-y-3">
-          <div className="flex items-center justify-center gap-2 text-[#005288]">
+          <div className="flex items-center justify-center gap-2 text-[#12537d]">
             <Clock className="w-6 h-6" />
             <span className="text-3xl font-bold font-mono tracking-wider">
               {formatTime(seconds)}
@@ -593,7 +538,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           {(!isStarted || isPaused) && (
             <button
               onClick={handleToggleTimer}
-              className="w-full py-2.5 bg-[#005288] hover:bg-sky-900 text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-[#12537d] hover:bg-brand-900 text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2"
             >
               <Play className="w-4 h-4 fill-current" />
               {!isStarted ? "Bắt đầu sửa chữa" : "Tiếp tục tính giờ"}
@@ -609,7 +554,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             </div>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-brand-700 hover:text-brand-900 flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Thêm linh kiện
             </button>
@@ -651,7 +596,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   </div>
                   <button
                     onClick={() => handleRemovePart(item.id)}
-                    className="text-slate-400 hover:text-red-500 p-1 cursor-pointer"
+                    className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
                     title="Xóa linh kiện"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -672,8 +617,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 type="number"
                 step={50000}
                 value={customLaborCost}
-                onChange={(e) => setCustomLaborCost(Math.max(0, Number(e.target.value)))}
-                className="w-24 p-1.5 text-right bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                onChange={(e) => { setFinalCostOverride(null); setCustomLaborCost(Math.max(0, Number(e.target.value))); }}
+                className="w-24 p-1.5 text-right bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <span className="text-xs font-medium text-slate-500">đ</span>
             </div>
@@ -702,10 +647,10 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                     <button
                       key={idx}
                       onClick={() => handleAddPart(preset.name, preset.price)}
-                      className="w-full text-left p-2 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-100 flex items-center justify-between text-xs cursor-pointer transition-colors"
+                      className="w-full text-left p-2 rounded-xl bg-slate-50 hover:bg-brand-50 border border-slate-100 flex items-center justify-between text-xs cursor-pointer transition-colors"
                     >
                       <span className="font-medium text-slate-700">{preset.name}</span>
-                      <span className="font-bold text-sky-800">{preset.price.toLocaleString("vi-VN")} đ</span>
+                      <span className="font-bold text-brand-800">{preset.price.toLocaleString("vi-VN")} đ</span>
                     </button>
                   ))}
                 </div>
@@ -714,24 +659,29 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
               
               <div className="border-t border-slate-100 pt-2 space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Hoặc nhập linh kiện khác:</p>
+                <label htmlFor="additional-item-type" className="text-xs text-slate-600">Loại hạng mục</label>
+                <select id="additional-item-type" value={newPartType} onChange={(event) => setNewPartType(event.target.value as "SPARE_PART" | "SERVICE")} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                  <option value="SPARE_PART">Linh kiện / vật tư</option>
+                  <option value="SERVICE">Công việc / dịch vụ</option>
+                </select>
                 <input
                   type="text"
                   placeholder="Tên linh kiện..."
                   value={newPartName}
                   onChange={(e) => setNewPartName(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
                 <input
                   type="number"
                   placeholder="Đơn giá (VNĐ)"
                   value={newPartPrice}
                   onChange={(e) => setNewPartPrice(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
                 <button
-                  onClick={() => handleAddPart(newPartName, Number(newPartPrice) || 0)}
+                  onClick={() => handleAddPart(newPartName, Math.max(0, Number(newPartPrice) || 0), newPartType)}
                   disabled={!newPartName.trim()}
-                  className="w-full py-2 bg-[#005288] disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  className="w-full py-2 bg-[#12537d] disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Xác nhận thêm
                 </button>
@@ -795,7 +745,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Ghi chú về việc sửa chữa và tình trạng thiết bị..."
-            className="w-full p-3 bg-white border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-slate-400"
+            className="w-full p-3 bg-white border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder:text-slate-400"
           />
         </div>
 
@@ -805,25 +755,25 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           <div className="flex justify-between items-center pb-2 border-b border-slate-100">
             <div>
               <span className="text-xs font-bold text-slate-800 block">
-                Báo giá đã duyệt ban đầu
+                Tổng báo giá đã duyệt
               </span>
               <span className="text-[10px] text-slate-400">
                 Hạn mức tối đa được khách hàng phê duyệt
               </span>
             </div>
             <span className="text-sm font-bold text-slate-700">
-              {approvedEstimate > 0 ? `${approvedEstimate.toLocaleString("vi-VN")} đ` : "Chưa có"}
+              {hasApprovedQuote ? `${approvedEstimate.toLocaleString("vi-VN")} đ` : "Chưa có"}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-slate-900">
-              Chi phí thực tế hiện tại
-            </span>
-            <span className={`text-base font-extrabold ${approvedEstimate > 0 && totalCost > approvedEstimate ? "text-amber-700" : "text-[#005288]"}`}>
-              {totalCost.toLocaleString("vi-VN")} đ
-            </span>
+            <label htmlFor="repair-final-cost" className="text-xs font-bold text-slate-900">Chi phí thực tế (Final Cost)</label>
+            <input id="repair-final-cost" type="number" min={0} step={1000} value={finalCost} disabled={isLoadingQuotes} onChange={(event) => setFinalCostOverride(Math.max(0, Number(event.target.value)))} className={`w-36 p-2 text-right border border-slate-200 rounded-lg text-sm font-bold ${additionalAmount > 0 ? "text-amber-700" : "text-brand-900"}`} />
           </div>
+
+          {isLoadingQuotes && <p role="status" className="text-xs text-slate-500">Đang tải báo giá đã duyệt...</p>}
+          {quoteLoadError && <p role="alert" className="text-xs text-rose-700">{quoteLoadError}</p>}
+          {hasPendingQuote && <p role="status" className="text-xs text-amber-800">Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất.</p>}
 
           <div className="flex items-start gap-1.5 text-[10px] text-slate-500 leading-snug">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
@@ -833,13 +783,13 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </div>
 
           {/* Cảnh báo nếu chi phí thực tế vượt Báo giá đã duyệt */}
-          {approvedEstimate > 0 && totalCost > approvedEstimate && (
+          {hasApprovedQuote && additionalAmount > 0 && !hasPendingQuote && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-[11px] text-amber-900 leading-tight">
                   <span className="font-bold">Chi phí vượt báo giá đã duyệt: </span>
-                  <span className="font-extrabold text-red-600">+{((totalCost - approvedEstimate)).toLocaleString("vi-VN")} đ</span>.
+                  <span className="font-extrabold text-rose-600">+{additionalAmount.toLocaleString("vi-VN")} đ</span>.
                   <p className="mt-1 text-slate-600">
                     Cần gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.
                   </p>
@@ -850,19 +800,19 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 onClick={() => setIsSupplementaryModalOpen(true)}
                 className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <FilePlus className="w-3.5 h-3.5" /> Tạo báo giá bổ sung (+{(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ)
+                <FilePlus className="w-3.5 h-3.5" /> Tạo báo giá bổ sung (+{additionalAmount.toLocaleString("vi-VN")} đ)
               </button>
             </div>
           )}
 
           {/* Nút Tạo chi phí phát sinh nếu technician muốn chủ động tạo thêm */}
-          {(!approvedEstimate || totalCost <= approvedEstimate) && (
+          {hasApprovedQuote && additionalAmount === 0 && !hasPendingQuote && (
             <button
               type="button"
-              onClick={() => setIsSupplementaryModalOpen(true)}
-              className="w-full py-2 bg-slate-50 hover:bg-sky-50 text-sky-800 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={() => setIsAddModalOpen(true)}
+              className="w-full py-2 bg-slate-50 hover:bg-brand-50 text-brand-800 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <FilePlus className="w-3.5 h-3.5" /> Tạo chi phí phát sinh / Báo giá bổ sung
+              <FilePlus className="w-3.5 h-3.5" /> Thêm linh kiện / công việc phát sinh
             </button>
           )}
         </div>
@@ -884,8 +834,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </button>
           <button
             onClick={handleFinishRepair}
-            disabled={isUploading}
-            className="flex-1 py-3 bg-[#005288] hover:bg-sky-900 disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
+            disabled={isUploading || isLoadingQuotes || Boolean(quoteLoadError) || hasPendingQuote || !hasApprovedQuote}
+            className="flex-1 py-3 bg-[#12537d] hover:bg-brand-900 disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
           >
             {isUploading ? (
               <>
@@ -893,7 +843,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
               </>
             ) : (
               <>
-                Hoàn tất sửa & Báo giá <Check className="w-4 h-4" />
+                Hoàn tất sửa chữa <Check className="w-4 h-4" />
               </>
             )}
           </button>
@@ -915,7 +865,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 </p>
               </div>
               <div className="space-y-2 pt-1">
-                <button
+                {additionalAmount > 0 && hasApprovedQuote && !hasPendingQuote && <button
                   type="button"
                   onClick={() => {
                     setValidationWarning(null);
@@ -923,8 +873,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   }}
                   className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
                 >
-                  Tạo báo giá bổ sung (+{(totalCost - approvedEstimate).toLocaleString("vi-VN")} đ)
-                </button>
+                  Tạo báo giá bổ sung (+{additionalAmount.toLocaleString("vi-VN")} đ)
+                </button>}
                 <button
                   type="button"
                   onClick={() => setValidationWarning(null)}
@@ -943,7 +893,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
-                  <FilePlus className="w-4 h-4 text-sky-700" />
+                  <FilePlus className="w-4 h-4 text-brand-700" />
                   <span>Tạo Báo Giá Bổ Sung</span>
                 </div>
                 <button
@@ -955,19 +905,19 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
               </div>
 
               <div className="space-y-2 text-xs">
-                <div className="bg-sky-50/70 p-3 rounded-xl border border-sky-100 space-y-1">
+                <div className="bg-brand-50/70 p-3 rounded-xl border border-brand-100 space-y-1">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Báo giá đã duyệt:</span>
                     <span className="font-bold text-slate-800">{approvedEstimate.toLocaleString("vi-VN")} đ</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Chi phí sau phát sinh:</span>
-                    <span className="font-bold text-slate-900">{totalCost.toLocaleString("vi-VN")} đ</span>
+                    <span className="font-bold text-slate-900">{finalCost.toLocaleString("vi-VN")} đ</span>
                   </div>
-                  <div className="flex justify-between pt-1 border-t border-sky-200/60 text-sky-950 font-bold">
+                  <div className="flex justify-between pt-1 border-t border-brand-200/60 text-brand-950 font-bold">
                     <span>Số tiền phát sinh:</span>
                     <span className="text-amber-700 font-black">
-                      +{Math.max(0, totalCost - approvedEstimate).toLocaleString("vi-VN")} đ
+                      +{additionalAmount.toLocaleString("vi-VN")} đ
                     </span>
                   </div>
                 </div>
@@ -979,7 +929,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                     value={supplementaryNote}
                     onChange={(e) => setSupplementaryNote(e.target.value)}
                     placeholder="Mô tả lý do phát sinh thêm linh kiện/công việc..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -994,9 +944,9 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 </button>
                 <button
                   type="button"
-                  disabled={isSubmittingSupplementary}
+                  disabled={isSubmittingSupplementary || additionalAmount <= 0 || hasPendingQuote || !hasApprovedQuote}
                   onClick={handleCreateSupplementaryQuote}
-                  className="flex-1 py-2.5 bg-sky-900 hover:bg-sky-950 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm cursor-pointer"
+                  className="flex-1 py-2.5 bg-brand-900 hover:bg-brand-950 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm cursor-pointer"
                 >
                   {isSubmittingSupplementary ? (
                     <>

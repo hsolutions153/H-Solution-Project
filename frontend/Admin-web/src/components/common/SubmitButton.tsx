@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "@h-mobility/ui";
 
 interface SubmitButtonProps {
   label?: string;
@@ -12,12 +13,8 @@ export const SubmitButton: React.FC<SubmitButtonProps> = ({
   disabled = false,
 }) => {
   return (
-    <button
-      type="submit"
-      disabled={disabled || isLoading}
-      className="px-5 py-2.5 rounded-xl bg-sky-900 hover:bg-sky-950 text-white font-bold text-sm transition cursor-pointer disabled:opacity-50"
-    >
+    <Button type="submit" loading={isLoading} disabled={disabled}>
       {isLoading ? "Đang xử lý..." : label}
-    </button>
+    </Button>
   );
 };

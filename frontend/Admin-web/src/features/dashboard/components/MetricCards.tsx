@@ -108,24 +108,24 @@ export const MetricCards = () => {
       label: "Yêu cầu mới nhận",
       value: loading ? "..." : metricsData.requested || 0,
       change: "+Mới",
-      color: "border-l-blue-600",
-      icon: <FileText className="w-5 h-5 text-blue-600" />,
-      iconBg: "bg-blue-50",
+      color: "border-l-brand-600",
+      icon: <FileText className="w-5 h-5 text-brand-600" />,
+      iconBg: "bg-brand-50",
     },
     {
       label: "Chưa phân công",
       value: loading ? "..." : metricsData.unassigned || 0,
       statusText: metricsData.unassigned > 0 ? "Cần xử lý" : "Đã sạch",
-      color: "border-l-red-500",
-      icon: <UserX className="w-5 h-5 text-red-500" />,
-      iconBg: "bg-red-50",
+      color: "border-l-rose-500",
+      icon: <UserX className="w-5 h-5 text-rose-500" />,
+      iconBg: "bg-rose-50",
     },
     {
       label: "Đang xử lý",
       value: loading ? "..." : metricsData.inProgress || 0,
-      color: "border-l-sky-600",
-      icon: <Wrench className="w-5 h-5 text-sky-600" />,
-      iconBg: "bg-sky-50",
+      color: "border-l-brand-600",
+      icon: <Wrench className="w-5 h-5 text-brand-600" />,
+      iconBg: "bg-brand-50",
     },
     {
       label: "Chờ duyệt báo giá",
@@ -157,14 +157,14 @@ export const MetricCards = () => {
               {item.icon}
             </div>
             {item.change && (
-              <span className="text-blue-600 font-bold text-xs flex items-center gap-1">
+              <span className="text-brand-600 font-bold text-xs flex items-center gap-1">
                 {item.change} <TrendingUp className="w-3.5 h-3.5" />
               </span>
             )}
             {item.statusText && (
               <span
                 className={`font-bold text-xs ${
-                  Number(item.value) > 0 ? "text-red-500" : "text-emerald-600"
+                  Number(item.value) > 0 ? "text-rose-500" : "text-emerald-600"
                 }`}
               >
                 {item.statusText}

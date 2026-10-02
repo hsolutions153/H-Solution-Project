@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, LogOut } from 'lucide-react';
+import { AVATAR_UPDATED_EVENT } from '@/lib/avatar';
 
 interface HeaderProps {
   onLogout?: () => void; // Hàm nhận sự kiện đăng xuất
@@ -12,6 +13,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [techName, setTechName] = useState<string>("Kỹ thuật viên");
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,6 +28,9 @@ export const Header = ({ onLogout }: HeaderProps) => {
         if (me && me.user && me.user.full_name) {
           setTechName(me.user.full_name);
         }
+        if (me?.user?.avatar_url) {
+          setAvatarUrl(me.user.avatar_url);
+        }
         if (me && typeof me.is_online === "boolean") {
           setIsOnline(me.is_online);
         }
@@ -34,6 +39,13 @@ export const Header = ({ onLogout }: HeaderProps) => {
       }
     }
     loadProfile();
+  }, []);
+
+  // Cập nhật ảnh ngay khi kỹ thuật viên đổi ảnh ở màn hồ sơ
+  useEffect(() => {
+    const onAvatarUpdated = (event: Event) => setAvatarUrl((event as CustomEvent<string>).detail || "");
+    window.addEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
+    return () => window.removeEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
   }, []);
 
   // Đóng menu khi click ra bên ngoài
@@ -50,7 +62,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const avatarChar = techName ? techName.charAt(0).toUpperCase() : "K";
 
   return (
-    <div className="relative flex items-center justify-between p-4 bg-white border-b border-gray-100">
+    <div className="relative flex items-center justify-between p-4 bg-white border-b border-slate-100">
       
       <div 
         ref={menuRef}
@@ -60,8 +72,12 @@ export const Header = ({ onLogout }: HeaderProps) => {
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-3 cursor-pointer select-none hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
         >
-          <div className="w-10 h-10 rounded-full bg-blue-600 text-white overflow-hidden flex items-center justify-center font-bold text-sm shadow-xs">
-            {avatarChar}
+          <div className="w-10 h-10 rounded-full bg-brand-600 text-white overflow-hidden flex items-center justify-center font-bold text-sm shadow-xs">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              avatarChar
+            )}
           </div>
           <div>
             <h2 className="font-bold text-slate-900 text-sm leading-tight">{techName}</h2>
@@ -73,15 +89,15 @@ export const Header = ({ onLogout }: HeaderProps) => {
 
         
         {isOpen && (
-          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => {
                 setIsOpen(false);
                 setShowLogoutModal(true);
               }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors cursor-pointer font-medium"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer font-medium"
             >
-              <LogOut className="w-4 h-4 text-red-500" />
+              <LogOut className="w-4 h-4 text-rose-500" />
               <span>Đăng xuất</span>
             </button>
           </div>
@@ -92,7 +108,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
           <div className="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto text-red-600 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-600 shadow-xs">
               <LogOut className="w-6 h-6 stroke-[2.2]" />
             </div>
 
@@ -119,7 +135,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
                   setShowLogoutModal(false);
                   if (onLogout) onLogout();
                 }}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-red-600/30"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-rose-600/30"
               >
                 Đăng xuất
               </button>
@@ -129,12 +145,12 @@ export const Header = ({ onLogout }: HeaderProps) => {
       )}
 
       <div className="flex items-center gap-1">
-        <button className="p-2 text-slate-600 hover:bg-sky-50 rounded-full flex items-center justify-center transition-colors cursor-pointer">
-          <Search className="w-5 h-5 text-sky-900" strokeWidth={2.2} />
+        <button className="p-2 text-slate-600 hover:bg-brand-50 rounded-full flex items-center justify-center transition-colors cursor-pointer">
+          <Search className="w-5 h-5 text-brand-900" strokeWidth={2.2} />
         </button>
-        <button className="p-2 text-slate-600 hover:bg-sky-50 rounded-full relative flex items-center justify-center transition-colors cursor-pointer">
-          <Bell className="w-5 h-5 text-sky-900" strokeWidth={2.2} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full ring-2 ring-white"></span>
+        <button className="p-2 text-slate-600 hover:bg-brand-50 rounded-full relative flex items-center justify-center transition-colors cursor-pointer">
+          <Bell className="w-5 h-5 text-brand-900" strokeWidth={2.2} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full ring-2 ring-white"></span>
         </button>
       </div>
     </div>

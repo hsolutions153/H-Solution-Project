@@ -113,7 +113,7 @@ export const EmergencyOrdersTable = ({
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex-1 flex flex-col justify-between">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
@@ -124,7 +124,7 @@ export const EmergencyOrdersTable = ({
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
           <div>
             <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <AlertTriangle className="w-4 h-4 text-rose-500" />
               <span>Yêu cầu khẩn cấp & Đang chờ xử lý</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -142,7 +142,7 @@ export const EmergencyOrdersTable = ({
             </button>
             <button
               onClick={onNavigateToOrders}
-              className="text-xs font-bold text-sky-900 hover:underline cursor-pointer"
+              className="text-xs font-bold text-brand-900 hover:underline cursor-pointer"
             >
               Xem tất cả ({orders.length}) &rarr;
             </button>
@@ -166,7 +166,7 @@ export const EmergencyOrdersTable = ({
               {loading && orders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-sky-800" />
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-brand-800" />
                     Đang tải dữ liệu đơn cứu hộ...
                   </td>
                 </tr>
@@ -197,7 +197,7 @@ export const EmergencyOrdersTable = ({
                             #{order.request_code || order.id?.substring(0, 7)}
                           </span>
                           {order.is_sos && (
-                            <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                            <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
                               SOS
                             </span>
                           )}
@@ -247,7 +247,7 @@ export const EmergencyOrdersTable = ({
                           <button
                             type="button"
                             onClick={(e) => handleOpenAssign(order, e)}
-                            className="bg-sky-900 hover:bg-sky-950 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
+                            className="bg-brand-900 hover:bg-brand-950 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
                           >
                             <UserCheck className="w-3 h-3" />
                             <span>Giao thợ</span>
@@ -263,7 +263,7 @@ export const EmergencyOrdersTable = ({
                             e.stopPropagation();
                             setSelectedOrder(order);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-sky-900 hover:bg-sky-50 rounded-lg transition"
+                          className="p-1.5 text-slate-400 hover:text-brand-900 hover:bg-brand-50 rounded-lg transition"
                           title="Xem chi tiết"
                         >
                           <Eye className="w-4 h-4" />
@@ -303,7 +303,7 @@ export const EmergencyOrdersTable = ({
                 <select
                   value={selectedTechId}
                   onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-sky-800 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-brand-800 outline-none"
                 >
                   {technicians.map((t: any) => (
                     <option key={t.user_id || t.id} value={t.user_id || t.id}>
@@ -327,7 +327,7 @@ export const EmergencyOrdersTable = ({
                   type="button"
                   onClick={handleConfirmQuickAssign}
                   disabled={isAssigning}
-                  className="bg-sky-900 hover:bg-sky-950 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50"
+                  className="bg-brand-900 hover:bg-brand-950 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>Xác nhận phân công</span>

@@ -41,7 +41,7 @@ type ProfileScreenProps = {
 
 type Notice = { type: "success" | "error"; message: string } | null;
 
-function Avatar({ avatar, large = false }: { avatar: string; large?: boolean }) {
+function Avatar({ avatar, large = false, uploading = false }: { avatar: string; large?: boolean; uploading?: boolean }) {
   return (
     <div className={`profile-avatar ${large ? "profile-avatar--large" : ""}`}>
       {avatar ? (
@@ -49,6 +49,11 @@ function Avatar({ avatar, large = false }: { avatar: string; large?: boolean }) 
       ) : (
         <UserRound aria-hidden="true" />
       )}
+      {uploading ? (
+        <span className="profile-avatar-uploading" aria-hidden="true">
+          <LoaderCircle className="profile-spinner" />
+        </span>
+      ) : null}
       <span className="profile-avatar-badge" aria-hidden="true">
         {large ? <Camera /> : <ShieldCheck />}
       </span>
@@ -56,7 +61,8 @@ function Avatar({ avatar, large = false }: { avatar: string; large?: boolean }) 
   );
 }
 
-async function resizeAvatar(file: File) {
+/** Center-crops the photo to a 360px square JPEG so uploads stay small. */
+async function resizeAvatar(file: File): Promise<Blob> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
@@ -88,7 +94,13 @@ async function resizeAvatar(file: File) {
     360,
     360,
   );
-  return canvas.toDataURL("image/jpeg", 0.86);
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Không thể xử lý hình ảnh này."))),
+      "image/jpeg",
+      0.86,
+    );
+  });
 }
 
 export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
@@ -96,6 +108,8 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState(initialProfile);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isFormSaved, setIsFormSaved] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -110,9 +124,10 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   useEffect(() => {
     async function loadCustomerProfile() {
       try {
-        const { fetchApi } = await import("@/lib/api-client");
+        const { fetchApi, updateUserInfo } = await import("@/lib/api-client");
         const data = await fetchApi<any>("/customers/me");
         if (data) {
+          updateUserInfo({ avatar_url: data.avatar_url || undefined });
           setProfile({
             id: data.id || data.user_id || "",
             name: data.full_name || data.name || initialProfile.name,
@@ -156,7 +171,6 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     if (changes.name !== undefined) payload.full_name = changes.name;
     if (changes.phone !== undefined) payload.phone = changes.phone;
     if (changes.address !== undefined) payload.address = changes.address;
-    if (changes.avatar !== undefined) payload.avatar_url = changes.avatar;
 
     const data = await fetchApi<any>("/customers/me", {
       method: "PATCH",
@@ -189,12 +203,25 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
       setNotice({ type: "error", message: "Chọn ảnh PNG, JPG hoặc WebP dưới 8 MB." });
       return;
     }
+    setIsUploadingAvatar(true);
+    setNotice(null);
     try {
-      const avatar = await resizeAvatar(file);
+      const resized = await resizeAvatar(file);
+      const body = new FormData();
+      body.append("file", resized, "avatar.jpg");
+      const { fetchApi, updateUserInfo } = await import("@/lib/api-client");
+      const data = await fetchApi<{ avatar_url?: string | null }>("/customers/me/avatar", {
+        method: "POST",
+        body,
+      });
+      const avatar = data.avatar_url || "";
       setProfile((current) => ({ ...current, avatar }));
-      setNotice(null);
+      updateUserInfo({ avatar_url: avatar || undefined });
+      setNotice({ type: "success", message: "Đã cập nhật ảnh đại diện." });
     } catch (error) {
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể xử lý ảnh." });
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể tải ảnh lên." });
+    } finally {
+      setIsUploadingAvatar(false);
     }
   }
 
@@ -214,9 +241,9 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
         name: profile.name,
         phone: profile.phone,
         address: profile.address,
-        avatar: profile.avatar,
       });
       setProfile(saved);
+      setIsFormSaved(true);
       setNotice({ type: "success", message: "Lưu hồ sơ thành công." });
       window.setTimeout(() => {
         router.push("/home/profile");
@@ -244,11 +271,21 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
           <form className="profile-edit-form" onSubmit={handleSubmit}>
             <div className="profile-edit-avatar">
-              <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Thay đổi ảnh đại diện">
-                <Avatar avatar={profile.avatar} large />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                aria-label="Thay đổi ảnh đại diện"
+              >
+                <Avatar avatar={profile.avatar} large uploading={isUploadingAvatar} />
               </button>
-              <button type="button" className="profile-change-photo" onClick={() => fileInputRef.current?.click()}>
-                Đổi ảnh đại diện
+              <button
+                type="button"
+                className="profile-change-photo"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+              >
+                {isUploadingAvatar ? "Đang tải ảnh lên..." : "Đổi ảnh đại diện"}
               </button>
               <input
                 ref={fileInputRef}
@@ -311,7 +348,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
 
             <div className="profile-save-wrap">
               <button className="profile-save-button" type="submit" disabled={isSaving}>
-                {isSaving ? <><LoaderCircle className="profile-spinner" /> Đang lưu...</> : notice?.type === "success" ? <><Check /> Đã lưu</> : "Lưu thay đổi"}
+                {isSaving ? <><LoaderCircle className="profile-spinner" /> Đang lưu...</> : isFormSaved ? <><Check /> Đã lưu</> : "Lưu thay đổi"}
               </button>
             </div>
           </form>
@@ -403,7 +440,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                 <div className="profile-vehicle-copy" style={{ width: "100%", padding: "4px 6px" }}>
                   <small>Phương tiện liên kết</small>
                   <strong>Chưa có phương tiện nào</strong>
-                  <span style={{ color: "#0782a7", fontWeight: 700, marginTop: "6px" }}>
+                  <span style={{ color: "#156495", fontWeight: 700, marginTop: "6px" }}>
                     + Đăng ký phương tiện mới
                   </span>
                 </div>
@@ -469,7 +506,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                   <LogOut size={24} />
                 </div>
 
-                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0F172A", margin: "0 0 6px 0" }}>
+                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0a2540", margin: "0 0 6px 0" }}>
                   Xác nhận đăng xuất
                 </h3>
                 <p style={{ fontSize: "13px", color: "#64748B", margin: "0 0 20px 0", lineHeight: 1.5 }}>
@@ -483,7 +520,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                     style={{
                       flex: 1,
                       padding: "10px 0",
-                      backgroundColor: "#F1F5F9",
+                      backgroundColor: "#eef6fb",
                       color: "#334155",
                       border: "none",
                       borderRadius: "12px",

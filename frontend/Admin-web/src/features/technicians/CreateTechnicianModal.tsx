@@ -70,11 +70,11 @@ export const CreateTechnicianModal = ({
         {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-900/60 border border-sky-400/30 flex items-center justify-center text-sky-400">
+            <div className="w-10 h-10 rounded-2xl bg-brand-900/60 border border-brand-400/30 flex items-center justify-center text-brand-400">
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+              <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                 Quản trị nhân sự
               </span>
               <h3 className="text-xl font-black mt-0.5">Thêm Kỹ Thuật Viên Mới</h3>
@@ -92,7 +92,7 @@ export const CreateTechnicianModal = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
             </div>
           )}
@@ -100,7 +100,7 @@ export const CreateTechnicianModal = ({
           {/* Họ và tên */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-              Họ và tên KTV <span className="text-red-500">*</span>
+              Họ và tên KTV <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -108,7 +108,7 @@ export const CreateTechnicianModal = ({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="VD: Nguyễn Văn Cường"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -116,8 +116,8 @@ export const CreateTechnicianModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-sky-700" />
-                Số điện thoại <span className="text-red-500">*</span>
+                <Phone className="w-3.5 h-3.5 text-brand-700" />
+                Số điện thoại <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -125,13 +125,13 @@ export const CreateTechnicianModal = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="VD: 0987654321"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-sky-700" />
+                <Mail className="w-3.5 h-3.5 text-brand-700" />
                 Email
               </label>
               <input
@@ -139,7 +139,7 @@ export const CreateTechnicianModal = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="VD: tech@example.com"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
             </div>
           </div>
@@ -148,7 +148,7 @@ export const CreateTechnicianModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-sky-700" />
+                <Lock className="w-3.5 h-3.5 text-brand-700" />
                 Mật khẩu đăng nhập
               </label>
               <input
@@ -156,7 +156,7 @@ export const CreateTechnicianModal = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mặc định: Abc123456@"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none font-mono"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none font-mono"
               />
             </div>
 
@@ -169,7 +169,7 @@ export const CreateTechnicianModal = ({
                 value={idCardNumber}
                 onChange={(e) => setIdCardNumber(e.target.value)}
                 placeholder="VD: 001201012345"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
             </div>
           </div>
@@ -177,7 +177,7 @@ export const CreateTechnicianModal = ({
           {/* Chuyên môn */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-              <Award className="w-3.5 h-3.5 text-sky-700" />
+              <Award className="w-3.5 h-3.5 text-brand-700" />
               Chuyên môn kỹ thuật
             </label>
             <input
@@ -185,7 +185,7 @@ export const CreateTechnicianModal = ({
               value={specialization}
               onChange={(e) => setSpecialization(e.target.value)}
               placeholder="VD: Sửa chữa xe máy điện, động cơ & bo mạch điều khiển"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
           </div>
 
@@ -201,7 +201,7 @@ export const CreateTechnicianModal = ({
                 max={50}
                 value={experienceYears}
                 onChange={(e) => setExperienceYears(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
             </div>
 
@@ -212,7 +212,7 @@ export const CreateTechnicianModal = ({
               <select
                 value={skills}
                 onChange={(e) => setSkills(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-sky-800 outline-none cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none cursor-pointer"
               >
                 <option value="SCOOTER">Xe máy điện</option>
                 <option value="BOTH">Tất cả hệ thống xe máy điện</option>
@@ -233,7 +233,7 @@ export const CreateTechnicianModal = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-sky-900 hover:bg-sky-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+              className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />

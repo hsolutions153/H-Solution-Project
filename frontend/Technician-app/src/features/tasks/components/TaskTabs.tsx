@@ -14,7 +14,7 @@ export const TaskTabs = ({ activeTab, setActiveTab }: TaskTabsProps) => {
   ];
 
   return (
-    <div className="flex border-b border-gray-200 bg-white px-2">
+    <div className="flex border-b border-slate-200 bg-white px-2">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -23,7 +23,7 @@ export const TaskTabs = ({ activeTab, setActiveTab }: TaskTabsProps) => {
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 whitespace-nowrap ${
               isActive
-                ? 'border-sky-700 text-sky-800 font-bold'
+                ? 'border-brand-700 text-brand-800 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >

@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from fastapi import UploadFile
 
 from app.core.exceptions import AppException, ErrorCode
@@ -74,3 +75,25 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
         logger.error("Failed to upload image: %s", exc)
         raise AppException(ErrorCode.IMAGE_UPLOAD_FAILED)
 
+
+
+MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
+AVATAR_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/x-png", "image/webp"}
+AVATAR_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+
+
+def upload_avatar(file: UploadFile, user_id: str) -> str:
+    """Validate a profile photo (JPEG/PNG/WebP, max 5 MB), store it and return its public URL."""
+    content_type = (file.content_type or "").lower()
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
+    if content_type not in AVATAR_CONTENT_TYPES and extension not in AVATAR_EXTENSIONS:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+
+    file.file.seek(0, 2)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > MAX_AVATAR_SIZE_BYTES:
+        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
+
+    safe_ext = extension if extension in AVATAR_EXTENSIONS else "jpg"
+    return upload_file_to_supabase(file, f"public/avatars/{user_id}/{uuid.uuid4()}.{safe_ext}")

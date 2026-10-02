@@ -274,7 +274,7 @@ export const OrdersList = () => {
     <div className="p-6 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-sky-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
@@ -304,7 +304,7 @@ export const OrdersList = () => {
               type="button"
               onClick={() => handleViewModeChange("table")}
               className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
-                viewMode === "table" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
+                viewMode === "table" ? "text-brand-950 font-black" : "text-slate-500 hover:text-slate-800"
               }`}
               title="Chuyển sang hiển thị dạng bảng"
             >
@@ -315,7 +315,7 @@ export const OrdersList = () => {
               type="button"
               onClick={() => handleViewModeChange("grid")}
               className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer w-28 ${
-                viewMode === "grid" ? "text-sky-950 font-black" : "text-slate-500 hover:text-slate-800"
+                viewMode === "grid" ? "text-brand-950 font-black" : "text-slate-500 hover:text-slate-800"
               }`}
               title="Chuyển sang hiển thị dạng lưới"
             >
@@ -334,7 +334,7 @@ export const OrdersList = () => {
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-sky-900 hover:bg-sky-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
+            className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Tạo đơn mới</span>
@@ -352,7 +352,7 @@ export const OrdersList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo mã đơn, tên khách hàng, số điện thoại..."
-            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-8 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800"
+            className="w-full bg-slate-50 border border-slate-200 pl-10 pr-8 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
           {searchTerm && (
             <button
@@ -384,8 +384,8 @@ export const OrdersList = () => {
               onClick={() => setTypeFilter("SOS")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
                 typeFilter === "SOS"
-                  ? "bg-red-500 text-white shadow-xs"
-                  : "text-red-600 hover:bg-red-50"
+                  ? "bg-rose-500 text-white shadow-xs"
+                  : "text-rose-600 hover:bg-rose-50"
               }`}
             >
               <AlertTriangle className="w-3 h-3" /> Cứu hộ SOS
@@ -406,7 +406,7 @@ export const OrdersList = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
           >
             <option value="ALL">Tất cả trạng thái</option>
             {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
@@ -445,7 +445,7 @@ export const OrdersList = () => {
                   setDateFrom("");
                   setDateTo("");
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:border-rose-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Hủy bộ lọc theo ngày"
               >
                 <XCircle className="w-3.5 h-3.5 shrink-0" />
@@ -459,7 +459,7 @@ export const OrdersList = () => {
             <select
               value={techFilter}
               onChange={(e) => setTechFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer max-w-50"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer max-w-50"
               title="Lọc theo kỹ thuật viên"
             >
               <option value="ALL">Tất cả kỹ thuật viên</option>
@@ -479,7 +479,7 @@ export const OrdersList = () => {
               <button
                 type="button"
                 onClick={() => setTechFilter("ALL")}
-                className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
+                className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:border-rose-300 font-bold text-xs transition cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Hủy lọc kỹ thuật viên"
               >
                 <XCircle className="w-3.5 h-3.5 shrink-0" />
@@ -497,7 +497,7 @@ export const OrdersList = () => {
           <div className="p-5">
             {loading ? (
               <div className="py-16 text-center text-slate-400">
-                <RefreshCw className="w-7 h-7 animate-spin mx-auto mb-2 text-sky-800" />
+                <RefreshCw className="w-7 h-7 animate-spin mx-auto mb-2 text-brand-800" />
                 <span className="text-sm font-medium">Đang tải danh sách đơn hàng...</span>
               </div>
             ) : paginatedOrders.length === 0 ? (
@@ -518,7 +518,7 @@ export const OrdersList = () => {
                   return (
                     <div
                       key={order.id}
-                      className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-4.5 flex flex-col justify-between gap-4 group hover:border-sky-300"
+                      className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-4.5 flex flex-col justify-between gap-4 group hover:border-brand-300"
                     >
                       {/* Card Header: Mã đơn + SOS + Trạng thái */}
                       <div>
@@ -528,7 +528,7 @@ export const OrdersList = () => {
                               #{order.request_code || order.id?.substring(0, 8)}
                             </span>
                             {order.is_sos && (
-                              <span className="bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 SOS
                               </span>
@@ -552,7 +552,7 @@ export const OrdersList = () => {
                               return (
                                 <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
                                   isBank
-                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    ? "bg-brand-50 text-brand-700 border border-brand-200"
                                     : isCash
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : "bg-slate-100 text-slate-700 border border-slate-200"
@@ -588,7 +588,7 @@ export const OrdersList = () => {
                         {/* Device & Issue */}
                         <div className="space-y-1.5 text-xs text-slate-600 mb-3">
                           <div className="flex items-start gap-2">
-                            <Wrench className="w-3.5 h-3.5 text-sky-800 shrink-0 mt-0.5" />
+                            <Wrench className="w-3.5 h-3.5 text-brand-800 shrink-0 mt-0.5" />
                             <div className="min-w-0">
                               <span className="font-bold text-slate-800 block truncate">
                                 {getDeviceLabel(order.device)}
@@ -620,11 +620,11 @@ export const OrdersList = () => {
                         <div className="flex items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {order.technician ? (
-                              <span className="bg-sky-50 text-sky-900 font-bold px-2 py-0.5 rounded border border-sky-100 truncate text-[11px]">
+                              <span className="bg-brand-50 text-brand-900 font-bold px-2 py-0.5 rounded border border-brand-100 truncate text-[11px]">
                                 KTV: {order.technician.user?.full_name || order.technician.name || order.technician.full_name}
                               </span>
                             ) : (
-                              <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-[11px]">
+                              <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-100 text-[11px]">
                                 Chưa phân công
                               </span>
                             )}
@@ -643,7 +643,7 @@ export const OrdersList = () => {
                         <div className="flex items-center justify-end gap-1.5 pt-1">
                           <button
                             onClick={() => setSelectedOrder(order)}
-                            className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                            className="w-8 h-8 rounded-xl flex items-center justify-center border border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 hover:text-brand-950 transition cursor-pointer shadow-2xs"
                             title="Xem chi tiết đơn hàng"
                             aria-label="Xem chi tiết đơn hàng"
                           >
@@ -664,7 +664,7 @@ export const OrdersList = () => {
                               isFinished
                                 ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
                                 : order.technician
-                                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-sky-900 cursor-pointer shadow-2xs"
+                                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
                                 : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
                             }`}
                             title={
@@ -690,7 +690,7 @@ export const OrdersList = () => {
                             className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
                               isFinished
                                 ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
-                                : "border-slate-200 bg-slate-50 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 cursor-pointer shadow-2xs"
+                                : "border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer shadow-2xs"
                             }`}
                             title={
                               isFinished
@@ -728,7 +728,7 @@ export const OrdersList = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-800" />
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-800" />
                       Đang tải danh sách đơn hàng...
                     </td>
                   </tr>
@@ -760,7 +760,7 @@ export const OrdersList = () => {
                               #{order.request_code || order.id?.substring(0, 8)}
                             </span>
                             {order.is_sos && (
-                              <span className="bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded">
+                              <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded">
                                 SOS
                               </span>
                             )}
@@ -824,7 +824,7 @@ export const OrdersList = () => {
                               return (
                                 <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
                                   isBank
-                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    ? "bg-brand-50 text-brand-700 border border-brand-200"
                                     : isCash
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : "bg-slate-100 text-slate-700 border border-slate-200"
@@ -843,7 +843,7 @@ export const OrdersList = () => {
                               {order.technician.user?.full_name || order.technician.name || order.technician.full_name}
                             </div>
                           ) : (
-                            <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded">
+                            <span className="text-xs text-rose-500 font-bold bg-rose-50 px-2 py-0.5 rounded">
                               Chưa phân công
                             </span>
                           )}
@@ -855,7 +855,7 @@ export const OrdersList = () => {
                             {/* Nút Xem chi tiết */}
                             <button
                               onClick={() => setSelectedOrder(order)}
-                              className="w-8 h-8 rounded-xl flex items-center justify-center border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-950 transition cursor-pointer shadow-2xs"
+                              className="w-8 h-8 rounded-xl flex items-center justify-center border border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 hover:text-brand-950 transition cursor-pointer shadow-2xs"
                               title="Xem chi tiết đơn hàng"
                               aria-label="Xem chi tiết đơn hàng"
                             >
@@ -877,7 +877,7 @@ export const OrdersList = () => {
                                 isFinished
                                   ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
                                   : order.technician
-                                  ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-sky-900 cursor-pointer shadow-2xs"
+                                  ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
                                   : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
                               }`}
                               title={
@@ -904,7 +904,7 @@ export const OrdersList = () => {
                               className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
                                 isFinished
                                   ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
-                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 cursor-pointer shadow-2xs"
+                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer shadow-2xs"
                               }`}
                               title={
                                 isFinished
@@ -969,7 +969,7 @@ export const OrdersList = () => {
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold tracking-wider text-sky-400 uppercase">
+                <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
                   Chức năng phân công
                 </span>
                 <h3 className="text-lg font-black mt-0.5">
@@ -1011,7 +1011,7 @@ export const OrdersList = () => {
                 <select
                   value={selectedTechId}
                   onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-800 cursor-pointer"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
                 >
                   <option value="">-- Chọn kỹ thuật viên --</option>
                   {technicians.map((t) => {
@@ -1042,7 +1042,7 @@ export const OrdersList = () => {
                   type="button"
                   onClick={handleQuickAssign}
                   disabled={actionLoading || !selectedTechId}
-                  className="px-5 py-2.5 rounded-xl bg-sky-900 hover:bg-sky-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
                 >
                   {actionLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1061,9 +1061,9 @@ export const OrdersList = () => {
       {cancellingOrder && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 bg-red-600 text-white flex justify-between items-center">
+            <div className="p-6 bg-rose-600 text-white flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold tracking-wider text-red-200 uppercase">
+                <span className="text-xs font-bold tracking-wider text-rose-200 uppercase">
                   Xác nhận hủy đơn
                 </span>
                 <h3 className="text-lg font-black mt-0.5">
@@ -1072,7 +1072,7 @@ export const OrdersList = () => {
               </div>
               <button
                 onClick={() => setCancellingOrder(null)}
-                className="text-red-200 hover:text-white p-1 rounded-lg transition cursor-pointer"
+                className="text-rose-200 hover:text-white p-1 rounded-lg transition cursor-pointer"
               >
                 ✕
               </button>
@@ -1090,7 +1090,7 @@ export const OrdersList = () => {
                 <select
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-600 cursor-pointer"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-600 cursor-pointer"
                 >
                   <option value="Khách hàng yêu cầu hủy">Khách hàng yêu cầu hủy</option>
                   <option value="Không liên lạc được với khách">Không liên lạc được với khách</option>
@@ -1111,7 +1111,7 @@ export const OrdersList = () => {
                     onChange={(e) => setCustomCancelReason(e.target.value)}
                     rows={2}
                     placeholder="Nhập lý do hủy chi tiết..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-600"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-600"
                   />
                 </div>
               )}
@@ -1129,7 +1129,7 @@ export const OrdersList = () => {
                   type="button"
                   onClick={handleQuickCancel}
                   disabled={actionLoading}
-                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
                 >
                   {actionLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />

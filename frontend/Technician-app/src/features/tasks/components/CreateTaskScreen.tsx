@@ -48,7 +48,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
         <button
           type="button"
           onClick={onBack}
-          className="text-xs font-bold text-sky-800 hover:underline flex items-center gap-1 cursor-pointer"
+          className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Tiếp nhận hiện trường
         </button>
@@ -57,13 +57,13 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
       <form id="create-task-form" onSubmit={handleSubmit} className="space-y-4">
         
         
-        <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-100 space-y-3">
+        <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-100 space-y-3">
           
           <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
               className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                customerType === 'new' ? 'bg-white text-sky-900 shadow-sm' : 'text-slate-500'
+                customerType === 'new' ? 'bg-white text-brand-900 shadow-sm' : 'text-slate-500'
               }`}
               onClick={() => setCustomerType('new')}
             >
@@ -72,7 +72,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
             <button
               type="button"
               className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                customerType === 'old' ? 'bg-white text-sky-900 shadow-sm' : 'text-slate-500'
+                customerType === 'old' ? 'bg-white text-brand-900 shadow-sm' : 'text-slate-500'
               }`}
               onClick={() => setCustomerType('old')}
             >
@@ -90,7 +90,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                   placeholder="Nhập họ và tên..."
                   value={newFormData.customerName}
                   onChange={(e) => setNewFormData({ ...newFormData, customerName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
@@ -102,7 +102,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                     placeholder="090..."
                     value={newFormData.phone}
                     onChange={(e) => setNewFormData({ ...newFormData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
@@ -112,7 +112,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                     placeholder="Số nhà, tên đường"
                     value={newFormData.address}
                     onChange={(e) => setNewFormData({ ...newFormData, address: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -128,21 +128,21 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                     placeholder="Tìm theo SĐT, Tên khách hàng hoặc Mã KH..."
                     value={oldFormData.searchKeyword}
                     onChange={(e) => setOldFormData({ ...oldFormData, searchKeyword: e.target.value })}
-                    className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
-                  <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
               
               {selectedOldCustomer && (
-                <div className="p-3 bg-slate-50 border border-sky-100 rounded-xl relative space-y-1.5">
+                <div className="p-3 bg-slate-50 border border-brand-100 rounded-xl relative space-y-1.5">
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-sky-900">Nguyễn Văn An - 0901234567</span>
+                    <span className="text-xs font-bold text-brand-900">Nguyễn Văn An - 0901234567</span>
                     <button 
                       type="button" 
                       onClick={() => setSelectedOldCustomer(false)}
-                      className="text-[10px] text-sky-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-[10px] text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <RefreshCw className="w-3 h-3" /> Đổi khách hàng
                     </button>
@@ -158,9 +158,9 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
         </div>
 
         
-        <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-100 space-y-3">
+        <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-100 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-sky-900 font-bold text-xs uppercase tracking-wide">
+            <div className="flex items-center space-x-2 text-brand-900 font-bold text-xs uppercase tracking-wide">
               <span>🔧</span>
               <span>Thông tin thiết bị & Sự cố</span>
             </div>
@@ -168,7 +168,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
               <button 
                 type="button" 
                 onClick={() => setIsAddingNewDevice(!isAddingNewDevice)}
-                className="text-[10px] text-sky-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-[10px] text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
               >
                 {isAddingNewDevice ? (
                   <>
@@ -191,12 +191,12 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                 <select 
                   value={oldFormData.selectedDevice}
                   onChange={(e) => setOldFormData({ ...oldFormData, selectedDevice: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 appearance-none cursor-pointer"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none cursor-pointer"
                 >
                   <option>Xe máy điện VinFast Feliz S - SN: VF12345</option>
                   <option>Xe máy điện Dat Bike Quantum - SN: DB98765</option>
                 </select>
-                <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
           )}
@@ -205,7 +205,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
           {(customerType === 'new' || isAddingNewDevice) && (
             <div className="space-y-3 animate-fadeIn">
               {isAddingNewDevice && (
-                <div className="bg-sky-50 text-sky-800 text-[11px] px-3 py-1.5 rounded-lg font-medium flex items-center justify-between">
+                <div className="bg-brand-50 text-brand-800 text-[11px] px-3 py-1.5 rounded-lg font-medium flex items-center justify-between">
                   <span>Đang thêm thiết bị hoàn toàn mới cho khách hàng này</span>
                 </div>
               )}
@@ -221,7 +221,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                       ? setNewFormData({ ...newFormData, deviceType: e.target.value })
                       : setOldFormData({ ...oldFormData, deviceType: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
@@ -234,7 +234,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                       ? setNewFormData({ ...newFormData, brandModel: e.target.value })
                       : setOldFormData({ ...oldFormData, brandModel: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -250,9 +250,9 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                       ? setNewFormData({ ...newFormData, serialNumber: e.target.value })
                       : setOldFormData({ ...oldFormData, serialNumber: e.target.value })
                     }
-                    className="w-full pl-3 pr-10 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
-                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-sky-600 cursor-pointer">
+                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-600 cursor-pointer">
                     <QrCode className="w-4 h-4" />
                   </button>
                 </div>
@@ -270,13 +270,13 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
                 ? setNewFormData({ ...newFormData, description: e.target.value })
                 : setOldFormData({ ...oldFormData, description: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Ảnh hiện trạng (Tối thiểu 1 ảnh)</label>
-            <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-gray-400 hover:border-sky-500 cursor-pointer transition-colors bg-slate-50">
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:border-brand-500 cursor-pointer transition-colors bg-slate-50">
               <Camera className="w-5 h-5 mb-1 text-slate-500" />
               <span className="text-[10px] font-bold text-slate-600">CHỤP ẢNH</span>
             </div>
@@ -287,7 +287,7 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
         <div className="pt-2">
           <button
             type="submit"
-            className="w-full bg-sky-900 hover:bg-sky-950 text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-sm transition-colors cursor-pointer"
+            className="w-full bg-brand-900 hover:bg-brand-950 text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-sm transition-colors cursor-pointer"
           >
             <span>Tạo phiếu tiếp nhận mới</span>
             <ArrowRight className="w-4 h-4" />

@@ -1,10 +1,11 @@
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 
 from app.auth import repository as auth_repository
 from app.auth.utils import get_current_user
+from app.core import storage
 from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE
 from app.db.database import supabase
@@ -169,6 +170,18 @@ def delete_technician(user_id: str):
 
 def fetch_my_technician(current_user: dict):
     return fetch_technician_by_user_id(current_user["sub"])
+
+
+def upload_my_avatar(current_user: dict, file: UploadFile):
+    """Store a new profile photo for the signed-in technician on their user row."""
+    fetch_my_technician(current_user)
+    avatar_url = storage.upload_avatar(file, current_user["sub"])
+    supabase.table("users").update({"avatar_url": avatar_url}).eq("id", current_user["sub"]).execute()
+
+    from app.repair_requests.service import invalidate_technician_cache  # local import avoids a cycle
+
+    invalidate_technician_cache(current_user["sub"])
+    return fetch_my_technician(current_user)
 
 
 def update_my_presence(current_user: dict, data):

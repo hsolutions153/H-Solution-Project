@@ -51,7 +51,7 @@ export const VerifyOtpScreen = ({
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-gray-200/60 p-6 shadow-sm relative flex flex-col justify-between">
+      <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-slate-200/60 p-6 shadow-sm relative flex flex-col justify-between">
         
         <div className="absolute top-4 right-4">
           <LanguageSelector />
@@ -73,7 +73,7 @@ export const VerifyOtpScreen = ({
             <button
               type="button"
               onClick={onBack}
-              className="text-xs font-bold text-sky-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-brand-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Quay lại</span>

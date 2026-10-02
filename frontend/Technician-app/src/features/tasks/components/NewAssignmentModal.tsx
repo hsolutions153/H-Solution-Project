@@ -64,10 +64,10 @@ export const NewAssignmentModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
       
-      <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+      <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
 
         
-        <div className="bg-sky-800 text-white px-4 py-3.5 flex items-center justify-between">
+        <div className="bg-brand-800 text-white px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-base">
             <span className="p-1 bg-white/20 rounded-lg flex items-center justify-center">
               <BadgeAlert className="w-4 h-4 text-white" />
@@ -89,7 +89,7 @@ export const NewAssignmentModal = ({
 
           
           <div className="flex gap-3">
-            <span className="text-sky-800 mt-0.5 flex-shrink-0">
+            <span className="text-brand-800 mt-0.5 flex-shrink-0">
               <MapPin className="w-4 h-4" />
             </span>
 
@@ -111,7 +111,7 @@ export const NewAssignmentModal = ({
             </div>
           </div>
 
-          <hr className="border-gray-100" />
+          <hr className="border-slate-100" />
 
           
           <div className="flex gap-3">
@@ -131,7 +131,7 @@ export const NewAssignmentModal = ({
               {task.urgency && (
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Mức độ ưu tiên:{' '}
-                  <span className="font-extrabold text-red-600">
+                  <span className="font-extrabold text-rose-600">
                     {task.urgency}
                   </span>
                 </p>
@@ -139,11 +139,11 @@ export const NewAssignmentModal = ({
             </div>
           </div>
 
-          <hr className="border-gray-100" />
+          <hr className="border-slate-100" />
 
           
           <div className="flex gap-3">
-            <span className="text-sky-800 mt-0.5 flex-shrink-0">
+            <span className="text-brand-800 mt-0.5 flex-shrink-0">
               <CalendarCheck className="w-4 h-4" />
             </span>
 
@@ -160,7 +160,7 @@ export const NewAssignmentModal = ({
                 Thời gian phản hồi:{' '}
                 <span
                   className={`font-bold ${
-                    timeLeft <= 60 ? 'text-red-600' : 'text-sky-800'
+                    timeLeft <= 60 ? 'text-rose-600' : 'text-brand-800'
                   }`}
                 >
                   {minutes}:{seconds}
@@ -172,7 +172,7 @@ export const NewAssignmentModal = ({
           
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sky-800 flex-shrink-0">
+              <span className="text-brand-800 flex-shrink-0">
                 <CarFront className="w-4 h-4" />
               </span>
 
@@ -194,7 +194,7 @@ export const NewAssignmentModal = ({
             <button
               type="button"
               onClick={() => onAccept(task.id)}
-              className="w-full py-2.5 bg-sky-800 hover:bg-sky-900 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 bg-brand-800 hover:bg-brand-900 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <CircleCheck className="w-4 h-4" />
               <span>Chấp nhận</span>
@@ -203,7 +203,7 @@ export const NewAssignmentModal = ({
             <button
               type="button"
               onClick={() => onReject(task.id)} // Bấm Từ chối -> Gọi handler mở RejectTaskModal
-              className="w-full py-2.5 bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <CircleX className="w-4 h-4 text-slate-500" />
               <span>Từ chối</span>

@@ -24,26 +24,13 @@ export const LoginScreen = ({ onLoginSuccess, onForgotPassword }: LoginScreenPro
   };
 
   return (
-    // Màn hình nền tổng thể
-    <div className="min-h-screen flex flex-col justify-center items-center p-4">
-      
-      <div className="w-full max-w-sm bg-slate-50 rounded-3xl border border-gray-200/60 p-6 shadow-sm relative flex flex-col justify-between">
-        
-        
-        <div className="absolute top-4 right-4">
-          <LanguageSelector />
-        </div>
+    <div className="min-h-full flex flex-col bg-surface px-5 pt-4 pb-8">
+      <LanguageSelector />
 
-        <div className="my-auto pt-4">
-          
-          <LoginHeader />
-          
-          
-          <LoginForm onSubmit={handleLogin} onForgotPassword={onForgotPassword} />
-
-          
-          <LoginFooter />
-        </div>
+      <div className="my-auto pt-6">
+        <LoginHeader />
+        <LoginForm onSubmit={handleLogin} onForgotPassword={onForgotPassword} />
+        <LoginFooter />
       </div>
     </div>
   );
