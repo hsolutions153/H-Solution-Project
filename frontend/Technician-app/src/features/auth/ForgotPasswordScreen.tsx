@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { fetchApi } from "@/lib/api-client";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { LoginHeader } from "@/components/LoginHeader";
 import { ForgotPasswordForm } from "./components/ForgotPasswordForm";
@@ -9,17 +10,26 @@ import { ArrowLeft } from "lucide-react"; // Import icon ArrowLeft
 
 interface ForgotPasswordScreenProps {
   onBackToLogin: () => void;
-  onSubmitSuccess?: () => void;
+  onSubmitSuccess?: (phone: string, developmentCode?: string) => void;
 }
 
 export const ForgotPasswordScreen = ({
   onBackToLogin,
   onSubmitSuccess,
 }: ForgotPasswordScreenProps) => {
-  const handleForgotPassword = (data: ForgotPasswordFormData) => {
-    console.log("Yêu cầu gửi OTP cho:", data.identity);
-    alert(`Đã gửi mã OTP đến: ${data.identity}`);
-    if (onSubmitSuccess) onSubmitSuccess();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const handleForgotPassword = async (data: ForgotPasswordFormData) => {
+    setLoading(true); setError("");
+    try {
+      const phone = data.identity.trim();
+      const result = await fetchApi<{ otp_code?: string }>("/auth/forgot-password", {
+        method: "POST", body: JSON.stringify({ phone }),
+      });
+      onSubmitSuccess?.(phone, result.otp_code);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Không thể gửi mã OTP.");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -36,7 +46,8 @@ export const ForgotPasswordScreen = ({
           <LoginHeader />
 
           
-          <ForgotPasswordForm onSubmit={handleForgotPassword} />
+          <ForgotPasswordForm onSubmit={handleForgotPassword} loading={loading} />
+          {error && <p role="alert" className="text-xs text-rose-600">{error}</p>}
 
           
           <div className="text-center mt-4">

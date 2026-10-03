@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, UserPlus, Phone, Mail, Award, Lock, RefreshCw, Save } from "lucide-react";
+import { Award,Lock,Mail,Phone,RefreshCw,UserPlus,X } from "lucide-react";
+import React,{ useState } from "react";
 
 export interface CreateTechnicianModalProps {
   onClose: () => void;

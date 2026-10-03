@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PasswordResetShell } from "@/components/auth/password-reset-shell";
 
 type StoredRequest = {
-  requestId: string;
   phone: string;
   expiresAt: string;
   developmentCode?: string;
@@ -20,9 +19,7 @@ function maskPhone(phone: string) {
 function OtpVerificationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialRequestId = searchParams.get("requestId") ?? "";
   const initialPhone = searchParams.get("phone") ?? "";
-  const [requestId] = useState(initialRequestId);
   const [phone] = useState(initialPhone);
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [seconds, setSeconds] = useState(60);
@@ -36,13 +33,13 @@ function OtpVerificationContent() {
     if (!stored) return;
     try {
       const data = JSON.parse(stored) as StoredRequest;
-      if (data.requestId === requestId) {
+      if (data.phone === phone) {
         queueMicrotask(() => setDevelopmentCode(data.developmentCode ?? ""));
       }
     } catch {
       // The development helper is optional.
     }
-  }, [requestId]);
+  }, [phone]);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -79,13 +76,17 @@ function OtpVerificationContent() {
     setLoading(true);
     setError("");
     try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi("/auth/verify-otp", {
+        method: "POST", body: JSON.stringify({ phone, otp_code: code }),
+      });
       sessionStorage.setItem(
         "passwordResetVerified",
         JSON.stringify({ phone, otp_code: code }),
       );
       router.push("/forgot-password/reset");
-    } catch {
-      setError("Không thể xử lý mã xác minh.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Không thể xử lý mã xác minh.");
     } finally {
       setLoading(false);
     }
@@ -104,6 +105,9 @@ function OtpVerificationContent() {
         method: "POST",
         body: JSON.stringify({ phone }),
       });
+      sessionStorage.setItem("passwordResetRequest", JSON.stringify({
+        phone, developmentCode: payload.otp_code, expiresAt: new Date(Date.now() + payload.expires_in_seconds * 1000).toISOString(),
+      }));
       setDevelopmentCode(payload.otp_code ?? "");
       setDigits(["", "", "", "", "", ""]);
       setSeconds(60);

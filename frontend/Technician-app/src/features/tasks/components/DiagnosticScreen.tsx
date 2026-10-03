@@ -2,7 +2,9 @@
 
 import React, { useState } from "react";
 import { Task } from "@/types/task";
-import { ArrowLeft, Camera, Wrench, Cpu, XCircle, Info, Plus, X, FileText, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowRight, Camera, Check, Wrench, Cpu, XCircle, Info, ImagePlus, Plus, X, FileText, Sparkles, AlertCircle } from "lucide-react";
+import { Button, cn } from "@h-mobility/ui";
+import { ActionBar, Modal, ScreenHeader, SectionTitle, textareaClasses } from "@/components/ui";
 
 interface DiagnosticScreenProps {
   task: Task;
@@ -52,8 +54,70 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
     setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const REPAIR_OPTIONS = [
+    { id: "FIX_NOW" as const, label: "Sửa được ngay", hint: "Xử lý tại chỗ", icon: Wrench },
+    { id: "BRING_TO_WORKSHOP" as const, label: "Cần mang về xưởng", hint: "Cần dụng cụ hoặc linh kiện", icon: Cpu },
+    { id: "CANT_FIX" as const, label: "Không thể sửa", hint: "Báo lại cho khách hàng", icon: XCircle },
+  ];
+
+  const handleSubmit = async () => {
+    if (!note.trim()) {
+      setNoteError("Vui lòng nhập nội dung chẩn đoán trước khi tiếp tục.");
+      return;
+    }
+
+    setIsUploading(true);
+    let finalImages = [...images];
+    let updatedTaskResponse: any = null;
+
+    if (task?.id && imageFiles.length > 0) {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        for (const file of imageFiles) {
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await fetchApi<any>(
+              `/repair-requests/${task.id}/diagnostic-images`,
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+            updatedTaskResponse = res;
+            if (res?.images && Array.isArray(res.images)) {
+              const beforeImgs = res.images
+                .filter(
+                  (img: any) =>
+                    img.image_type === "BEFORE_REPAIR" ||
+                    img.type === "BEFORE_REPAIR"
+                )
+                .map((img: any) => img.image_url || img.url);
+              if (beforeImgs.length > 0) {
+                finalImages = beforeImgs;
+              }
+            }
+          } catch (uploadErr) {
+            console.error("Lỗi khi upload ảnh chẩn đoán:", uploadErr);
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi kết nối khi tải ảnh chẩn đoán:", err);
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      setIsUploading(false);
+    }
+
+    onSubmitDiagnostic(
+      { note, repairType, images: finalImages },
+      updatedTaskResponse
+    );
+  };
+
   return (
-    <div className="p-4 pb-28 space-y-4 relative">
+    <div className="space-y-5 px-4 pt-4">
       <input
         type="file"
         id="cameraInput"
@@ -71,93 +135,65 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
         onChange={handleFileChange}
       />
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Đăng ký Chẩn đoán
-        </button>
-      </div>
+      <ScreenHeader
+        title="Chẩn đoán"
+        subtitle={`Mã đơn ${task.code || "#JOB-2904"} · ${task.serviceName || "Sửa chữa thiết bị y tế / Xe lăn"}`}
+        onBack={onBack}
+      />
 
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-1">
-        <p className="text-[10px] text-slate-400 font-medium">
-          MA ĐƠN: {task.code || `#JOB-2904`}
-        </p>
-        <h3 className="text-xs font-bold text-slate-800">
-          {task.serviceName || `Sửa chữa thiết bị y tế / Xe lăn`}
-        </h3>
-        <p className="text-[11px] text-slate-500">
-          Ghi nhận kết quả kiểm tra và đánh giá tình trạng thiết bị.
-        </p>
-      </div>
-
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-brand-100 flex items-center justify-center text-brand-800 shrink-0">
-              <FileText className="w-4 h-4" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-900 block leading-tight">
-                Nội dung chẩn đoán kỹ thuật
-              </label>
-              <span className="text-[10px] text-slate-500 font-medium">
-                Nguyên nhân hư hỏng & phát sinh thực tế
-              </span>
-            </div>
-          </div>
-          {note.trim().length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {note.trim().length} ký tự
-              </span>
+      <section className="space-y-2.5">
+        <SectionTitle
+          icon={<FileText />}
+          action={
+            note.trim().length > 0 ? (
               <button
                 type="button"
                 onClick={() => {
                   setNote("");
                   setNoteError(null);
                 }}
-                className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                className="text-[13px] font-semibold text-slate-500 hover:text-rose-700 cursor-pointer"
               >
-                Xóa
+                Xóa nội dung
               </button>
-            </div>
+            ) : null
+          }
+        >
+          <label htmlFor="diagnostic-note">Kết quả chẩn đoán</label>
+        </SectionTitle>
+        <textarea
+          id="diagnostic-note"
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            if (noteError && e.target.value.trim()) {
+              setNoteError(null);
+            }
+          }}
+          placeholder="Nguyên nhân hư hỏng và vấn đề phát sinh. Ví dụ: ắc quy chai phồng, sụt áp nhanh, cần thay cụm bình mới."
+          rows={4}
+          aria-invalid={noteError ? true : undefined}
+          aria-describedby={noteError ? "diagnostic-note-error" : undefined}
+          className={cn(
+            textareaClasses,
+            noteError && "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
           )}
-        </div>
+        />
+        {noteError ? (
+          <p id="diagnostic-note-error" className="flex items-center gap-1.5 text-xs font-medium text-rose-700">
+            <AlertCircle className="size-3.5 shrink-0" />
+            {noteError}
+          </p>
+        ) : note.trim().length > 0 ? (
+          <p className="text-xs text-slate-500 tabular-nums">{note.trim().length} ký tự</p>
+        ) : null}
 
-        <div className="relative">
-          <textarea
-            value={note}
-            onChange={(e) => {
-              setNote(e.target.value);
-              if (noteError && e.target.value.trim()) {
-                setNoteError(null);
-              }
-            }}
-            placeholder="Nhập chi tiết lỗi kiểm tra được và các vấn đề phát sinh (ví dụ: Bình ắc quy bị chai phồng, sụt áp nhanh; cần thay cụm bình mới)..."
-            rows={4}
-            className={`w-full p-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border-2 ${
-              noteError
-                ? "border-rose-500 bg-rose-50/20"
-                : "border-slate-200 focus:border-brand-800 focus:bg-white"
-            } rounded-xl focus:outline-none focus:ring-3 focus:ring-brand-800/10 transition-all resize-none leading-relaxed`}
-          />
-          {noteError && (
-            <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {noteError}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-1.5 pt-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Gợi ý chẩn đoán nhanh:</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="pt-1">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <Sparkles className="size-3.5 text-brand-600" />
+            Chọn nhanh lỗi thường gặp
+          </p>
+          <div className="flex flex-wrap gap-2">
             {[
               "Ắc quy chai / sụt áp",
               "Hỏng bộ điều khiển (IC)",
@@ -165,96 +201,101 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
               "Đứt dây phanh / kẹt phanh",
               "Hỏng cần lái Joystick / tay ga",
               "Động cơ kêu / kẹt trục",
-            ].map((tag) => (
+            ].map((tag) => {
+              const added = note.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    setNote((prev) => {
+                      const trimmed = prev.trim();
+                      if (!trimmed) return tag;
+                      if (trimmed.includes(tag)) return trimmed;
+                      return `${trimmed}, ${tag}`;
+                    });
+                    setNoteError(null);
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors active:scale-95 cursor-pointer",
+                    added
+                      ? "border-brand-300 bg-brand-50 text-brand-800"
+                      : "border-line bg-white text-slate-700 hover:border-brand-300 hover:bg-brand-50"
+                  )}
+                >
+                  {added ? <Check className="size-3.5" /> : <Plus className="size-3.5" />}
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2.5">
+        <SectionTitle icon={<Wrench />}>Khả năng sửa chữa</SectionTitle>
+        <div role="radiogroup" className="space-y-2">
+          {REPAIR_OPTIONS.map((opt) => {
+            const selected = repairType === opt.id;
+            const danger = opt.id === "CANT_FIX";
+            const Icon = opt.icon;
+            return (
               <button
-                key={tag}
+                key={opt.id}
                 type="button"
-                onClick={() => {
-                  setNote((prev) => {
-                    const trimmed = prev.trim();
-                    if (!trimmed) return tag;
-                    if (trimmed.includes(tag)) return trimmed;
-                    return `${trimmed}, ${tag}`;
-                  });
-                }}
-                className="text-[11px] font-semibold px-2.5 py-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-900 hover:border-brand-300 border border-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer active:scale-95 shadow-2xs"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setRepairType(opt.id)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-card border bg-white p-3 text-left transition-colors cursor-pointer",
+                  selected
+                    ? danger
+                      ? "border-rose-400 bg-rose-50 ring-1 ring-rose-200"
+                      : "border-brand-500 bg-brand-50 ring-1 ring-brand-200"
+                    : "border-line hover:bg-slate-50"
+                )}
               >
-                + {tag}
+                <span
+                  className={cn(
+                    "flex size-10 shrink-0 items-center justify-center rounded-control",
+                    danger ? "bg-rose-100 text-rose-700" : "bg-brand-100 text-brand-700"
+                  )}
+                >
+                  <Icon className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-ink">{opt.label}</span>
+                  <span className="block text-xs text-slate-500">{opt.hint}</span>
+                </span>
+                <span
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                    selected ? (danger ? "border-rose-600 bg-rose-600" : "border-brand-600 bg-brand-600") : "border-slate-300"
+                  )}
+                  aria-hidden
+                >
+                  {selected ? <Check className="size-3 text-white" strokeWidth={3} /> : null}
+                </span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-2">
-        <p className="text-xs font-bold text-slate-800">Đánh giá khả năng sửa chữa</p>
-
-        <div
-          onClick={() => setRepairType("FIX_NOW")}
-          className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
-            repairType === "FIX_NOW"
-              ? "bg-brand-50 border-brand-400 text-brand-900 shadow-xs"
-              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
-          }`}
+      <section className="space-y-2.5">
+        <SectionTitle
+          icon={<Camera />}
+          action={<span className="text-xs text-slate-500">Trước khi sửa chữa</span>}
         >
-          <div className="w-8 h-8 rounded-xl bg-brand-100 flex items-center justify-center text-brand-800">
-            <Wrench className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-bold">Sửa được ngay</span>
-        </div>
-
-        <div
-          onClick={() => setRepairType("BRING_TO_WORKSHOP")}
-          className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
-            repairType === "BRING_TO_WORKSHOP"
-              ? "bg-brand-50 border-brand-400 text-brand-900 shadow-xs"
-              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-            <Cpu className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-bold">Cần mang về xưởng</span>
-        </div>
-
-        <div
-          onClick={() => setRepairType("CANT_FIX")}
-          className={`p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition ${
-            repairType === "CANT_FIX"
-              ? "bg-rose-50 border-rose-300 text-rose-900 shadow-xs"
-              : "bg-white border-slate-100 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600">
-            <XCircle className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-bold">Không thể sửa</span>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-800">Chụp ảnh hiện trạng</p>
-            <p className="text-[10px] text-slate-400">Trước khi thực hiện sửa chữa</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => document.getElementById("cameraInput")?.click()}
-            className="bg-brand-900 hover:bg-brand-950 text-white px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            Chụp ảnh
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
+          Ảnh hiện trạng
+        </SectionTitle>
+        <div className="grid grid-cols-3 gap-2">
           {images.map((imgSrc, index) => (
-            <div key={index} className="rounded-xl overflow-hidden h-20 border border-slate-100 relative group">
+            <div key={index} className="relative aspect-square overflow-hidden rounded-control border border-line bg-slate-100">
               <img
                 src={imgSrc}
-                className="w-full h-full object-cover"
-                alt="Hiện trạng"
+                className="size-full object-cover"
+                alt={`Ảnh hiện trạng ${index + 1}`}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/images/s1.jpg";
                 }}
@@ -262,152 +303,71 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleRemoveImage(index)}
-                className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-80 hover:opacity-100 transition cursor-pointer"
+                aria-label={`Xóa ảnh ${index + 1}`}
+                className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-brand-950/70 text-white transition-colors hover:bg-brand-950 cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <X className="size-3.5" />
               </button>
             </div>
           ))}
 
-          <div
+          <button
+            type="button"
             onClick={() => setShowImagePickerModal(true)}
-            className="rounded-xl border-2 border-dashed border-slate-200 h-20 flex flex-col items-center justify-center text-slate-400 hover:border-brand-800 hover:text-brand-800 cursor-pointer transition bg-slate-50/50"
+            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed border-slate-300 bg-white text-slate-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 cursor-pointer"
           >
-            <Plus className="w-5 h-5 mb-1" />
-            <span className="text-[10px] font-bold">Thêm ảnh</span>
-          </div>
+            <Camera className="size-5" />
+            <span className="text-xs font-semibold">Thêm ảnh</span>
+          </button>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-slate-100 rounded-2xl p-3 flex items-start gap-2 text-slate-600">
-        <Info className="w-4 h-4 text-brand-800 shrink-0 mt-0.5" />
-        <p className="text-[11px] leading-relaxed">
-          Cần chuẩn bị linh kiện thay thế nếu chuyển về xưởng hoặc tiến hành báo giá trực tiếp.
-        </p>
-      </div>
+      <p className="flex items-start gap-2.5 rounded-card bg-slate-100 p-3.5 text-[13px] leading-relaxed text-slate-600">
+        <Info className="mt-0.5 size-4 shrink-0 text-brand-600" />
+        Cần chuẩn bị linh kiện thay thế nếu chuyển về xưởng hoặc tiến hành báo giá trực tiếp.
+      </p>
 
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isUploading}
-          className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50"
-        >
-          Hủy bỏ
-        </button>
-        <button
-          type="button"
-          disabled={isUploading}
-          onClick={async () => {
-            if (!note.trim()) {
-              setNoteError("Vui lòng nhập nội dung chẩn đoán trước khi tiếp tục.");
-              return;
-            }
+      <ActionBar className="grid grid-cols-[1fr_2fr] gap-2.5">
+        <Button size="lg" variant="secondary" onClick={onBack} disabled={isUploading}>
+          Hủy
+        </Button>
+        <Button size="lg" onClick={handleSubmit} loading={isUploading}>
+          {isUploading ? "Đang tải ảnh..." : "Tiếp tục báo giá"}
+          {!isUploading && <ArrowRight className="size-5" />}
+        </Button>
+      </ActionBar>
 
-            setIsUploading(true);
-            let finalImages = [...images];
-            let updatedTaskResponse: any = null;
-
-            if (task?.id && imageFiles.length > 0) {
-              try {
-                const { fetchApi } = await import("@/lib/api-client");
-                for (const file of imageFiles) {
-                  try {
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    const res = await fetchApi<any>(
-                      `/repair-requests/${task.id}/diagnostic-images`,
-                      {
-                        method: "POST",
-                        body: formData,
-                      }
-                    );
-                    updatedTaskResponse = res;
-                    if (res?.images && Array.isArray(res.images)) {
-                      const beforeImgs = res.images
-                        .filter(
-                          (img: any) =>
-                            img.image_type === "BEFORE_REPAIR" ||
-                            img.type === "BEFORE_REPAIR"
-                        )
-                        .map((img: any) => img.image_url || img.url);
-                      if (beforeImgs.length > 0) {
-                        finalImages = beforeImgs;
-                      }
-                    }
-                  } catch (uploadErr) {
-                    console.error("Lỗi khi upload ảnh chẩn đoán:", uploadErr);
-                  }
-                }
-              } catch (err) {
-                console.error("Lỗi kết nối khi tải ảnh chẩn đoán:", err);
-              } finally {
-                setIsUploading(false);
-              }
-            } else {
-              setIsUploading(false);
-            }
-
-            onSubmitDiagnostic(
-              { note, repairType, images: finalImages },
-              updatedTaskResponse
-            );
-          }}
-          className="flex-1 py-3 bg-brand-900 hover:bg-brand-950 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-sm disabled:opacity-50"
-        >
-          {isUploading ? (
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-              Đang tải ảnh lên...
-            </span>
-          ) : (
-            <span>Lưu & Tiếp tục báo giá ➔</span>
-          )}
-        </button>
-      </div>
-
-      {showImagePickerModal && (
-        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="bg-white w-full max-w-xs rounded-3xl p-4 shadow-xl space-y-3 animate-slide-up">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h4 className="text-xs font-bold text-slate-800">Thêm hình ảnh hiện trạng</h4>
-              <button
-                type="button"
-                onClick={() => setShowImagePickerModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowImagePickerModal(false);
-                  document.getElementById("cameraInput")?.click();
-                }}
-                className="w-full py-2.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-900 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
-              >
-                <Camera className="w-4 h-4 text-brand-800" />
-                Bật Camera chụp trực tiếp
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowImagePickerModal(false);
-                  document.getElementById("galleryInput")?.click();
-                }}
-                className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-slate-500" />
-                Chọn ảnh từ thư viện thiết bị
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={showImagePickerModal}
+        onClose={() => setShowImagePickerModal(false)}
+        variant="sheet"
+        title="Thêm ảnh hiện trạng"
+      >
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowImagePickerModal(false);
+              document.getElementById("cameraInput")?.click();
+            }}
+            className="flex w-full items-center gap-3 rounded-control bg-brand-50 px-4 py-3.5 text-left text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 cursor-pointer"
+          >
+            <Camera className="size-5" />
+            Chụp ảnh bằng camera
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowImagePickerModal(false);
+              document.getElementById("galleryInput")?.click();
+            }}
+            className="flex w-full items-center gap-3 rounded-control bg-slate-100 px-4 py-3.5 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 cursor-pointer"
+          >
+            <ImagePlus className="size-5" />
+            Chọn ảnh từ thư viện
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

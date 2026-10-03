@@ -13,6 +13,7 @@ then install the optional test dependency and a browser:
 python -m pip install playwright==1.63.0
 python -m playwright install chromium
 python tests/check_repair_costs_ui.py
+python tests/check_audit_fixes_ui.py
 ```
 
 The script uses `http://localhost:3002` for the User app and
@@ -25,3 +26,10 @@ in-memory database and test authentication. They do not modify Supabase data.
 The checks cover equal/lower/higher final costs, additional parts and services,
 approval/rejection of additional costs, zero final cost, customer receipts,
 and duplicate completion calls.
+
+The audit regression script also uses `ADMIN_APP_URL` (default
+`http://localhost:3000`). It checks admin order creation with real API handlers,
+search across server pages in all three apps, empty admin history, completed
+unpaid orders, pending MoMo responses, rating failures, and both password reset
+flows. Google, SMS and payment unit tests mock provider calls; they require no
+provider credentials and perform no real transfers or message delivery.

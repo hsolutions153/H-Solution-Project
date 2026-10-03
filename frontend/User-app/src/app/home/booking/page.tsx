@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { fileToStoredImage } from "@/utils/image-data";
 import { HomeShell } from "@/components/home/home-shell";
-import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
+import { PageHeader } from "@/components/home/page-header";
 
 type BookingStep = "PROBLEM" | "CAMERA" | "DETAILS" | "LOCATION" | "SCHEDULE" | "SUCCESS";
 type Issue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -360,27 +360,12 @@ export default function BookingPage() {
     <HomeShell activeNav="wheelchair" hideHeader mainClassName="booking-home-content">
       <div className="sos-flow-page booking-flow-page">
         <header className="sos-flow-header">
-          <div className="sos-flow-header-main">
-            {step !== "PROBLEM" && (
-              <button type="button" className="sos-flow-back-btn" onClick={goBack} aria-label="Quay lại">
-                <span className="material-symbols-outlined">arrow_back</span>
-              </button>
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <EMobiCareLogoIcon size={26} />
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#156495", letterSpacing: "0.04em" }}>H-Mobility Care</span>
-                  {step !== "SUCCESS" && (
-                    <span className="booking-header-step" style={{ margin: 0 }}>
-                      · Bước {STEP_ORDER.indexOf(step) + 1}/{STEP_ORDER.length}
-                    </span>
-                  )}
-                </div>
-                <strong className="booking-header-title">Đặt lịch sửa chữa</strong>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            title="Đặt lịch sửa chữa"
+            subtitle={step !== "SUCCESS" ? `Bước ${STEP_ORDER.indexOf(step) + 1}/${STEP_ORDER.length}` : "Đã gửi yêu cầu"}
+            onBack={step !== "PROBLEM" ? goBack : undefined}
+            backHref={step === "PROBLEM" ? "/home" : undefined}
+          />
           {step !== "SUCCESS" && (
             <div className="booking-progress" aria-hidden>
               <span style={{ width: `${((STEP_ORDER.indexOf(step) + 1) / STEP_ORDER.length) * 100}%` }} />
@@ -400,7 +385,6 @@ export default function BookingPage() {
         {step === "PROBLEM" && (
           <section className="sos-step-panel">
             <div className="sos-step-head">
-              <p className="sos-step-kicker">CHỌN SỰ CỐ</p>
               <h1 className="sos-step-title">Xe máy điện của bạn đang gặp vấn đề gì?</h1>
             </div>
             <div className="sos-issue-grid">

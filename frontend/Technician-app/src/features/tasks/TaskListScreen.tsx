@@ -1,25 +1,60 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { TaskTabs } from "./components/TaskTabs";
-import { TaskCard } from "./components/TaskCard";
+import React,{ useEffect,useMemo,useState } from "react";
+import { CreateTaskScreen } from "./components/CreateTaskScreen";
+import { HomeOverview } from "./components/HomeOverview";
 import { NewAssignmentModal } from "./components/NewAssignmentModal";
 import { RejectTaskModal } from "./components/RejectTaskModal";
+import { TaskCard } from "./components/TaskCard";
+import { TaskTabs } from "./components/TaskTabs";
 import { TaskDetailScreen } from "./TaskDetailScreen";
-import { CreateTaskScreen } from "./components/CreateTaskScreen";
 
 import { MOCK_TASKS } from "@/constants/mockTasks";
-import { Task, TaskStatus, HistoryTask } from "@/types/task";
-import { mapApiTask } from "./mapApiTask";
-import { Plus } from "lucide-react";
+import { HistoryTask,Task,TaskStatus } from "@/types/task";
+import { EmptyState } from "@h-mobility/ui";
+import { ClipboardList,Plus } from "lucide-react";
 import { createPortal } from "react-dom";
+import { mapApiTask } from "./mapApiTask";
+
+const DOING_STATUSES: TaskStatus[] = [
+  "IN_PROGRESS",
+  "WAITING_MOVE",
+  "MOVING",
+  "ARRIVED",
+  "WAITING_CONFIRM",
+  "DIAGNOSING",
+  "WAITING_FOR_APPROVAL",
+  "ESTIMATE_APPROVED",
+  "ESTIMATE_REJECTED",
+  "REPAIRING",
+];
+
+function filterTasksByTab(tasks: Task[], tab: string): Task[] {
+  switch (tab) {
+    case "new":
+      return tasks.filter((t) => t.status === "WAITING_ACCEPT" || t.status === "PENDING");
+    case "doing":
+      return tasks.filter((t) => DOING_STATUSES.includes(t.status));
+    case "done":
+      return tasks.filter((t) => t.status === "COMPLETED");
+    case "today":
+    default:
+      return tasks.filter((t) => t.status !== "CANCELLED");
+  }
+}
 
 interface TaskListScreenProps {
   onCompleteRepair?: (completedTask: HistoryTask) => void;
+  /** "home" shows the overview, "tasks" the full task list and the task flow. */
+  view?: "home" | "tasks";
+  /** Switches the bottom-nav tab, used to open a job from Home in the Tasks tab. */
+  onNavigate?: (tab: "home" | "tasks") => void;
 }
 
 export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   onCompleteRepair,
+  view = "tasks",
+  onNavigate,
 }) => {
   const [activeTab, setActiveTab] = useState("today");
   const [isClient, setIsClient] = useState(false);
@@ -86,8 +121,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     let isMounted = true;
     async function loadTechnicianTasks() {
       try {
-        const { fetchApi } = await import("@/lib/api-client");
-        const res = await fetchApi<any>("/repair-requests/technician/me");
+        const { fetchApiPages } = await import("@/lib/api-client");
+        const res = await fetchApiPages<any>("/repair-requests/technician/me");
         if (res && Array.isArray(res.items)) {
           const apiTasks: Task[] = res.items.map(mapApiTask);
 
@@ -151,6 +186,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     sessionStorage.setItem("currentView", "detail");
     setIsModalOpen(false);
     setCurrentView("detail");
+    if (view === "home") onNavigate?.("tasks");
 
     import("@/lib/api-client").then(({ fetchApi }) => {
       fetchApi(`/repair-requests/${taskId}/status`, {
@@ -260,33 +296,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     }
   };
 
-  const filteredTasks = useMemo(() => {
-    switch (activeTab) {
-      case "new":
-        return tasks.filter(
-          (t) => t.status === "WAITING_ACCEPT" || t.status === "PENDING"
-        );
-      case "doing":
-        return tasks.filter(
-          (t) =>
-            t.status === "IN_PROGRESS" ||
-            t.status === "WAITING_MOVE" ||
-            t.status === "MOVING" ||
-            t.status === "ARRIVED" ||
-            t.status === "WAITING_CONFIRM" ||
-            t.status === "DIAGNOSING" ||
-            t.status === "WAITING_FOR_APPROVAL" ||
-            t.status === "ESTIMATE_APPROVED" ||
-            t.status === "ESTIMATE_REJECTED" ||
-            t.status === "REPAIRING"
-        );
-      case "done":
-        return tasks.filter((t) => t.status === "COMPLETED");
-      case "today":
-      default:
-        return tasks.filter((t) => t.status !== "CANCELLED");
-    }
-  }, [tasks, activeTab]);
+  const filteredTasks = useMemo(() => filterTasksByTab(tasks, activeTab), [tasks, activeTab]);
+  const tabCounts = useMemo(
+    () => Object.fromEntries(["today", "new", "doing", "done"].map((tab) => [tab, filterTasksByTab(tasks, tab).length])),
+    [tasks]
+  );
 
   const TAB_TITLES: Record<string, string> = {
     today: "Công việc hôm nay",
@@ -295,7 +309,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     done: "Đã hoàn tất",
   };
 
-  if (currentView === "create") {
+  if (view === "tasks" && currentView === "create") {
     return (
       <CreateTaskScreen
         onBack={() => {
@@ -310,7 +324,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     );
   }
 
-  if (currentView === "detail") {
+  if (view === "tasks" && currentView === "detail") {
     return (
       <TaskDetailScreen
         task={selectedTask}
@@ -331,58 +345,25 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     );
   }
 
-  return (
-    <div className="relative pb-24">
-      <TaskTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+  const openCreate = () => {
+    sessionStorage.setItem("currentView", "create");
+    setCurrentView("create");
+  };
+  const fabContainer = isClient && typeof document !== "undefined" ? document.getElementById("fab-container") : null;
+  const fab = (
+    <button
+      type="button"
+      onClick={openCreate}
+      className="flex size-14 items-center justify-center rounded-card bg-brand-600 text-white shadow-raised transition-[background-color,transform] hover:bg-brand-700 active:scale-95 cursor-pointer"
+      aria-label="Tạo phiếu tiếp nhận mới"
+      title="Tạo phiếu tiếp nhận mới"
+    >
+      <Plus className="size-6" strokeWidth={2.25} />
+    </button>
+  );
 
-      <h1 className="text-sm font-bold text-slate-900 mb-3 px-4 mt-2">
-        {TAB_TITLES[activeTab] || TAB_TITLES.today} ({filteredTasks.length})
-      </h1>
-
-      <div className="space-y-3 px-4">
-        {filteredTasks.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-xs font-medium">
-            Không có công việc nào trong mục này
-          </div>
-        ) : (
-          filteredTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onClick={() => handleCardClick(task)}
-              onDetailClick={handleOpenDetail}
-            />
-          ))
-        )}
-      </div>
-
-      {isClient && typeof document !== "undefined" && document.getElementById("fab-container") ? (
-        createPortal(
-          <button
-            onClick={() => {
-              sessionStorage.setItem("currentView", "create");
-              setCurrentView("create");
-            }}
-            className="w-12 h-12 bg-brand-700 hover:bg-brand-800 rounded-2xl shadow-xl flex items-center justify-center transition-all cursor-pointer active:scale-95 text-brand-200"
-            title="Tạo công việc mới"
-          >
-            <Plus className="w-6 h-6 text-brand-200" strokeWidth={2.5} />
-          </button>,
-          document.getElementById("fab-container")!
-        )
-      ) : (
-        <button
-          onClick={() => {
-            sessionStorage.setItem("currentView", "create");
-            setCurrentView("create");
-          }}
-          className="absolute bottom-20 right-4 w-12 h-12 bg-brand-700 hover:bg-brand-800 rounded-2xl shadow-xl flex items-center justify-center z-30 transition-all cursor-pointer active:scale-95 text-brand-200"
-          title="Tạo công việc mới"
-        >
-          <Plus className="w-6 h-6 text-brand-200" strokeWidth={2.5} />
-        </button>
-      )}
-
+  const modals = (
+    <>
       <NewAssignmentModal
         isOpen={isModalOpen}
         task={selectedTask}
@@ -401,6 +382,69 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         }}
         onConfirmReject={handleConfirmReject}
       />
+    </>
+  );
+
+  if (view === "home") {
+    return (
+      <div className="relative pb-8">
+        <HomeOverview
+          tasks={tasks}
+          onOpenTask={(task) => {
+            if (task.status === "WAITING_ACCEPT") {
+              setSelectedTask(task);
+              setIsModalOpen(true);
+              return;
+            }
+            sessionStorage.setItem("selectedTask", JSON.stringify(task));
+            sessionStorage.setItem("currentView", "detail");
+            onNavigate?.("tasks");
+          }}
+          onViewAll={() => onNavigate?.("tasks")}
+        />
+        {modals}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative pb-28">
+      <div className="px-4 pt-4">
+        <h1 className="text-lg font-bold text-ink">Công việc</h1>
+      </div>
+      <TaskTabs activeTab={activeTab} setActiveTab={setActiveTab} counts={tabCounts} />
+
+      <div className="flex items-baseline justify-between px-4 pt-3 pb-3">
+        <h2 className="text-sm font-semibold text-ink">{TAB_TITLES[activeTab] || TAB_TITLES.today}</h2>
+        <span className="text-xs font-medium text-slate-500 tabular-nums">{filteredTasks.length} công việc</span>
+      </div>
+
+      <div className="space-y-3 px-4">
+        {filteredTasks.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardList />}
+            title="Chưa có công việc"
+            description={
+              activeTab === "new"
+                ? "Yêu cầu mới được phân công cho bạn sẽ hiện ở đây."
+                : "Không có công việc nào trong mục này."
+            }
+          />
+        ) : (
+          filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onClick={() => handleCardClick(task)}
+              onDetailClick={handleOpenDetail}
+            />
+          ))
+        )}
+      </div>
+
+      {fabContainer ? createPortal(fab, fabContainer) : <div className="absolute bottom-6 right-4 z-30">{fab}</div>}
+
+      {modals}
     </div>
   );
 };

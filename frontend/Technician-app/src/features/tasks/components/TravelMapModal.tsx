@@ -3,14 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { Task, TaskStatus } from "@/types/task";
 import Image from "next/image";
-import {
-  X,
-  CirclePlay,
-  MapPin,
-  CheckCircle2,
-  Phone,
-  Smartphone,
-} from "lucide-react";
+import { X, CirclePlay, MapPin, CheckCircle2, Phone, Navigation2, Stethoscope } from "lucide-react";
+import { Button, StatusBadge } from "@h-mobility/ui";
 
 interface TravelModalProps {
   task: Task;
@@ -22,6 +16,12 @@ interface TravelModalProps {
     backendStatus?: string
   ) => void;
 }
+
+const STATUS_LABEL: Partial<Record<TaskStatus, string>> = {
+  WAITING_MOVE: "Chờ di chuyển",
+  MOVING: "Đang di chuyển",
+  ARRIVED: "Đã đến nơi",
+};
 
 export const TravelMapModal: React.FC<TravelModalProps> = ({
   task,
@@ -52,131 +52,92 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="relative h-full w-full max-w-sm bg-white overflow-hidden shadow-lg flex flex-col">
-        
-        <div className="relative flex-1 overflow-hidden bg-slate-100">
-          <Image
-            src="/images/roadmap.jpg"
-            alt="Bản đồ hành trình"
-            fill
-            priority
-            className="object-cover"
-          />
+    <div className="anim-overlay fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="Bản đồ di chuyển">
+      <div className="relative flex-1 overflow-hidden bg-slate-100">
+        <Image src="/images/roadmap.jpg" alt="Bản đồ hành trình" fill priority className="object-cover" />
 
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white shadow hover:bg-slate-50 transition cursor-pointer"
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Đóng bản đồ"
+          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 flex size-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-raised transition-colors hover:bg-slate-50 cursor-pointer"
+        >
+          <X className="size-5" />
+        </button>
+
+        <div className="absolute bottom-[25%] left-[57%] z-10 flex -translate-x-1/2 translate-y-1/2 flex-col items-center">
+          <span className="mb-1 whitespace-nowrap rounded-lg bg-brand-950 px-2 py-1 text-xs font-semibold text-white shadow-raised">
+            Vị trí của bạn
+          </span>
+          <span className="flex size-9 items-center justify-center rounded-full border-[3px] border-white bg-brand-600 text-white shadow-raised">
+            <Navigation2 className="size-4 fill-current" />
+          </span>
+        </div>
+
+        <div className="absolute top-[15%] left-[33%] z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+          <span className="mb-1 max-w-40 truncate whitespace-nowrap rounded-lg bg-white px-2 py-1 text-xs font-semibold text-ink shadow-raised">
+            {task.customerName}
+          </span>
+          <span className="flex size-9 items-center justify-center rounded-full border-[3px] border-white bg-rose-600 text-white shadow-raised">
+            <MapPin className="size-4" />
+          </span>
+        </div>
+      </div>
+
+      <div className="anim-sheet relative -mt-6 space-y-4 rounded-t-sheet bg-white px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-nav">
+        <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" aria-hidden />
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold tabular-nums text-slate-500">{task.code}</span>
+          {STATUS_LABEL[status] ? (
+            <StatusBadge status={status} label={STATUS_LABEL[status]} />
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-bold text-ink">{task.customerName}</h3>
+            <p className="mt-0.5 flex items-start gap-1.5 text-[13px] text-slate-600">
+              <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+              <span className="line-clamp-2">{task.address}</span>
+            </p>
+          </div>
+          {task.customerPhone ? (
+            <a
+              href={`tel:${task.customerPhone}`}
+              aria-label={`Gọi ${task.customerName}`}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100"
+            >
+              <Phone className="size-5" />
+            </a>
+          ) : null}
+        </div>
+
+        {status === "WAITING_MOVE" && (
+          <Button size="lg" fullWidth icon={<CirclePlay className="size-5" />} onClick={handleNextStep}>
+            Bắt đầu di chuyển
+          </Button>
+        )}
+
+        {status === "MOVING" && (
+          <Button size="lg" fullWidth icon={<CheckCircle2 className="size-5" />} onClick={handleNextStep}>
+            Đã đến nơi
+          </Button>
+        )}
+
+        {status === "ARRIVED" && (
+          <Button
+            size="lg"
+            fullWidth
+            icon={<Stethoscope className="size-5" />}
+            onClick={() => {
+              onStatusChange(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
+              onClose();
+            }}
           >
-            <X className="w-5 h-5 text-slate-700" />
-          </button>
-
-          
-          <div className="absolute bottom-[25%] left-[57%] z-10 flex flex-col items-center -translate-x-1/2 translate-y-1/2 animate-bounce">
-            <div className="bg-brand-800 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md mb-1 whitespace-nowrap">
-              Vị trí của bạn
-            </div>
-            <div className="w-7 h-7 rounded-full bg-brand-800 border-2 border-white shadow-lg flex items-center justify-center text-white">
-              <MapPin className="w-3.5 h-3.5" />
-            </div>
-          </div>
-
-          
-          <div className="absolute top-[15%] left-[33%] z-10 flex flex-col items-center -translate-x-1/2 -translate-y-1/2">
-            <div className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-md mb-1 whitespace-nowrap">
-              {task.customerName}
-            </div>
-            <div className="w-7 h-7 rounded-full bg-rose-600 border-2 border-white shadow-lg flex items-center justify-center text-white animate-pulse">
-              <span className="text-xs font-bold">📍</span>
-            </div>
-          </div>
-        </div>
-
-        
-        <div className="bg-white border-t rounded-t-3xl shadow-lg p-4 space-y-3 pb-6">
-          <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-900">
-                {task.code}
-              </span>
-
-              {status === "WAITING_MOVE" && (
-                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-600 text-xs font-medium">
-                  Chờ di chuyển
-                </span>
-              )}
-
-              {status === "MOVING" && (
-                <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-600 text-xs font-medium flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                  Đang di chuyển
-                </span>
-              )}
-
-              {status === "ARRIVED" && (
-                <span className="px-3 py-1 rounded-full bg-brand-100 text-brand-600 text-xs font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Đã đến nơi
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-              <div>
-                <p className="text-[11px] text-slate-400 font-medium">
-                  Khách hàng
-                </p>
-                <h3 className="text-sm font-bold text-slate-800">
-                  {task.customerName}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                  <Smartphone className="w-3 h-3 text-slate-400" />{" "}
-                  {task.customerPhone || "Chưa có SĐT"}
-                </p>
-              </div>
-              <a
-                href={`tel:${task.customerPhone || ""}`}
-                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition cursor-pointer"
-              >
-                <Phone className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-
-          
-          {status === "WAITING_MOVE" && (
-            <button
-              onClick={handleNextStep}
-              className="w-full rounded-xl bg-[#114567] py-3 text-xs font-semibold text-white hover:bg-[#0f3a56] transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              <CirclePlay className="w-4 h-4" />
-              Bắt đầu di chuyển
-            </button>
-          )}
-
-          {status === "MOVING" && (
-            <button
-              onClick={handleNextStep}
-              className="w-full rounded-xl bg-[#b2d5ea] py-3 text-xs font-semibold text-[#114567] hover:bg-[#7fb8da] transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              <MapPin className="w-4 h-4" />
-              Đã đến nơi
-            </button>
-          )}
-
-          {status === "ARRIVED" && (
-            <button
-              onClick={() => {
-                onStatusChange(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
-                onClose();
-              }}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Bắt đầu công việc
-            </button>
-          )}
-        </div>
+            Bắt đầu công việc
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -1,28 +1,26 @@
 "use client";
 
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
 import {
-  ArrowLeft,
-  Camera,
-  LoaderCircle,
-  Save,
-  Star,
-  Trash2,
-  Bike,
-  Battery,
-  Calendar,
-  Sparkles,
-  Search,
-} from "lucide-react";
+VehiclePickerModal,
+type SelectedVehicleResult,
+} from "@/components/home/vehicle-picker-modal";
+import { BATTERY_TYPE_OPTIONS } from "@/constants/vehicle-data";
 import type { Device } from "@/types/device";
 import {
-  VehiclePickerModal,
-  type SelectedVehicleResult,
-} from "@/components/home/vehicle-picker-modal";
-import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
-import { BATTERY_TYPE_OPTIONS } from "@/constants/vehicle-data";
+ArrowLeft,
+Bike,
+Camera,
+LoaderCircle,
+Save,
+Search,
+Sparkles,
+Star,
+Trash2
+} from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { ChangeEvent,FormEvent,useRef,useState } from "react";
 
 type Props = { device?: Device };
 

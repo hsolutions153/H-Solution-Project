@@ -30,10 +30,7 @@ class AuthenticatedUser(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    email: EmailStr
-    name: str | None = None
-    avatar: str | None = None
-    google_id: str | None = None
+    id_token: str = Field(min_length=1, max_length=10000)
 
 
 class SignupResponse(BaseModel):
@@ -52,7 +49,7 @@ class TokenResponse(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    phone: str = Field(min_length=1, max_length=20)
+    phone: str = Field(pattern=r"^0(3|5|7|8|9)\d{8}$")
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -61,9 +58,12 @@ class ForgotPasswordResponse(BaseModel):
     otp_code: str | None = None
 
 
-class ResetPasswordRequest(BaseModel):
-    phone: str = Field(min_length=1, max_length=20)
+class VerifyOtpRequest(BaseModel):
+    phone: str = Field(pattern=r"^0(3|5|7|8|9)\d{8}$")
     otp_code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class ResetPasswordRequest(VerifyOtpRequest):
     new_password: str = Field(min_length=8, max_length=72)
 
 

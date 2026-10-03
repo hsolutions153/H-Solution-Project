@@ -8,6 +8,28 @@ from app.repair_requests.models import (
 )
 
 
+def save_review(data: dict):
+    import secrets
+    existing = supabase.table("reviews").select("id").eq("repair_id", data["repair_id"]).maybe_single().execute()
+    record = dict(data)
+    record["id"] = existing.data["id"] if existing and existing.data else secrets.token_hex(5).upper()
+    if not (existing and existing.data):
+        record["created_by"] = data["customer_id"]
+    result = supabase.table("reviews").upsert(record, on_conflict="repair_id").execute()
+    if result and result.data:
+        ratings = []
+        offset = 0
+        while True:
+            page = supabase.table("reviews").select("rating").eq("technician_id", data["technician_id"]).range(offset, offset + 999).execute()
+            ratings.extend(float(item["rating"]) for item in page.data or [])
+            if len(page.data or []) < 1000:
+                break
+            offset += 1000
+        if ratings:
+            supabase.table("technician_profiles").update({"rating_avg": round(sum(ratings) / len(ratings), 2)}).eq("user_id", data["technician_id"]).execute()
+    return result.data[0] if result and result.data else None
+
+
 def get_device_for_customer(device_id: str, customer_id: str):
     response = (
         supabase.table(CUSTOMER_DEVICES_TABLE)
@@ -75,7 +97,7 @@ def get_repair_request_by_id(request_id: str):
     return response.data if response and hasattr(response, "data") else None
 
 
-def get_repair_requests(*, customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int, include_count: bool = False):
+def get_repair_requests(*, customer_id: str | None, technician_id: str | None, request_status: str | None, page: int, limit: int, include_count: bool = True):
     if include_count:
         query = supabase.table(REPAIR_REQUESTS_TABLE).select("*", count="exact")
     else:

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, MapPin, Phone, RefreshCw, Siren } from "lucide-react";
-import { Card, EmptyState, StatusBadge } from "@h-mobility/ui";
-import { mapApiTask, parseAppointment } from "@/features/tasks/mapApiTask";
+import { mapApiTask,parseAppointment } from "@/features/tasks/mapApiTask";
 import type { Task } from "@/types/task";
+import { Card,EmptyState,StatusBadge } from "@h-mobility/ui";
+import { CalendarDays,ChevronRight,MapPin,Phone,RefreshCw,Siren } from "lucide-react";
+import { useCallback,useEffect,useMemo,useState } from "react";
 
 /** Requests that no longer need the technician to show up. */
 const CLOSED_STATUSES = new Set(["COMPLETED", "CANCELLED", "REJECTED", "ESTIMATE_REJECTED"]);
@@ -104,8 +104,8 @@ export function ScheduleScreen({ onOpenTask }: ScheduleScreenProps) {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
-      const res = await fetchApi<{ items?: unknown[] }>("/repair-requests/technician/me");
+      const { fetchApiPages } = await import("@/lib/api-client");
+      const res = await fetchApiPages<unknown>("/repair-requests/technician/me");
       setTasks(Array.isArray(res?.items) ? res.items.map(mapApiTask) : []);
       setError("");
     } catch (err) {

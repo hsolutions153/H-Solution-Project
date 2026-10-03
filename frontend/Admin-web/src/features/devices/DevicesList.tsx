@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { Search, RefreshCw, Bike, X } from "lucide-react";
+import type { Customer,Device } from "@/types/api";
+
 import { Pagination } from "@/components/common/Pagination";
+import { Bike,RefreshCw,Search,X } from "lucide-react";
+import { useEffect,useMemo,useState } from "react";
 
 export const DevicesList = () => {
-  const [devices, setDevices] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -14,25 +16,17 @@ export const DevicesList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
 
   const fetchDevicesAndCustomers = async () => {
     setLoading(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [devRes, custRes] = await Promise.all([
-        fetchApi<any>("/devices"),
-        fetchApi<any>("/customers"),
+        fetchApi<Device[]>("/devices"),
+        fetchApiPages<Customer>("/customers"),
       ]);
 
-      const devList = Array.isArray(devRes)
-        ? devRes
-        : Array.isArray(devRes?.items)
-        ? devRes.items
-        : [];
+      const devList = devRes;
       setDevices(devList);
 
       const custList = Array.isArray(custRes)
@@ -41,7 +35,7 @@ export const DevicesList = () => {
         ? custRes.items
         : [];
       setCustomers(custList);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Error fetching devices and customers:", err);
     } finally {
       setLoading(false);
@@ -49,7 +43,7 @@ export const DevicesList = () => {
   };
 
   useEffect(() => {
-    fetchDevicesAndCustomers();
+    void Promise.resolve().then(fetchDevicesAndCustomers);
   }, []);
 
   // Map tra cứu nhanh tên khách hàng theo customer_id
@@ -64,7 +58,7 @@ export const DevicesList = () => {
   }, [customers]);
 
   // Helper hiển thị tên loại thiết bị chuẩn dạng xe máy điện
-  const getDeviceTypeBadge = (deviceType: string) => {
+  const getDeviceTypeBadge = () => {
     return {
       label: "Xe máy điện",
       bg: "bg-brand-50 text-brand-700 border-brand-200",
@@ -128,7 +122,7 @@ export const DevicesList = () => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             placeholder="Tìm thiết bị theo tên hãng, chủ sở hữu, model, số serial..."
             className="w-full bg-slate-50 border border-slate-200 pl-10 pr-10 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
@@ -175,7 +169,7 @@ export const DevicesList = () => {
                 </tr>
               ) : (
                 paginatedDevices.map((d) => {
-                  const typeBadge = getDeviceTypeBadge(d.device_type);
+                  const typeBadge = getDeviceTypeBadge();
                   const ownerName =
                     d.customer?.full_name ||
                     customerMap.get(d.customer_id) ||

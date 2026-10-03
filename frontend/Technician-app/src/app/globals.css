@@ -54,3 +54,33 @@ body {
     box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 12px 48px rgba(15, 23, 42, 0.12);
   }
 }
+
+/* ── Overlay transitions ──
+   Only used to show that a dialog or sheet opened. tokens.css collapses them
+   under prefers-reduced-motion. */
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+.anim-overlay {
+  animation: overlay-in 160ms ease-out both;
+}
+
+.anim-dialog {
+  animation: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.anim-sheet {
+  animation: sheet-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}

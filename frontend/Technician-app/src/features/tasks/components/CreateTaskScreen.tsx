@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { ArrowLeft, Camera, QrCode, ArrowRight, Search, ChevronDown, Plus, MapPin, RefreshCw, X } from 'lucide-react';
+import { Camera, QrCode, ArrowRight, Search, ChevronDown, Plus, MapPin, RefreshCw, X, Phone, UserRound, Wrench } from 'lucide-react';
+import { Button, Card, Field } from '@h-mobility/ui';
+import { ActionBar, ScreenHeader, SectionTitle, labelClasses, selectClasses, textareaClasses } from '@/components/ui';
 
 interface CreateTaskScreenProps {
   onBack: () => void;
@@ -40,260 +42,219 @@ export const CreateTaskScreen: React.FC<CreateTaskScreenProps> = ({ onBack, onSu
     onSubmitSuccess();
   };
 
+  const isNew = customerType === 'new';
+  const device = isNew ? newFormData : oldFormData;
+  const setDevice = (patch: Partial<Pick<typeof newFormData, 'deviceType' | 'brandModel' | 'serialNumber' | 'description'>>) =>
+    isNew ? setNewFormData({ ...newFormData, ...patch }) : setOldFormData({ ...oldFormData, ...patch });
+
   return (
-    <div className="p-4 pb-28 space-y-4 relative">
-      
-      
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Tiếp nhận hiện trường
-        </button>
-      </div>
+    <div className="space-y-5 px-4 pt-4">
+      <ScreenHeader title="Tiếp nhận hiện trường" subtitle="Tạo phiếu cho khách gặp trực tiếp" onBack={onBack} />
 
-      <form id="create-task-form" onSubmit={handleSubmit} className="space-y-4">
-        
-        
-        <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-100 space-y-3">
-          
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              type="button"
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                customerType === 'new' ? 'bg-white text-brand-900 shadow-sm' : 'text-slate-500'
-              }`}
-              onClick={() => setCustomerType('new')}
-            >
-              Khách hàng mới
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                customerType === 'old' ? 'bg-white text-brand-900 shadow-sm' : 'text-slate-500'
-              }`}
-              onClick={() => setCustomerType('old')}
-            >
-              Khách hàng cũ
-            </button>
-          </div>
+      <form id="create-task-form" onSubmit={handleSubmit} className="space-y-5">
+        <section className="space-y-3">
+          <SectionTitle icon={<UserRound />}>Khách hàng</SectionTitle>
 
-          
-          {customerType === 'new' ? (
-            <div className="space-y-3 animate-fadeIn">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Tên khách hàng</label>
-                <input
-                  type="text"
-                  placeholder="Nhập họ và tên..."
-                  value={newFormData.customerName}
-                  onChange={(e) => setNewFormData({ ...newFormData, customerName: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Số điện thoại</label>
-                  <input
-                    type="text"
-                    placeholder="090..."
-                    value={newFormData.phone}
-                    onChange={(e) => setNewFormData({ ...newFormData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ</label>
-                  <input
-                    type="text"
-                    placeholder="Số nhà, tên đường"
-                    value={newFormData.address}
-                    onChange={(e) => setNewFormData({ ...newFormData, address: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* NỘI DUNG KHI LÀ KHÁCH HÀNG CŨ */
-            <div className="space-y-3 animate-fadeIn">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Tìm kiếm khách hàng</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Tìm theo SĐT, Tên khách hàng hoặc Mã KH..."
-                    value={oldFormData.searchKeyword}
-                    onChange={(e) => setOldFormData({ ...oldFormData, searchKeyword: e.target.value })}
-                    className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                </div>
-              </div>
-
-              
-              {selectedOldCustomer && (
-                <div className="p-3 bg-slate-50 border border-brand-100 rounded-xl relative space-y-1.5">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-brand-900">Nguyễn Văn An - 0901234567</span>
-                    <button 
-                      type="button" 
-                      onClick={() => setSelectedOldCustomer(false)}
-                      className="text-[10px] text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Đổi khách hàng
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>45 Lê Lợi, Q. Hoàn Kiếm, Hà Nội</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        
-        <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-100 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-brand-900 font-bold text-xs uppercase tracking-wide">
-              <span>🔧</span>
-              <span>Thông tin thiết bị & Sự cố</span>
-            </div>
-            {customerType === 'old' && (
-              <button 
-                type="button" 
-                onClick={() => setIsAddingNewDevice(!isAddingNewDevice)}
-                className="text-[10px] text-brand-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+          <div role="radiogroup" className="grid grid-cols-2 gap-1 rounded-control bg-slate-200/70 p-1">
+            {([
+              ['new', 'Khách hàng mới'],
+              ['old', 'Khách hàng cũ'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={customerType === value}
+                onClick={() => setCustomerType(value)}
+                className={`rounded-lg py-2 text-sm transition-colors cursor-pointer ${
+                  customerType === value ? 'bg-white font-bold text-brand-700 shadow-card' : 'font-medium text-slate-600 hover:text-ink'
+                }`}
               >
-                {isAddingNewDevice ? (
-                  <>
-                    <X className="w-3 h-3" /> Chọn từ thiết bị đã có
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3 h-3" /> Thêm thiết bị mới cho KH này
-                  </>
-                )}
+                {label}
               </button>
-            )}
+            ))}
           </div>
 
-          
-          {customerType === 'old' && !isAddingNewDevice && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Chọn từ thiết bị đã lưu của KH</label>
-              <div className="relative">
-                <select 
-                  value={oldFormData.selectedDevice}
-                  onChange={(e) => setOldFormData({ ...oldFormData, selectedDevice: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none cursor-pointer"
-                >
-                  <option>Xe máy điện VinFast Feliz S - SN: VF12345</option>
-                  <option>Xe máy điện Dat Bike Quantum - SN: DB98765</option>
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-          )}
+          {isNew ? (
+            <Card className="space-y-4">
+              <Field
+                label="Tên khách hàng"
+                type="text"
+                autoComplete="name"
+                placeholder="Họ và tên"
+                value={newFormData.customerName}
+                onChange={(e) => setNewFormData({ ...newFormData, customerName: e.target.value })}
+              />
+              <Field
+                label="Số điện thoại"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="0901 234 567"
+                icon={<Phone />}
+                value={newFormData.phone}
+                onChange={(e) => setNewFormData({ ...newFormData, phone: e.target.value })}
+              />
+              <Field
+                label="Địa chỉ"
+                type="text"
+                autoComplete="street-address"
+                placeholder="Số nhà, tên đường, phường"
+                icon={<MapPin />}
+                value={newFormData.address}
+                onChange={(e) => setNewFormData({ ...newFormData, address: e.target.value })}
+              />
+            </Card>
+          ) : (
+            <Card className="space-y-4">
+              <Field
+                label="Tìm kiếm khách hàng"
+                type="search"
+                placeholder="Số điện thoại, tên hoặc mã KH"
+                icon={<Search />}
+                value={oldFormData.searchKeyword}
+                onChange={(e) => setOldFormData({ ...oldFormData, searchKeyword: e.target.value })}
+              />
 
-          
-          {(customerType === 'new' || isAddingNewDevice) && (
-            <div className="space-y-3 animate-fadeIn">
-              {isAddingNewDevice && (
-                <div className="bg-brand-50 text-brand-800 text-[11px] px-3 py-1.5 rounded-lg font-medium flex items-center justify-between">
-                  <span>Đang thêm thiết bị hoàn toàn mới cho khách hàng này</span>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Loại thiết bị</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Xe máy điện"
-                    value={customerType === 'new' ? newFormData.deviceType : oldFormData.deviceType}
-                    onChange={(e) => customerType === 'new' 
-                      ? setNewFormData({ ...newFormData, deviceType: e.target.value })
-                      : setOldFormData({ ...oldFormData, deviceType: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Thương hiệu / Model</label>
-                  <input
-                    type="text"
-                    placeholder="VD: VinFast Evo 200..."
-                    value={customerType === 'new' ? newFormData.brandModel : oldFormData.brandModel}
-                    onChange={(e) => customerType === 'new' 
-                      ? setNewFormData({ ...newFormData, brandModel: e.target.value })
-                      : setOldFormData({ ...oldFormData, brandModel: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Mã Serial / Số máy</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Nhập hoặc quét mã..."
-                    value={customerType === 'new' ? newFormData.serialNumber : oldFormData.serialNumber}
-                    onChange={(e) => customerType === 'new' 
-                      ? setNewFormData({ ...newFormData, serialNumber: e.target.value })
-                      : setOldFormData({ ...oldFormData, serialNumber: e.target.value })
-                    }
-                    className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-600 cursor-pointer">
-                    <QrCode className="w-4 h-4" />
+              {selectedOldCustomer && (
+                <div className="flex items-start gap-3 rounded-control border border-brand-200 bg-brand-50 p-3.5">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-brand-700">
+                    N
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-ink">Nguyễn Văn An</p>
+                    <p className="text-[13px] text-slate-600 tabular-nums">0901234567</p>
+                    <p className="mt-1 flex items-start gap-1 text-xs text-slate-500">
+                      <MapPin className="mt-px size-3.5 shrink-0" />
+                      45 Lê Lợi, Q. Hoàn Kiếm, Hà Nội
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOldCustomer(false)}
+                    className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-brand-700 hover:bg-white cursor-pointer"
+                  >
+                    <RefreshCw className="size-3.5" /> Đổi
                   </button>
                 </div>
-              </div>
-            </div>
+              )}
+            </Card>
           )}
+        </section>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả sự cố / Yêu cầu của KH</label>
-            <textarea
-              rows={3}
-              placeholder="Mô tả chi tiết tình trạng hư hỏng..."
-              value={customerType === 'new' ? newFormData.description : oldFormData.description}
-              onChange={(e) => customerType === 'new' 
-                ? setNewFormData({ ...newFormData, description: e.target.value })
-                : setOldFormData({ ...oldFormData, description: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Ảnh hiện trạng (Tối thiểu 1 ảnh)</label>
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:border-brand-500 cursor-pointer transition-colors bg-slate-50">
-              <Camera className="w-5 h-5 mb-1 text-slate-500" />
-              <span className="text-[10px] font-bold text-slate-600">CHỤP ẢNH</span>
-            </div>
-          </div>
-        </div>
-
-        
-        <div className="pt-2">
-          <button
-            type="submit"
-            className="w-full bg-brand-900 hover:bg-brand-950 text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-sm transition-colors cursor-pointer"
+        <section className="space-y-3">
+          <SectionTitle
+            icon={<Wrench />}
+            action={
+              !isNew ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={isAddingNewDevice ? <X className="size-4" /> : <Plus className="size-4" />}
+                  onClick={() => setIsAddingNewDevice(!isAddingNewDevice)}
+                >
+                  {isAddingNewDevice ? 'Chọn thiết bị cũ' : 'Thiết bị mới'}
+                </Button>
+              ) : null
+            }
           >
-            <span>Tạo phiếu tiếp nhận mới</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+            Thiết bị & sự cố
+          </SectionTitle>
 
+          <Card className="space-y-4">
+            {!isNew && !isAddingNewDevice && (
+              <div className="space-y-1.5">
+                <label htmlFor="saved-device" className={labelClasses}>Thiết bị đã lưu của khách</label>
+                <div className="relative">
+                  <select
+                    id="saved-device"
+                    value={oldFormData.selectedDevice}
+                    onChange={(e) => setOldFormData({ ...oldFormData, selectedDevice: e.target.value })}
+                    className={selectClasses}
+                  >
+                    <option>Xe máy điện VinFast Feliz S - SN: VF12345</option>
+                    <option>Xe máy điện Dat Bike Quantum - SN: DB98765</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+            )}
+
+            {(isNew || isAddingNewDevice) && (
+              <>
+                {isAddingNewDevice && (
+                  <p className="rounded-control bg-brand-50 px-3 py-2 text-[13px] font-medium text-brand-800">
+                    Đang thêm thiết bị mới cho khách hàng này
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Loại thiết bị"
+                    type="text"
+                    placeholder="Xe máy điện"
+                    value={device.deviceType}
+                    onChange={(e) => setDevice({ deviceType: e.target.value })}
+                  />
+                  <Field
+                    label="Hãng / model"
+                    type="text"
+                    placeholder="VinFast Evo 200"
+                    value={device.brandModel}
+                    onChange={(e) => setDevice({ brandModel: e.target.value })}
+                  />
+                </div>
+                <Field
+                  label="Số serial / số máy"
+                  type="text"
+                  placeholder="Nhập hoặc quét mã"
+                  value={device.serialNumber}
+                  onChange={(e) => setDevice({ serialNumber: e.target.value })}
+                  trailing={
+                    <button
+                      type="button"
+                      aria-label="Quét mã QR"
+                      className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-brand-700 cursor-pointer"
+                    >
+                      <QrCode className="size-[18px]" />
+                    </button>
+                  }
+                />
+              </>
+            )}
+
+            <div className="space-y-1.5">
+              <label htmlFor="issue-description" className={labelClasses}>Mô tả sự cố</label>
+              <textarea
+                id="issue-description"
+                rows={3}
+                placeholder="Tình trạng hư hỏng và yêu cầu của khách"
+                value={device.description}
+                onChange={(e) => setDevice({ description: e.target.value })}
+                className={textareaClasses}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <p className={labelClasses}>
+                Ảnh hiện trạng <span className="font-normal text-slate-500">(tối thiểu 1 ảnh)</span>
+              </p>
+              <button
+                type="button"
+                className="flex w-full flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed border-slate-300 bg-slate-50 py-5 text-slate-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 cursor-pointer"
+              >
+                <Camera className="size-6" />
+                <span className="text-sm font-semibold">Chụp ảnh</span>
+              </button>
+            </div>
+          </Card>
+        </section>
+
+        <ActionBar>
+          <Button type="submit" size="lg" fullWidth>
+            Tạo phiếu tiếp nhận
+            <ArrowRight className="size-5" />
+          </Button>
+        </ActionBar>
       </form>
     </div>
   );

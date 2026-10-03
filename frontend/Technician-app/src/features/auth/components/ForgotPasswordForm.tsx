@@ -5,10 +5,11 @@ import { ForgotPasswordFormData } from '@/types/auth';
 import { User, ArrowRight } from 'lucide-react'; // Import các icon từ lucide-react
 
 interface ForgotPasswordFormProps {
-  onSubmit: (data: ForgotPasswordFormData) => void;
+  loading?: boolean;
+  onSubmit: (data: ForgotPasswordFormData) => void | Promise<void>;
 }
 
-export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
+export const ForgotPasswordForm = ({ onSubmit, loading }: ForgotPasswordFormProps) => {
   const [identity, setIdentity] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -24,7 +25,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
           Quên mật khẩu
         </h2>
         <p className="text-xs text-slate-500 leading-relaxed">
-          Nhập email hoặc số điện thoại đã đăng ký để nhận mã xác thực OTP.
+          Nhập số điện thoại đã đăng ký để nhận mã xác thực OTP.
         </p>
       </div>
 
@@ -32,14 +33,16 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
         
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            Số điện thoại hoặc Email
+            Số điện thoại
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center justify-center">
               <User className="w-4 h-4" />
             </span>
             <input
-              type="text"
+              type="tel"
+              pattern="0[0-9]{9}"
+              maxLength={10}
               required
               value={identity}
               onChange={(e) => setIdentity(e.target.value)}
@@ -52,6 +55,7 @@ export const ForgotPasswordForm = ({ onSubmit }: ForgotPasswordFormProps) => {
         
         <button
           type="submit"
+            disabled={loading}
           className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
         >
           <span>Gửi mã xác thực</span>

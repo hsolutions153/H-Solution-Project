@@ -1,14 +1,14 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export const api = {
-  async get<T = any>(
+  async get<T = unknown>(
     url: string,
-    config?: { params?: Record<string, any> }
+    config?: { params?: Record<string, string | number | boolean | undefined | null> }
   ): Promise<{ data: T }> {
     let query = "";
     if (config?.params) {
       const filtered = Object.entries(config.params).filter(
-        ([_, v]) => v !== undefined && v !== null
+        ([, v]) => v !== undefined && v !== null
       );
       if (filtered.length > 0) {
         query =
@@ -27,7 +27,7 @@ export const api = {
     return { data };
   },
 
-  async post<T = any>(url: string, body?: any): Promise<{ data: T }> {
+  async post<T = unknown>(url: string, body?: unknown): Promise<{ data: T }> {
     const res = await fetch(`${BASE_URL}${url}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -38,7 +38,7 @@ export const api = {
     return { data };
   },
 
-  async patch<T = any>(url: string, body?: any): Promise<{ data: T }> {
+  async patch<T = unknown>(url: string, body?: unknown): Promise<{ data: T }> {
     const res = await fetch(`${BASE_URL}${url}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ export const api = {
     return { data };
   },
 
-  async delete<T = any>(url: string): Promise<{ data: T }> {
+  async delete<T = unknown>(url: string): Promise<{ data: T }> {
     const res = await fetch(`${BASE_URL}${url}`, {
       method: "DELETE",
     });

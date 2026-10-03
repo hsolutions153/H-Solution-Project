@@ -1,49 +1,47 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Search,
-  RefreshCw,
-  UserCheck,
-  ShieldCheck,
-  ShieldAlert,
-  Phone,
-  Star,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  X,
-  TrendingUp,
-  Calendar,
-  DollarSign,
-  Award,
-  BarChart3,
-  Layers,
-  Activity,
-  Wrench,
-  ChevronRight,
-  FileText,
-  Table,
-  LayoutGrid,
-  Plus,
-  UserPlus,
-  Eye,
-  Pencil,
-  Trash2,
-  Mail,
-  User,
-} from "lucide-react";
+import type { OrderRecord } from "@/features/orders/OrderDetailModal";
+import type { Technician } from "@/types/api";
+import { errorMessage } from "@/types/api";
+
 import { Pagination } from "@/components/common/Pagination";
-import { ViewTechnicianModal } from "./ViewTechnicianModal";
-import { EditTechnicianModal } from "./EditTechnicianModal";
+import {
+Activity,
+BarChart3,
+Calendar,
+CheckCircle2,
+Clock,
+DollarSign,
+Eye,
+FileText,
+Layers,
+LayoutGrid,
+Mail,
+Pencil,
+Phone,
+RefreshCw,
+Search,
+ShieldAlert,
+Star,
+Table,
+Trash2,
+TrendingUp,
+UserPlus,
+Wrench,
+X,
+XCircle
+} from "lucide-react";
+import { useEffect,useMemo,useState } from "react";
 import { CreateTechnicianModal } from "./CreateTechnicianModal";
 import { DeleteTechnicianModal } from "./DeleteTechnicianModal";
+import { EditTechnicianModal } from "./EditTechnicianModal";
+import { ViewTechnicianModal } from "./ViewTechnicianModal";
 
 type TimeRange = "TODAY" | "MONTH" | "YEAR" | "ALL";
 
 export const TechniciansList = () => {
-  const [technicians, setTechnicians] = useState<any[]>([]);
-  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -51,7 +49,13 @@ export const TechniciansList = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // View Mode: 'table' (dạng bảng) hoặc 'grid' (dạng lưới)
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("admin_technicians_view_mode");
+      if (saved === "grid" || saved === "table") return saved;
+    }
+    return "table";
+  });
 
   // Phân trang cho Dạng Bảng (10 bản ghi 1 trang)
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,31 +63,22 @@ export const TechniciansList = () => {
 
   // Modals Quản lý KTV ở Dạng Bảng
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [viewingTech, setViewingTech] = useState<any | null>(null);
-  const [editingTech, setEditingTech] = useState<any | null>(null);
-  const [deletingTech, setDeletingTech] = useState<any | null>(null);
+  const [viewingTech, setViewingTech] = useState<Technician | null>(null);
+  const [editingTech, setEditingTech] = useState<Technician | null>(null);
+  const [deletingTech, setDeletingTech] = useState<Technician | null>(null);
   const [togglingOnlineId, setTogglingOnlineId] = useState<string | null>(null);
 
   // KYC Review Modal State
-  const [selectedKycTech, setSelectedKycTech] = useState<any | null>(null);
+  const [selectedKycTech, setSelectedKycTech] = useState<Technician | null>(null);
   const [kycLoading, setKycLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
   // Stats Detail Modal State (Dạng lưới)
-  const [detailStatsTech, setDetailStatsTech] = useState<any | null>(null);
+  const [detailStatsTech, setDetailStatsTech] = useState<(Technician & { stats: NonNullable<Technician["stats"]> }) | null>(null);
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("admin_technicians_view_mode");
-      if (saved === "grid" || saved === "table") {
-        setViewMode(saved);
-      }
-    } catch {}
-  }, []);
 
   const handleViewModeChange = (mode: "table" | "grid") => {
     setViewMode(mode);
@@ -95,19 +90,17 @@ export const TechniciansList = () => {
   const fetchTechniciansAndOrders = async () => {
     setLoading(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [techRes, ordersRes] = await Promise.allSettled([
-        fetchApi<any>("/technicians"),
-        fetchApi<any>("/orders?limit=200")
-          .catch(() => fetchApi<any>("/orders?limit=100"))
-          .catch(() => fetchApi<any>("/repair-requests?limit=100")),
+        fetchApi<Technician[]>("/technicians"),
+        fetchApiPages<OrderRecord>("/orders"),
       ]);
 
       const techList =
         techRes.status === "fulfilled"
           ? Array.isArray(techRes.value)
             ? techRes.value
-            : techRes.value?.items || []
+            : []
           : [];
 
       const rawOrders = ordersRes.status === "fulfilled" ? ordersRes.value : null;
@@ -119,7 +112,7 @@ export const TechniciansList = () => {
 
       setTechnicians(techList);
       setAllOrders(ordersList);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Error fetching data:", err);
     } finally {
       setLoading(false);
@@ -127,21 +120,17 @@ export const TechniciansList = () => {
   };
 
   useEffect(() => {
-    fetchTechniciansAndOrders();
+    void Promise.resolve().then(fetchTechniciansAndOrders);
   }, []);
 
-  // Reset trang về 1 khi lọc
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
 
   const handleShowToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleToggleOnline = async (tech: any) => {
-    const techId = tech.user_id || tech.id;
+  const handleToggleOnline = async (tech: Technician) => {
+    const techId = tech.user_id || tech.id || "";
     if (togglingOnlineId === techId) return;
     const nextStatus = !tech.is_online;
     setTogglingOnlineId(techId);
@@ -157,8 +146,8 @@ export const TechniciansList = () => {
         }!`
       );
       fetchTechniciansAndOrders();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi cập nhật trạng thái");
+    } catch (err: unknown) {
+      alert(errorMessage(err, "Lỗi khi cập nhật trạng thái"));
     } finally {
       setTogglingOnlineId(null);
     }
@@ -175,7 +164,7 @@ export const TechniciansList = () => {
         method: "PATCH",
         body: JSON.stringify({
           kyc_status: status,
-          rejection_reason: status === "REJECTED" ? rejectionReason : null,
+          kyc_note: status === "REJECTED" ? rejectionReason : null,
         }),
       });
 
@@ -185,8 +174,8 @@ export const TechniciansList = () => {
       setSelectedKycTech(null);
       setRejectionReason("");
       fetchTechniciansAndOrders();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi duyệt KYC");
+    } catch (err: unknown) {
+      alert(errorMessage(err, "Lỗi khi duyệt KYC"));
     } finally {
       setKycLoading(false);
     }
@@ -237,7 +226,7 @@ export const TechniciansList = () => {
         yearRevenue: number;
         allOrders: number;
         allRevenue: number;
-        orderList: any[];
+        orderList: OrderRecord[];
       }
     > = {};
 
@@ -251,7 +240,7 @@ export const TechniciansList = () => {
         yearRevenue: 0,
         allOrders: 0,
         allRevenue: 0,
-        orderList: [] as any[],
+        orderList: [] as OrderRecord[],
       };
       if (tech.user_id) map[tech.user_id] = statsObj;
       if (tech.id && !map[tech.id]) map[tech.id] = statsObj;
@@ -270,8 +259,7 @@ export const TechniciansList = () => {
       if (!isCompleted) return;
 
       const cost =
-        Number(order.total_amount || order.actual_cost || order.estimated_cost || 0) ||
-        350000;
+        Number(order.total_amount ?? order.actual_cost ?? 0);
 
       const dateStr = order.completed_at || order.updated_at || order.created_at;
 
@@ -308,8 +296,7 @@ export const TechniciansList = () => {
       if (!isCompleted) return;
 
       const cost =
-        Number(order.total_amount || order.actual_cost || order.estimated_cost || 0) ||
-        350000;
+        Number(order.total_amount ?? order.actual_cost ?? 0);
       const dateStr = order.completed_at || order.updated_at || order.created_at;
 
       if (timeRange === "TODAY") {
@@ -456,7 +443,7 @@ export const TechniciansList = () => {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Tìm theo tên thợ, số điện thoại, email, chuyên môn..."
                 className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
@@ -464,7 +451,7 @@ export const TechniciansList = () => {
 
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
               <button
-                onClick={() => setStatusFilter("ALL")}
+                onClick={() => { setStatusFilter("ALL"); setCurrentPage(1); }}
                 className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ALL"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -474,7 +461,7 @@ export const TechniciansList = () => {
                 Tất cả ({technicians.length})
               </button>
               <button
-                onClick={() => setStatusFilter("ONLINE")}
+                onClick={() => { setStatusFilter("ONLINE"); setCurrentPage(1); }}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ONLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -485,7 +472,7 @@ export const TechniciansList = () => {
                 Online ({technicians.filter((t) => t.is_online).length})
               </button>
               <button
-                onClick={() => setStatusFilter("OFFLINE")}
+                onClick={() => { setStatusFilter("OFFLINE"); setCurrentPage(1); }}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "OFFLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -496,7 +483,7 @@ export const TechniciansList = () => {
                 Offline ({technicians.filter((t) => !t.is_online).length})
               </button>
               <button
-                onClick={() => setStatusFilter("KYC_PENDING")}
+                onClick={() => { setStatusFilter("KYC_PENDING"); setCurrentPage(1); }}
                 className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "KYC_PENDING"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -539,7 +526,7 @@ export const TechniciansList = () => {
                     </tr>
                   ) : (
                     paginatedTechs.map((tech) => {
-                      const techId = tech.user_id || tech.id;
+                      const techId = tech.user_id || tech.id || "";
                       const name =
                         tech.full_name || tech.user?.full_name || tech.name || "Kỹ thuật viên";
                       const phone = tech.phone || tech.user?.phone;
@@ -880,7 +867,7 @@ export const TechniciansList = () => {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
                 className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
@@ -888,7 +875,7 @@ export const TechniciansList = () => {
 
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
               <button
-                onClick={() => setStatusFilter("ALL")}
+                onClick={() => { setStatusFilter("ALL"); setCurrentPage(1); }}
                 className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ALL"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -898,7 +885,7 @@ export const TechniciansList = () => {
                 Tất cả ({technicians.length})
               </button>
               <button
-                onClick={() => setStatusFilter("ONLINE")}
+                onClick={() => { setStatusFilter("ONLINE"); setCurrentPage(1); }}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "ONLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -909,7 +896,7 @@ export const TechniciansList = () => {
                 Online ({technicians.filter((t) => t.is_online).length})
               </button>
               <button
-                onClick={() => setStatusFilter("OFFLINE")}
+                onClick={() => { setStatusFilter("OFFLINE"); setCurrentPage(1); }}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "OFFLINE"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -920,7 +907,7 @@ export const TechniciansList = () => {
                 Offline ({technicians.filter((t) => !t.is_online).length})
               </button>
               <button
-                onClick={() => setStatusFilter("KYC_PENDING")}
+                onClick={() => { setStatusFilter("KYC_PENDING"); setCurrentPage(1); }}
                 className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
                   statusFilter === "KYC_PENDING"
                     ? "bg-white text-slate-900 shadow-xs font-black"
@@ -945,7 +932,7 @@ export const TechniciansList = () => {
               </div>
             ) : (
               filteredTechs.map((tech) => {
-                const techId = tech.user_id || tech.id;
+                const techId = tech.user_id || tech.id || "";
                 const name = tech.full_name || tech.user?.full_name || tech.name || "Kỹ thuật viên";
                 const phone = tech.phone || tech.user?.phone || "Chưa có SĐT";
                 const isApproved = tech.kyc_status === "APPROVED";
@@ -1224,7 +1211,7 @@ export const TechniciansList = () => {
                   </div>
                 ) : (
                   <div className="max-h-56 overflow-y-auto space-y-2 border border-slate-100 rounded-2xl p-2">
-                    {detailStatsTech.stats.orderList.slice(0, 10).map((ord: any) => (
+                    {detailStatsTech.stats.orderList.slice(0, 10).map((ord: OrderRecord) => (
                       <div
                         key={ord.id}
                         className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs"
@@ -1319,7 +1306,7 @@ export const TechniciansList = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    handleReviewKyc(selectedKycTech.user_id || selectedKycTech.id, "REJECTED")
+                    handleReviewKyc(selectedKycTech.user_id || selectedKycTech.id || "", "REJECTED")
                   }
                   disabled={kycLoading}
                   className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -1330,7 +1317,7 @@ export const TechniciansList = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    handleReviewKyc(selectedKycTech.user_id || selectedKycTech.id, "APPROVED")
+                    handleReviewKyc(selectedKycTech.user_id || selectedKycTech.id || "", "APPROVED")
                   }
                   disabled={kycLoading}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 cursor-pointer disabled:opacity-50"

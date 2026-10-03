@@ -13,7 +13,6 @@ const readAvatar = () => getUserInfo()?.avatar_url ?? "";
 export function HeaderAvatar() {
   const avatar = useSyncExternalStore(subscribe, readAvatar, () => "");
   if (avatar) {
-    // eslint-disable-next-line @next/next/no-img-element -- remote storage URL, already resized on upload
     return <img src={avatar} alt="" className="home-profile-avatar" />;
   }
   return (

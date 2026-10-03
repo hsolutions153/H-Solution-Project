@@ -107,18 +107,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       strategy: "jwt",
     },
     callbacks: {
-      async jwt({ token, user, account }) {
-        if (account?.provider === "google" && user?.email) {
+      async jwt({ token, account }) {
+        if (account?.provider === "google") {
+          if (!account.id_token) throw new Error("Thiếu thông tin xác minh Google.");
           try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
             const res = await fetch(`${apiUrl}/auth/google`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                email: user.email,
-                name: user.name || "Khách hàng Google",
-                avatar: user.image,
-                google_id: account.providerAccountId,
+                id_token: account.id_token,
               }),
             });
             if (res.ok) {
@@ -128,10 +126,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
               token.isNewUser = data.is_new_user;
               token.isProfileComplete = data.is_profile_complete;
             } else {
-              console.error("Backend auth/google returned status:", res.status);
+              throw new Error("Không thể xác minh tài khoản Google.");
             }
           } catch (err) {
             console.error("Backend auth/google call failed:", err);
+            throw new Error("Không thể hoàn tất đăng nhập Google.");
           }
         }
         return token;

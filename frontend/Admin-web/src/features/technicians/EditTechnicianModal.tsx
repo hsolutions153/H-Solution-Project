@@ -1,10 +1,11 @@
 "use client";
+import type { Technician } from "@/types/api";
 
-import React, { useState } from "react";
-import { X, Edit3, Phone, Lock, RefreshCw, Save, Award, Wrench, Shield } from "lucide-react";
+import { Award,Edit3,Lock,Phone,RefreshCw,Save,X } from "lucide-react";
+import React,{ useState } from "react";
 
 export interface EditTechnicianModalProps {
-  technician: any;
+  technician: Technician;
   onClose: () => void;
   onSuccess: (msg: string) => void;
 }

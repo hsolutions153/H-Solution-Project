@@ -133,7 +133,7 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
                 for p in payments_resp.data:
                     rid = p.get("repair_id")
                     if rid and rid not in payments_map:
-                        payments_map[rid] = p.get("payment_method")
+                        payments_map[rid] = p
         except Exception:
             pass
 
@@ -158,7 +158,9 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
         if item.get("technician_id"):
             item["technician"] = techs_map.get(item["technician_id"])
 
-        item["payment_method"] = item.get("payment_method") or payments_map.get(item["id"])
+        payment = payments_map.get(item["id"], {})
+        item["payment_method"] = payment.get("payment_method") or item.get("payment_method")
+        item["payment_status"] = payment.get("payment_status", "UNPAID")
         quotes = quotes_map.get(item["id"], [])
         if quotes:
             q = quotes[0]
@@ -458,9 +460,16 @@ def _validate_booking_schedule(booking_date: str | None, booking_slot: str | Non
 
 
 def create_request(current_user: dict, data):
-    if not _is_role(current_user, CUSTOMER_ROLE_CODE):
+    is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
+    if not is_admin and not _is_role(current_user, CUSTOMER_ROLE_CODE):
         raise AppException(ErrorCode.FORBIDDEN)
     payload = _payload(data)
+    customer_id = current_user["sub"]
+    if is_admin:
+        customer_id = payload.get("customer_id")
+        customer = auth_repository.get_user_by_id(customer_id) if customer_id else None
+        if not customer or customer.get("role_id") != _role_id(CUSTOMER_ROLE_CODE):
+            raise AppException(ErrorCode.USER_NOT_FOUND, message="Vui lòng chọn khách hàng hợp lệ để tạo đơn.")
 
     issue_type = (payload.get("issue_type") or "").upper()
     ISSUE_TYPE_MAP = {
@@ -474,12 +483,14 @@ def create_request(current_user: dict, data):
         issue_type = "OTHER"
 
     device_id = payload.get("device_id")
-    if not device_id or not repository.get_device_for_customer(device_id, current_user["sub"]):
-        existing_device_id = repository.get_any_device_for_customer(current_user["sub"])
+    if not device_id or not repository.get_device_for_customer(device_id, customer_id):
+        if is_admin:
+            raise AppException(ErrorCode.DEVICE_ACCESS_DENIED, message="Thiết bị được chọn không thuộc khách hàng này.")
+        existing_device_id = repository.get_any_device_for_customer(customer_id)
         if existing_device_id:
             device_id = existing_device_id
         else:
-            device_id = repository.create_default_device_for_customer(current_user["sub"])
+            device_id = repository.create_default_device_for_customer(customer_id)
 
     description = payload.get("description") or payload.get("issue_description") or ""
     address = payload.get("address_detail") or payload.get("location_address") or ""
@@ -518,7 +529,7 @@ def create_request(current_user: dict, data):
     record = {
         "id": request_id,
         "request_code": _request_id(),
-        "customer_id": current_user["sub"],
+        "customer_id": customer_id,
         "technician_id": tech_id,
         "device_id": device_id,
         "issue_type": issue_type,
@@ -602,7 +613,7 @@ def fetch_request(request_id: str, current_user: dict):
     can_view = (
         _is_role(current_user, ADMIN_ROLE_CODE)
         or (_is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"])
-        or (_is_role(current_user, TECHNICIAN_ROLE_CODE))
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"])
     )
     if not can_view:
         raise AppException(ErrorCode.FORBIDDEN)
@@ -673,13 +684,15 @@ def fetch_request(request_id: str, current_user: dict):
                 else float(latest_quote.get("estimated_price") or 0)
             )
 
-    # 4. Payment method
+    # 4. Payment status is independent of repair completion.
     try:
-        if not request_data.get("payment_method"):
-            from app.payments.repository import get_payment_by_repair_id
-            p_rec = get_payment_by_repair_id(request_id)
-            if p_rec and p_rec.get("payment_method"):
-                request_data["payment_method"] = p_rec.get("payment_method")
+        from app.payments.repository import get_payment_by_repair_id
+        p_rec = get_payment_by_repair_id(actual_id)
+        if isinstance(p_rec, dict):
+            request_data["payment_method"] = p_rec.get("payment_method")
+            request_data["payment_status"] = p_rec.get("payment_status", "UNPAID")
+        else:
+            request_data["payment_status"] = "UNPAID"
     except Exception as pm_err:
         logger.warning(f"Failed to load payment info in fetch_request: {pm_err}")
 
@@ -1131,7 +1144,7 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
     is_technician = (
         _is_role(current_user, ADMIN_ROLE_CODE)
-        or _is_role(current_user, TECHNICIAN_ROLE_CODE)
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"])
     )
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
@@ -1303,21 +1316,29 @@ def submit_technician_rating(request_id: str, data: dict, current_user: dict):
     if not req:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
 
+    if current_user.get("sub") != req.get("customer_id"):
+        raise AppException(ErrorCode.FORBIDDEN)
+    if req.get("status") != "COMPLETED" or not req.get("technician_id"):
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ có thể đánh giá kỹ thuật viên sau khi đơn hoàn thành.")
+
     rating = data.get("rating", 5)
     if not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
         raise AppException(ErrorCode.INVALID_RATING_VALUE)
 
     tech_id = req.get("technician_id")
-    if tech_id:
-        try:
-            from app.db.database import supabase
-            profile = repository.get_technician_profile(tech_id)
-            if profile:
-                current_avg = float(profile.get("rating_avg") or 5.0)
-                new_avg = round((current_avg + float(rating)) / 2.0, 2)
-                supabase.table("technician_profiles").update({"rating_avg": new_avg}).eq("user_id", tech_id).execute()
-        except Exception as e:
-            logger.warning(f"Failed to update technician rating_avg: {e}")
+    try:
+        saved = repository.save_review({
+            "repair_id": req["id"], "customer_id": current_user["sub"],
+            "technician_id": tech_id, "rating": int(rating),
+            "comment": data.get("comment") or "", "updated_by": current_user["sub"],
+        })
+        if not saved:
+            raise AppException(ErrorCode.DATABASE_ERROR)
+    except AppException:
+        raise
+    except Exception as error:
+        logger.warning("Failed to save technician review: %s", error)
+        raise AppException(ErrorCode.DATABASE_ERROR) from error
 
     return {
         "success": True,

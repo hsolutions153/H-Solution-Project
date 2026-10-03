@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import { PageHeader } from "@/components/home/page-header";
 import { useState, useEffect, useRef } from "react";
 
 interface JobItem {
@@ -38,6 +38,7 @@ interface RepairDetail {
   laborCost?: number;
   partsCost?: number;
   paymentMethod?: string | null;
+  paymentStatus?: string;
   total: number;
   initialEstimate?: number;
   approvedEstimate?: number;
@@ -158,6 +159,7 @@ export function HistoryDetail() {
   const [ratingTags, setRatingTags] = useState<string[]>([]);
   const [isRated, setIsRated] = useState<boolean>(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+  const [ratingError, setRatingError] = useState("");
   const [ratingSuccessMsg, setRatingSuccessMsg] = useState<string>("");
   const [isEditingRating, setIsEditingRating] = useState<boolean>(false);
 
@@ -191,6 +193,7 @@ export function HistoryDetail() {
     if (e) e.preventDefault();
     if (!detail) return;
     setIsSubmittingRating(true);
+    setRatingError("");
     try {
       const payload = {
         rating: ratingStars,
@@ -198,15 +201,10 @@ export function HistoryDetail() {
         tags: ratingTags,
       };
 
-      try {
-        const { fetchApi } = await import("@/lib/api-client");
-        await fetchApi(`/repair-requests/${detail.id}/rating`, {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      } catch (apiErr) {
-        console.warn("Rating API call error (fallback to local storage):", apiErr);
-      }
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi(`/repair-requests/${detail.id}/rating`, {
+        method: "POST", body: JSON.stringify(payload),
+      });
 
       if (typeof window !== "undefined") {
         localStorage.setItem(
@@ -222,6 +220,8 @@ export function HistoryDetail() {
       setIsEditingRating(false);
       setRatingSuccessMsg("Cảm ơn bạn đã gửi đánh giá kỹ thuật viên!");
       setTimeout(() => setRatingSuccessMsg(""), 4000);
+    } catch (error) {
+      setRatingError(error instanceof Error ? error.message : "Không thể gửi đánh giá. Vui lòng thử lại.");
     } finally {
       setIsSubmittingRating(false);
     }
@@ -252,7 +252,7 @@ export function HistoryDetail() {
                     rating: 4.9,
                     reviews: 25,
                     avatar: "",
-                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
+                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
                     verified: true,
                   }
                 : null,
@@ -324,7 +324,7 @@ export function HistoryDetail() {
                 phone: res.technician.phone || "",
                 rating: res.technician.rating || 4.9,
                 reviews: res.technician.reviews || 25,
-                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
+                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
                 experience_years: res.technician.experience_years || 3,
                 avatar: res.technician.avatar || "",
                 verified: true,
@@ -510,6 +510,7 @@ export function HistoryDetail() {
               laborCost: parsedLaborCost,
               partsCost: parsedPartsCost,
               paymentMethod: res.payment_method || null,
+              paymentStatus: res.payment_status || "UNPAID",
               total: effectiveTotal,
               initialEstimate,
               approvedEstimate,
@@ -537,7 +538,7 @@ export function HistoryDetail() {
     // Background refresh every 8s (only if in progress and tab is visible)
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      if (detail?.status === "in_progress") {
+      if (detail?.status === "in_progress" || (detail?.status === "completed" && detail.paymentStatus !== "PAID")) {
         fetchDetail();
       }
     }, 8000);
@@ -549,7 +550,7 @@ export function HistoryDetail() {
       isFetchingRef.current = false;
       clearInterval(interval);
     };
-  }, [id, detail?.status]);
+  }, [id, detail?.status, detail?.paymentStatus]);
 
   const [isApprovingQuote, setIsApprovingQuote] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -633,18 +634,13 @@ export function HistoryDetail() {
     <div className="rd-container">
       {/* Header */}
       <div className="rd-header">
-        <Link href="/home/history" className="rd-back-btn" aria-label="Quay lại lịch sử">
-          <span className="material-symbols-outlined">arrow_back</span>
-        </Link>
-        <h1 className="rd-header-title">Chi tiết sửa chữa</h1>
-        <div style={{ width: 40 }} />
+        <PageHeader title="Chi tiết sửa chữa" subtitle={`Mã đơn #${detail.orderCode}`} backHref="/home/history" />
       </div>
 
       {/* Scrollable Content */}
       <div className="rd-scroll-content">
         {/* Order Code & Title */}
         <div className="rd-order-section">
-          <span className="rd-order-code">MÃ ĐƠN: #{detail.orderCode}</span>
           <div className="rd-title-row">
             <h2 className="rd-repair-title">{detail.title}</h2>
             <span className={`rd-status-pill ${statusBadge.className}`}>
@@ -806,7 +802,7 @@ export function HistoryDetail() {
                 <span className="text-lg font-black text-amber-300">
                   {formatCurrency(detail.isSupplementaryQuote
                     ? ((detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0))
-                    : (detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0))))}
+                    : detail.total)}
                 </span>
               </div>
               <div className="text-[11px] text-brand-200/90 italic">
@@ -863,13 +859,13 @@ export function HistoryDetail() {
 
         {/* Technician Profile Card */}
         <div className="rd-technician-card">
-          <span className="rd-section-label">KỸ THUẬT VIÊN PHỤ TRÁCH</span>
+          <span className="rd-section-label">Kỹ thuật viên phụ trách</span>
           {detail.technician?.verified && (
             <div className="rd-verification-badge">
               <span className="material-symbols-outlined" style={{ fontSize: 14, color: "#16a34a" }}>
                 verified
               </span>
-              <span>ĐÃ XÁC MINH</span>
+              <span>Đã xác minh</span>
             </div>
           )}
           {detail.technician ? (
@@ -972,6 +968,7 @@ export function HistoryDetail() {
               )}
             </div>
 
+            {ratingError && <p role="alert" style={{ color: "#e11d48", fontSize: 13 }}>{ratingError}</p>}
             {ratingSuccessMsg && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
                 <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
@@ -1160,7 +1157,7 @@ export function HistoryDetail() {
 
         {/* 1. KHỐI CHI TIẾT CÔNG VIỆC: LOẠI SỰ CỐ, MÔ TẢ SỰ CỐ & THAY GÌ */}
         <div className="rd-jobs-section">
-          <span className="rd-section-label">CHI TIẾT CÔNG VIỆC THỰC HIỆN</span>
+          <span className="rd-section-label">Chi tiết công việc</span>
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3.5">
             {/* 1. Loại sự cố gặp phải */}
             <div className="space-y-1.5">
@@ -1216,7 +1213,7 @@ export function HistoryDetail() {
 
         {/* 2. KHỐI TỔNG HỢP CHI PHÍ THANH TOÁN */}
         <div className="rd-jobs-section">
-          <span className="rd-section-label">TỔNG HỢP CHI PHÍ THANH TOÁN</span>
+          <span className="rd-section-label">Chi phí thanh toán</span>
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3 text-xs">
             {/* Tiền công kỹ thuật viên */}
             <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
@@ -1269,6 +1266,7 @@ export function HistoryDetail() {
                   if (pm.includes("TRANSFER") || pm.includes("BANK") || pm.includes("CHUYỂN KHOẢN"))
                     return "Chuyển khoản ngân hàng";
                   if (pm.includes("MOMO")) return "Ví MoMo";
+                  if (pm === "QR") return "Thanh toán trực tuyến";
                   if (pm.includes("VNPAY")) return "Cổng VNPAY";
                   return detail.paymentMethod || "Chưa thanh toán";
                 })()}
@@ -1357,7 +1355,7 @@ export function HistoryDetail() {
                 </span>
               </div>
               <span className="font-black text-lg text-brand-800">
-                {formatCurrency(detail.total || ((detail.laborCost || 0) + (detail.partsCost || 0)))}
+                {formatCurrency(detail.total)}
               </span>
             </div>
           </div>
@@ -1366,7 +1364,7 @@ export function HistoryDetail() {
         {/* Images After Repair */}
         {detail.images.length > 0 && (
           <div className="rd-images-section">
-            <span className="rd-section-label">ẢNH SAU SỬA CHỮA</span>
+            <span className="rd-section-label">Ảnh sau sửa chữa</span>
             <div className="rd-images-grid">
               {detail.images.slice(0, 3).map((src, i) => (
                 <div key={i} className="rd-image-thumb">
@@ -1414,11 +1412,13 @@ export function HistoryDetail() {
               {isRated ? "Xem lại đánh giá KTV" : "Đánh giá kỹ thuật viên"}
             </button>
           )}
-          {detail.total > 0 && detail.status !== "completed" && (
+          {detail.total > 0 && detail.status === "completed" && ["UNPAID", "PENDING", "FAILED", "CANCELLED", "EXPIRED"].includes(detail.paymentStatus || "") && (
             <button
               className="rd-action-primary"
               style={{ background: "linear-gradient(135deg, #4896c4, #4896c4)" }}
               onClick={async () => {
+                setActivePaymentTab("VIETQR");
+                setQrData(null); setMomoData(null); setPaymentNotice("");
                 setShowQrModal(true);
                 setIsQrLoading(true);
                 setQrError("");
@@ -1509,12 +1509,15 @@ export function HistoryDetail() {
                   type="button"
                   onClick={async () => {
                     setActivePaymentTab("VIETQR");
+                    setQrError(""); setQrData(null); setMomoData(null);
                     setIsQrLoading(true);
                     try {
                       const { fetchApi } = await import("@/lib/api-client");
                       const res = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=BANK_TRANSFER`);
                       setQrData(res);
-                    } catch { } finally {
+                    } catch (error) {
+                      setQrError(error instanceof Error ? error.message : "Không thể khởi tạo thanh toán.");
+                    } finally {
                       setIsQrLoading(false);
                     }
                   }}
@@ -1527,12 +1530,15 @@ export function HistoryDetail() {
                   type="button"
                   onClick={async () => {
                     setActivePaymentTab("COD");
+                    setQrError(""); setQrData(null); setMomoData(null);
                     setIsQrLoading(true);
                     try {
                       const { fetchApi } = await import("@/lib/api-client");
                       const res = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=COD`);
                       setQrData(res);
-                    } catch { } finally {
+                    } catch (error) {
+                      setQrError(error instanceof Error ? error.message : "Không thể khởi tạo thanh toán.");
+                    } finally {
                       setIsQrLoading(false);
                     }
                   }}
@@ -1545,6 +1551,7 @@ export function HistoryDetail() {
                   type="button"
                   onClick={async () => {
                     setActivePaymentTab("MOMO_ATM");
+                    setQrError(""); setQrData(null); setMomoData(null);
                     setIsQrLoading(true);
                     setQrError("");
                     try {
@@ -1552,7 +1559,7 @@ export function HistoryDetail() {
                       const res = await fetchApi<any>(`/payments/repair/${detail.id}/momo?request_type=payWithATM`, { method: "POST" });
                       setMomoData(res);
                     } catch (err: any) {
-                      setQrError(err.message || "Không thể kết nối MoMo Sandbox API.");
+                      setQrError(err.message || "Không thể kết nối MoMo.");
                     } finally {
                       setIsQrLoading(false);
                     }
@@ -1560,10 +1567,11 @@ export function HistoryDetail() {
                   className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "MOMO_ATM" ? "bg-white text-pink-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
-                  💳 MoMo (ATM Sandbox)
+                  💳 MoMo (ATM)
                 </button>
               </div>
 
+              {qrError && activePaymentTab !== "VIETQR" && <p role="alert" className="text-xs text-rose-600 mb-3">{qrError}</p>}
               {paymentNotice && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl mb-3 flex items-center gap-1.5 font-medium">
                   <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
@@ -1596,19 +1604,19 @@ export function HistoryDetail() {
                       <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs space-y-1 text-left">
                         <div className="flex justify-between">
                           <span className="text-slate-400">Ngân hàng:</span>
-                          <span className="font-bold text-slate-800">MBBank (Ngân Hàng Quân Đội)</span>
+                          <span className="font-bold text-slate-800">{qrData.bank_name}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Số tài khoản:</span>
-                          <span className="font-bold text-brand-700">09123456789</span>
+                          <span className="font-bold text-brand-700">{qrData.bank_account}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Chủ tài khoản:</span>
-                          <span className="font-bold text-slate-800">CTY CO PHAN H-SOLUTION</span>
+                          <span className="font-bold text-slate-800">{qrData.bank_account_name || "—"}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Số tiền:</span>
-                          <span className="font-bold text-emerald-600">{formatCurrency(Number(qrData.payment?.amount || detail.total))}</span>
+                          <span className="font-bold text-emerald-600">{formatCurrency(Number(qrData.payment?.amount ?? detail.total))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Nội dung CK:</span>
@@ -1635,7 +1643,8 @@ export function HistoryDetail() {
                   <button
                     type="button"
                     onClick={() => {
-                      setDetail((prev) => prev ? { ...prev, paymentMethod: "Tiền mặt (COD)" } : null);
+                      if (!qrData || qrError) return;
+                      setDetail((prev) => prev ? { ...prev, paymentMethod: "CASH" } : null);
                       setPaymentNotice("Đã chọn thanh toán Tiền mặt (COD) cho KTV.");
                       setTimeout(() => setPaymentNotice(""), 3000);
                     }}
@@ -1653,16 +1662,16 @@ export function HistoryDetail() {
                     <span className="material-symbols-outlined" style={{ fontSize: 28 }}>credit_card</span>
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm">Cổng Thanh Toán MoMo ATM Sandbox</h4>
+                    <h4 className="font-bold text-slate-800 text-sm">Thanh toán qua MoMo</h4>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Dành cho Developer: Thanh toán thử nghiệm bằng thẻ ATM qua Cổng MoMo Sandbox.
+                      Thanh toán bằng thẻ ATM qua cổng MoMo, sau đó kiểm tra kết quả giao dịch.
                     </p>
                   </div>
 
                   {isQrLoading ? (
                     <div style={{ padding: "24px 0" }}>
                       <div className="rh-loading-spinner" style={{ margin: "0 auto 10px auto" }} />
-                      <p style={{ fontSize: 13, color: "#64748B" }}>Đang kết nối MoMo Sandbox API...</p>
+                      <p style={{ fontSize: 13, color: "#64748B" }}>Đang kết nối MoMo...</p>
                     </div>
                   ) : (
                     <>
@@ -1678,30 +1687,6 @@ export function HistoryDetail() {
                         </div>
                       )}
 
-                      {/* Sandbox Test Card Info */}
-                      <div className="bg-pink-50 border border-pink-200 text-left p-2.5 rounded-xl text-xs space-y-1">
-                        <div className="font-bold text-pink-900 flex items-center gap-1 mb-1">
-                          <span className="material-symbols-outlined text-pink-600" style={{ fontSize: 16 }}>info</span>
-                          Thông tin thẻ ATM Sandbox dành cho Developer:
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-pink-700">Số thẻ ATM:</span>
-                          <span className="font-mono font-bold text-pink-950">9704000000000018</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-pink-700">Tên chủ thẻ:</span>
-                          <span className="font-bold text-pink-950">NGUYEN VAN A</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-pink-700">Ngày phát hành:</span>
-                          <span className="font-bold text-pink-950">07/15</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-pink-700">Mã OTP:</span>
-                          <span className="font-mono font-bold text-pink-950">123456</span>
-                        </div>
-                      </div>
-
                       {momoData?.pay_url && (
                         <a
                           href={momoData.pay_url}
@@ -1710,18 +1695,26 @@ export function HistoryDetail() {
                           className="w-full py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
-                          Mở Cổng Thanh Toán MoMo Sandbox (ATM)
+                          Mở cổng thanh toán MoMo
                         </a>
                       )}
 
                       <button
                         type="button"
                         onClick={async () => {
+                          setQrError("");
                           try {
                             const { fetchApi } = await import("@/lib/api-client");
-                            await fetchApi(`/payments/repair/${detail.id}/momo-confirm`, { method: "POST" });
-                            setDetail((prev) => prev ? { ...prev, status: "completed", paymentMethod: "Ví MoMo Sandbox ATM" } : null);
-                            setPaymentNotice("Xác nhận thanh toán MoMo Sandbox thành công!");
+                            const result = await fetchApi<{ success: boolean; payment_status: string; message?: string }>(`/payments/repair/${detail.id}/momo-confirm`, { method: "POST" });
+                            if (!result.success || result.payment_status !== "PAID") {
+                              setQrError(result.message || "Chưa ghi nhận thanh toán thành công.");
+                              if (result.payment_status === "FAILED") {
+                                setDetail((previous) => previous ? { ...previous, paymentStatus: "FAILED" } : null);
+                              }
+                              return;
+                            }
+                            setDetail((prev) => prev ? { ...prev, paymentStatus: "PAID", paymentMethod: "MoMo" } : null);
+                            setPaymentNotice("Thanh toán MoMo thành công!");
                             setTimeout(() => setPaymentNotice(""), 3000);
                           } catch (err: any) {
                             setQrError(err.message || "Xác nhận thất bại");
@@ -1729,7 +1722,7 @@ export function HistoryDetail() {
                         }}
                         className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
                       >
-                        ✓ Xác nhận hoàn tất thanh toán Sandbox
+                        Kiểm tra kết quả thanh toán
                       </button>
                     </>
                   )}

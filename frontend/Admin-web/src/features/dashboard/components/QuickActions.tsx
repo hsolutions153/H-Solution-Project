@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { Zap, CopyPlus, SquareUser, Receipt } from "lucide-react";
+import { CopyPlus,Receipt,SquareUser,Zap } from "lucide-react";
 
 export interface QuickActionsProps {
   onOpenCreateOrder?: () => void;
@@ -12,7 +11,6 @@ export interface QuickActionsProps {
 export const QuickActions = ({
   onOpenCreateOrder,
   onNavigateToOrders,
-  onNavigateToTechs,
 }: QuickActionsProps) => {
   return (
     <div className="bg-brand-950 text-white rounded-2xl p-5 shadow-sm">

@@ -1,3 +1,5 @@
+import { fetchAllPages } from "@h-mobility/ui";
+
 function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 }
@@ -20,6 +22,7 @@ export function setAuthToken(token: string, user?: UserSession): void {
   localStorage.setItem("access_token", token);
   if (user) {
     localStorage.setItem("user_info", JSON.stringify(user));
+    window.dispatchEvent(new Event("session-changed"));
   }
 }
 
@@ -27,6 +30,7 @@ export function removeAuthToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem("access_token");
   localStorage.removeItem("user_info");
+  window.dispatchEvent(new Event("session-changed"));
 }
 
 export function getUserInfo(): UserSession | null {
@@ -75,8 +79,8 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       ...options,
       headers,
     });
-  } catch (err: any) {
-    console.warn(`[Network/Fetch Error] ${endpoint}:`, err?.message || err);
+  } catch (err: unknown) {
+    console.warn(`[Network/Fetch Error] ${endpoint}:`, err instanceof Error ? err.message : err);
     throw new ApiError(
       "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.",
       0,
@@ -89,12 +93,12 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
 
   const contentType = response.headers.get("content-type");
-  let data: any = null;
+  let data: { detail?: { message?: string; code?: string } | string; message?: string; code?: string } | null = null;
   try {
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     } else {
-      data = await response.text();
+      data = { message: await response.text() };
     }
   } catch {
     data = null;
@@ -102,11 +106,11 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
   if (!response.ok) {
     const errorMsg =
-      data?.detail?.message ||
+      (typeof data?.detail === "object" ? data.detail?.message : null) ||
       (typeof data?.detail === "string" ? data.detail : null) ||
       data?.message ||
       `Yêu cầu thất bại (${response.status})`;
-    const errorCode = data?.detail?.code || data?.code;
+    const errorCode = (typeof data?.detail === "object" ? data.detail?.code : undefined) || data?.code;
 
     if (response.status === 401 && typeof window !== "undefined") {
       removeAuthToken();
@@ -116,4 +120,8 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
 
   return data as T;
+}
+
+export async function fetchApiPages<T>(endpoint: string): Promise<{ items: T[] }> {
+  return { items: await fetchAllPages<T>((url) => fetchApi(url), endpoint) };
 }

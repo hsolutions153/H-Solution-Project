@@ -1,24 +1,37 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { fetchApi } from '@/lib/api-client';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { LoginHeader } from '@/components/LoginHeader';
 import { ResetPasswordForm } from './components/ResetPasswordForm';
 import { ResetPasswordFormData } from '@/types/auth';
 
 interface ResetPasswordScreenProps {
+  phone: string;
+  otpCode: string;
   onResetSuccess: () => void;
   onBackToLogin: () => void;
 }
 
 export const ResetPasswordScreen = ({
+  phone,
+  otpCode,
   onResetSuccess,
   onBackToLogin,
 }: ResetPasswordScreenProps) => {
-  const handleResetPassword = (data: ResetPasswordFormData) => {
-    console.log('Mật khẩu mới:', data.newPassword);
-    alert('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.');
-    onResetSuccess(); // Chuyển về trang Login
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const handleResetPassword = async (data: ResetPasswordFormData) => {
+    setLoading(true); setError("");
+    try {
+      await fetchApi("/auth/reset-password", {
+        method: "POST", body: JSON.stringify({ phone, otp_code: otpCode, new_password: data.newPassword }),
+      });
+      onResetSuccess();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Không thể đặt lại mật khẩu.");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -34,7 +47,9 @@ export const ResetPasswordScreen = ({
           <LoginHeader />
 
           
+          {error && <p role="alert" className="text-xs text-rose-600 mb-2">{error}</p>}
           <ResetPasswordForm
+            loading={loading}
             onSubmit={handleResetPassword}
             onBackToLogin={onBackToLogin}
           />

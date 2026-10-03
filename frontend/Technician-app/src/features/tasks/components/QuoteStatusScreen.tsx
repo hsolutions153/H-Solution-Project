@@ -2,7 +2,10 @@
 
 import React from "react";
 import { Task } from "@/types/task";
-import { ArrowLeft, MapPin, Clock, FileText, Phone, CheckCircle, XCircle } from "lucide-react";
+import { MapPin, Clock, FileText, Phone, CheckCircle, XCircle, PencilLine, Wrench, Play } from "lucide-react";
+import { Badge, Button, Card, buttonClasses } from "@h-mobility/ui";
+import { ActionBar, ScreenHeader } from "@/components/ui";
+import { isSupplementaryQuote } from "../mapApiTask";
 
 interface QuoteStatusScreenProps {
   task: Task;
@@ -12,6 +15,13 @@ interface QuoteStatusScreenProps {
   isApproved?: boolean;
 }
 
+const vnd = (n: number) => `${n.toLocaleString("vi-VN")} đ`;
+
+/**
+ * Customer decision on a quote. Two cases share this screen:
+ * - the first quote, sent before repair starts ("Bắt đầu sửa chữa"), and
+ * - a supplementary quote for extra cost found during the repair ("Tiếp tục sửa chữa").
+ */
 export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   task,
   onBack,
@@ -29,9 +39,10 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   const acceptedQuotes = (task.quotes || (task.quote ? [task.quote] : []))
     .filter((quote: any) => quote.status === "ACCEPTED");
   const hasApprovedQuote = acceptedQuotes.length > 0;
-  const approvedEstimate = Number(task.approvedEstimate ?? acceptedQuotes.reduce(
+  const approvedEstimate = Number(task.approvedEstimate || acceptedQuotes.reduce(
     (sum: number, quote: any) => sum + Number(quote.estimated_price || 0), 0
   ));
+  const supplementary = isSupplementaryQuote(task);
 
   const isRejected = task.status === "ESTIMATE_REJECTED" || (task.status !== "WAITING_FOR_APPROVAL" && quoteObj?.status === "REJECTED");
   const effectivelyApproved = !isRejected && task.status !== "WAITING_FOR_APPROVAL" && (isApproved || task.status === "ESTIMATE_APPROVED" || quoteObj?.status === "ACCEPTED");
@@ -39,164 +50,168 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   const displayTotal = Number(quoteObj?.estimated_price ?? quoteObj?.totalCost ?? task.totalAmount ?? 0);
   const rejectReason = quoteObj?.reject_reason || "Khách hàng chưa cung cấp lý do";
 
+  const state = isRejected ? "rejected" : effectivelyApproved ? "approved" : "pending";
+  const STATE_UI = {
+    rejected: { tone: "danger" as const, badge: "Bị từ chối", icon: XCircle, iconClass: "bg-rose-50 text-rose-600" },
+    approved: { tone: "success" as const, badge: "Đã phê duyệt", icon: CheckCircle, iconClass: "bg-emerald-50 text-emerald-600" },
+    pending: { tone: "warning" as const, badge: "Chờ phê duyệt", icon: Clock, iconClass: "bg-amber-50 text-amber-600" },
+  }[state];
+  const StateIcon = STATE_UI.icon;
+  // A rejected supplementary quote still leaves the approved part to finish.
+  const canContinue = effectivelyApproved || (isRejected && hasApprovedQuote);
+
+  const COPY = supplementary
+    ? {
+        title: "Chi phí phát sinh",
+        heading: {
+          pending: "Đã gửi chi phí phát sinh tới khách hàng",
+          approved: "Khách hàng đã duyệt chi phí phát sinh",
+          rejected: "Khách hàng từ chối chi phí phát sinh",
+        }[state],
+        body: {
+          pending: "Sửa chữa đang tạm dừng. Bạn sẽ tiếp tục ngay khi khách hàng phản hồi.",
+          approved: `Tiếp tục sửa chữa với tổng chi phí đã duyệt ${vnd(approvedEstimate)}.`,
+          rejected: `Chỉ tiếp tục các hạng mục đã duyệt trước đó (${vnd(approvedEstimate)}).`,
+        }[state],
+        primary: "Tiếp tục sửa chữa",
+        footer: {
+          pending: "Nút sẽ mở khi khách hàng phản hồi khoản phát sinh.",
+          approved: "Khoản phát sinh đã được cộng vào chi phí sửa chữa.",
+          rejected: "Khoản phát sinh bị từ chối không được cộng vào chi phí sửa chữa.",
+        }[state],
+      }
+    : {
+        title: "Trạng thái báo giá",
+        heading: {
+          pending: "Đã gửi báo giá tới khách hàng",
+          approved: "Khách hàng đã đồng ý báo giá",
+          rejected: "Khách hàng từ chối báo giá",
+        }[state],
+        body: {
+          pending: "Đang chờ khách hàng xác nhận báo giá trên ứng dụng của họ.",
+          approved: "Bạn có thể bắt đầu sửa chữa theo báo giá đã duyệt.",
+          rejected: "Cần điều chỉnh và gửi lại báo giá để khách hàng duyệt trước khi sửa chữa.",
+        }[state],
+        primary: "Bắt đầu sửa chữa",
+        footer: {
+          pending: "Nút sẽ mở khi khách hàng duyệt báo giá.",
+          approved: "Khách hàng đã đồng ý báo giá.",
+          rejected: "Báo giá chưa được duyệt nên chưa thể bắt đầu sửa chữa.",
+        }[state],
+      };
+
   return (
-    <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between">
-      <div className="p-4 space-y-4">
-        
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-xs font-bold text-brand-800 hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Trạng thái báo giá
-          </button>
-        </div>
+    <div className="space-y-4 px-4 pt-4">
+      <ScreenHeader
+        title={COPY.title}
+        subtitle={`Mã đơn ${task.code}`}
+        onBack={onBack}
+        trailing={<Badge tone={STATE_UI.tone}>{STATE_UI.badge}</Badge>}
+      />
 
-        
-        <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold px-2.5 py-1 bg-brand-50 text-brand-700 rounded-md">
-              Mã đơn: {task.code}
-            </span>
-            {isRejected ? (
-              <span className="text-xs font-medium px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                Từ chối báo giá
-              </span>
-            ) : effectivelyApproved ? (
-              <span className="text-xs font-medium px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Đã phê duyệt
-              </span>
-            ) : (
-              <span className="text-xs font-medium px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                Chờ phê duyệt
-              </span>
-            )}
-          </div>
-          <h2 className="text-base font-bold text-slate-900">
-            {task.serviceName}
-          </h2>
-          <div className="flex items-start gap-1.5 text-xs text-slate-500">
-            <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-            <span>{task.address}</span>
-          </div>
-        </div>
+      <Card className="space-y-1">
+        <h2 className="text-sm font-bold text-ink">{task.serviceName}</h2>
+        <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+          {task.address}
+        </p>
+      </Card>
 
-        
-        <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm text-center space-y-3">
+      <Card padded={false}>
+        <div className="flex flex-col items-center px-5 pt-6 pb-5 text-center">
+          <span className={`flex size-14 items-center justify-center rounded-full ${STATE_UI.iconClass}`}>
+            <StateIcon className="size-7" />
+          </span>
+          <h3 className="mt-4 text-lg font-bold text-ink">{COPY.heading}</h3>
+          <p className="mt-1.5 max-w-[34ch] text-sm leading-relaxed text-slate-600">{COPY.body}</p>
           {isRejected ? (
-            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-2xl mx-auto flex items-center justify-center">
-              <XCircle className="w-8 h-8 text-rose-500" />
-            </div>
-          ) : effectivelyApproved ? (
-            <div className="w-16 h-16 bg-emerald-50 border border-emerald-100 rounded-2xl mx-auto flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-emerald-600" />
-            </div>
-          ) : (
-            <div className="w-16 h-16 bg-brand-50 border border-brand-100 rounded-2xl mx-auto flex items-center justify-center">
-              <Clock className="w-8 h-8 text-brand-500 animate-spin-slow" />
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-slate-900">
-              {isRejected
-                ? hasApprovedQuote ? "Khách hàng từ chối báo giá bổ sung" : "Khách hàng từ chối báo giá sửa chữa"
-                : effectivelyApproved
-                ? "Khách hàng đã đồng ý báo giá"
-                : "Đã gửi báo giá tới khách hàng"}
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed px-4">
-              {isRejected
-                ? hasApprovedQuote
-                  ? `Lý do từ chối: "${rejectReason}". Chỉ tiếp tục các hạng mục đã được duyệt (${approvedEstimate.toLocaleString("vi-VN")} đ).`
-                  : `Lý do từ chối: "${rejectReason}". Cần điều chỉnh và gửi lại báo giá để khách hàng duyệt trước khi sửa chữa.`
-                : effectivelyApproved
-                ? "Báo giá đã được khách hàng phê duyệt. Bạn có thể tiếp tục tiến hành sửa chữa."
-                : "Hệ thống đang chờ Khách hàng xác nhận và phê duyệt báo giá trên ứng dụng Customer App."}
+            <p className="mt-3 w-full rounded-control border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-left text-[13px] text-rose-800">
+              <span className="font-semibold">Lý do từ chối:</span> {rejectReason}
             </p>
-          </div>
-
-          
-          <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-4 text-left mt-4">
-            <div className="pl-2">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Tổng chi phí báo giá
-              </span>
-              <span className="text-base font-bold text-brand-700">
-                {displayTotal > 0 ? `${Number(displayTotal).toLocaleString("vi-VN")} đ` : "Chờ tính phí"}
-              </span>
-            </div>
-            <div className="border-l border-slate-100 pl-4">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Dự kiến
-              </span>
-              <span className="text-base font-bold text-slate-800">
-                {quoteObj?.estimatedTime || "2 giờ"}
-              </span>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={onViewDetailQuote}
-              className="text-xs font-semibold text-brand-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-            >
-              Xem chi tiết báo giá <FileText className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          ) : null}
         </div>
 
-        
-        <div className="space-y-3 pt-2">
-          {!effectivelyApproved && !isRejected && (
-            <button className="w-full py-3 bg-white border border-brand-700 text-brand-700 hover:bg-brand-50 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm">
-              <Phone className="w-4 h-4 text-brand-600" />
-              Gọi/Nhắc khách hàng
-            </button>
+        <dl className="grid grid-cols-2 divide-x divide-line border-t border-line">
+          {supplementary ? (
+            <>
+              <div className="px-4 py-3.5">
+                <dt className="text-xs text-slate-500">Chi phí phát sinh</dt>
+                <dd className={`mt-0.5 text-base font-bold tabular-nums ${isRejected ? "text-slate-400 line-through" : "text-ink"}`}>
+                  +{vnd(displayTotal)}
+                </dd>
+              </div>
+              <div className="px-4 py-3.5">
+                <dt className="text-xs text-slate-500">Tổng đã duyệt</dt>
+                <dd className="mt-0.5 text-base font-bold tabular-nums text-ink">{vnd(approvedEstimate)}</dd>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="px-4 py-3.5">
+                <dt className="text-xs text-slate-500">Tổng báo giá</dt>
+                <dd className="mt-0.5 text-base font-bold tabular-nums text-ink">
+                  {displayTotal > 0 ? vnd(displayTotal) : "Chờ tính phí"}
+                </dd>
+              </div>
+              <div className="px-4 py-3.5">
+                <dt className="text-xs text-slate-500">Thời gian dự kiến</dt>
+                <dd className="mt-0.5 text-base font-bold text-ink">{quoteObj?.estimatedTime || "2 giờ"}</dd>
+              </div>
+            </>
           )}
+        </dl>
 
+        {onViewDetailQuote ? (
           <button
             type="button"
-            disabled={isRejected ? !hasApprovedQuote && !onViewDetailQuote : !effectivelyApproved}
-            onClick={() => {
-              if (isRejected && !hasApprovedQuote) {
-                onViewDetailQuote?.();
-                return;
-              }
-              if (!effectivelyApproved && !isRejected) return;
-              onContinueRepair();
-            }}
-            className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer ${
-              isRejected
-                ? "bg-amber-600 hover:bg-amber-700 text-white"
-                : effectivelyApproved
-                ? "bg-brand-800 hover:bg-brand-900 text-white"
-                : "bg-slate-200 text-slate-400 cursor-not-allowed"
-            }`}
+            onClick={onViewDetailQuote}
+            className="flex w-full items-center justify-center gap-1.5 border-t border-line py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 cursor-pointer rounded-b-card"
           >
-            {isRejected
-              ? hasApprovedQuote ? "Tiếp tục sửa theo báo giá đã duyệt" : "Điều chỉnh và gửi lại báo giá"
-              : "Bắt đầu / Tiếp tục sửa chữa"}
+            <FileText className="size-4" />
+            {supplementary ? "Xem chi tiết khoản phát sinh" : "Xem chi tiết báo giá"}
           </button>
-          <p className="text-[11px] text-center font-medium">
-            {isRejected ? (
-              <span className="text-amber-700">
-                {hasApprovedQuote
-                  ? "Khoản phát sinh bị từ chối không được cộng vào chi phí sửa chữa."
-                  : "Báo giá chưa được duyệt. Chưa thể bắt đầu sửa chữa."}
-              </span>
-            ) : effectivelyApproved ? (
-              <span className="text-emerald-600">Khách hàng đã đồng ý báo giá. Có thể tiếp tục sửa chữa.</span>
-            ) : (
-              <span className="text-slate-400">Đang chờ khách hàng xác nhận báo giá...</span>
-            )}
-          </p>
-        </div>
-      </div>
+        ) : null}
+      </Card>
+
+      <ActionBar className="space-y-2.5">
+        {state === "pending" && task.customerPhone ? (
+          <a href={`tel:${task.customerPhone}`} className={buttonClasses("secondary", "lg", true)}>
+            <Phone className="size-5" />
+            Gọi nhắc khách hàng
+          </a>
+        ) : null}
+
+        {isRejected && supplementary && onViewDetailQuote ? (
+          <Button size="lg" fullWidth variant="secondary" icon={<PencilLine className="size-5" />} onClick={onViewDetailQuote}>
+            Gửi lại chi phí phát sinh
+          </Button>
+        ) : null}
+
+        {isRejected && !hasApprovedQuote ? (
+          <Button
+            size="lg"
+            fullWidth
+            disabled={!onViewDetailQuote}
+            icon={<PencilLine className="size-5" />}
+            onClick={() => onViewDetailQuote?.()}
+          >
+            Điều chỉnh báo giá
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            fullWidth
+            disabled={!canContinue}
+            icon={supplementary ? <Play className="size-5" /> : <Wrench className="size-5" />}
+            onClick={() => {
+              if (canContinue) onContinueRepair();
+            }}
+          >
+            {COPY.primary}
+          </Button>
+        )}
+        <p className="text-center text-xs text-slate-500">{COPY.footer}</p>
+      </ActionBar>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useSyncExternalStore } from "react";
 
 export type AdminTab =
   | "dashboard"
@@ -25,30 +25,31 @@ interface AdminContextType {
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
+const sidebarKey = "admin_sidebar_collapsed";
+function subscribeSidebar(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener("sidebar-changed", listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener("sidebar-changed", listener);
+  };
+}
+
 export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-
-  // Khôi phục trạng thái thu gọn từ localStorage khi load
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem("admin_sidebar_collapsed");
-      if (saved !== null) {
-        setSidebarCollapsed(saved === "true");
-      }
-    } catch {}
-  }, []);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeSidebar, () => localStorage.getItem(sidebarKey) === "true", () => false,
+  );
+  const setSidebarCollapsed = (value: boolean | ((previous: boolean) => boolean)) => {
+    const next = typeof value === "function" ? value(sidebarCollapsed) : value;
+    localStorage.setItem(sidebarKey, String(next));
+    window.dispatchEvent(new Event("sidebar-changed"));
+  };
 
   const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("admin_sidebar_collapsed", String(next));
-      } catch {}
-      return next;
-    });
+    setSidebarCollapsed((prev) => !prev);
   };
 
   const showToast = (msg: string) => {

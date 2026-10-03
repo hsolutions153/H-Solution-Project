@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { Button } from '@h-mobility/ui';
+import { Modal, labelClasses, textareaClasses } from '@/components/ui';
 
 interface RejectTaskModalProps {
   isOpen: boolean;
@@ -38,75 +39,58 @@ export const RejectTaskModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
-      <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
-        
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 text-sm">
-            Xác nhận từ chối công việc
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <Modal open onClose={onClose} variant="sheet" title="Từ chối công việc">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <fieldset className="space-y-2">
+          <legend className={`${labelClasses} mb-2`}>
+            Lý do từ chối <span className="text-rose-600">*</span>
+          </legend>
+          {REASON_OPTIONS.map((opt) => {
+            const checked = reason === opt;
+            return (
+              <label
+                key={opt}
+                className={`flex items-center gap-3 rounded-control border px-3.5 py-3 text-sm transition-colors cursor-pointer ${
+                  checked ? 'border-brand-500 bg-brand-50 font-semibold text-ink' : 'border-line bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="reject-reason"
+                  value={opt}
+                  checked={checked}
+                  onChange={() => setReason(opt)}
+                  className="size-4 accent-brand-600"
+                />
+                {opt}
+              </label>
+            );
+          })}
+        </fieldset>
+
+        <div className="space-y-1.5">
+          <label htmlFor="reject-note" className={labelClasses}>
+            Ghi chú thêm
+          </label>
+          <textarea
+            id="reject-note"
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Nhập chi tiết lý do (không bắt buộc)"
+            className={textareaClasses}
+          />
         </div>
 
-        
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          
-          <div className="space-y-1.5">
-            <label className="block font-medium text-slate-700">
-              Lý do từ chối <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-brand-800 focus:outline-none focus:ring-1 focus:ring-brand-800 transition-all cursor-pointer"
-            >
-              {REASON_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          
-          <div className="space-y-1.5">
-            <label className="block font-medium text-slate-700">
-              Ghi chú thêm
-            </label>
-            <textarea
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Nhập chi tiết lý do (không bắt buộc)..."
-              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-brand-800 focus:outline-none focus:ring-1 focus:ring-brand-800 transition-all resize-none"
-            />
-          </div>
-
-          
-          <div className="grid grid-cols-2 gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer text-center"
-            >
-              Hủy
-            </button>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-bold rounded-xl shadow-sm transition-colors cursor-pointer text-center"
-            >
-              Xác nhận từ chối
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button size="lg" variant="secondary" onClick={onClose}>
+            Hủy
+          </Button>
+          <Button size="lg" variant="danger" type="submit">
+            Từ chối việc
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };

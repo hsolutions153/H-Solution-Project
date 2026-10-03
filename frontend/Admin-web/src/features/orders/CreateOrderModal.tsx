@@ -1,20 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import {
-  X,
-  Plus,
-  AlertTriangle,
-  MapPin,
-  FileText,
-  User,
-  Wrench,
-  CheckCircle2,
-  Search,
-  ChevronDown,
-  Check,
-} from "lucide-react";
+import type { Customer,Device } from "@/types/api";
+import { errorMessage } from "@/types/api";
+
 import { ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
+import {
+AlertTriangle,
+Check,
+ChevronDown,
+FileText,
+MapPin,
+Plus,
+Search,
+User,
+Wrench,
+X
+} from "lucide-react";
+import React,{ useEffect,useRef,useState } from "react";
 
 export interface CreateOrderModalProps {
   onClose: () => void;
@@ -25,8 +27,8 @@ export const CreateOrderModal = ({
   onClose,
   onSuccess,
 }: CreateOrderModalProps) => {
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [devices, setDevices] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
   // Form fields
@@ -60,10 +62,10 @@ export const CreateOrderModal = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { fetchApi } = await import("@/lib/api-client");
+        const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
         const [custRes, devRes] = await Promise.all([
-          fetchApi<any>("/customers"),
-          fetchApi<any>("/devices"),
+          fetchApiPages<Customer>("/customers"),
+          fetchApi<Device[]>("/devices"),
         ]);
 
         const custList = Array.isArray(custRes?.items)
@@ -79,10 +81,8 @@ export const CreateOrderModal = ({
 
         const devList = Array.isArray(devRes) ? devRes : [];
         setDevices(devList);
-        if (devList.length > 0) {
-          setDeviceId(devList[0].id);
-        }
-      } catch (err: any) {
+        setDeviceId(devList.find((device: Device) => device.customer_id === custList[0]?.id)?.id || "");
+      } catch (err: unknown) {
         console.warn("Could not fetch customers/devices:", err);
       } finally {
         setLoadingInitial(false);
@@ -107,18 +107,9 @@ export const CreateOrderModal = ({
     return name.includes(q) || phone.includes(q) || id.includes(q);
   });
 
-  // Auto select first device when customer changes
-  useEffect(() => {
-    if (filteredDevices.length > 0) {
-      setDeviceId(filteredDevices[0].id);
-    } else if (devices.length > 0) {
-      setDeviceId(devices[0].id);
-    }
-  }, [customerId, devices]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deviceId) {
+    if (!customerId || !filteredDevices.some((device) => device.id === deviceId)) {
       setError("Vui lòng chọn thiết bị sửa chữa.");
       return;
     }
@@ -147,8 +138,8 @@ export const CreateOrderModal = ({
 
       onSuccess("Tạo đơn sửa chữa thành công!");
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Lỗi khi tạo đơn sửa chữa.");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Lỗi khi tạo đơn sửa chữa."));
     } finally {
       setSubmitting(false);
     }
@@ -275,7 +266,7 @@ export const CreateOrderModal = ({
               <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto z-50 py-1">
                 {filteredCustomers.length === 0 ? (
                   <div className="p-4 text-center text-xs text-slate-400 font-medium">
-                    Không tìm thấy khách hàng nào khớp với "{customerSearch}"
+                    Không tìm thấy khách hàng nào khớp với &quot;{customerSearch}&quot;
                   </div>
                 ) : (
                   filteredCustomers.map((c) => {
@@ -287,6 +278,7 @@ export const CreateOrderModal = ({
                         type="button"
                         onClick={() => {
                           setCustomerId(c.id);
+                          setDeviceId(devices.find((device) => device.customer_id === c.id)?.id || "");
                           setCustomerSearch(cName);
                           setIsCustomerDropdownOpen(false);
                         }}
@@ -406,7 +398,7 @@ export const CreateOrderModal = ({
             </button>
             <button
               type="submit"
-              disabled={submitting || loadingInitial}
+              disabled={submitting || loadingInitial || !customerId || !deviceId}
               className="bg-brand-900 hover:bg-brand-950 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-brand-900/20 disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (

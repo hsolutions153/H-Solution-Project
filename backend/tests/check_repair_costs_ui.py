@@ -69,9 +69,10 @@ def scenario(browser, mode, final_amount=1200000):
     try:
         user.goto(USER_APP_URL + '/home/history/REPAIR0001', wait_until='networkidle')
         tech.goto(TECHNICIAN_APP_URL + '/', wait_until='networkidle')
+        tech.get_by_role('button', name='Công việc', exact=True).click()
         expect(tech.get_by_text('REQUEST001', exact=False).first).to_be_visible(timeout=12000)
         tech.get_by_text('REQUEST001', exact=False).first.click()
-        final_input = tech.get_by_label('Chi phí thực tế (Final Cost)', exact=True)
+        final_input = tech.get_by_label('Chi phí thực tế', exact=True)
         expect(final_input).to_be_enabled()
         expect(final_input).to_have_value('1200000')
         finish = tech.get_by_role('button', name='Hoàn tất sửa chữa', exact=True)
@@ -80,23 +81,23 @@ def scenario(browser, mode, final_amount=1200000):
             final_input.fill(str(final_amount))
             finish.click()
             if mode == 'higher':
-                expect(tech.get_by_role('heading', name='Không thể hoàn tất đơn sửa chữa!', exact=True)).to_be_visible()
+                expect(tech.get_by_role('heading', name='Chưa thể hoàn tất đơn', exact=True)).to_be_visible()
                 assert harness.request['status'] == 'REPAIRING'
                 assert not any(payload and payload.get('status') == 'COMPLETED' for _, _, payload in calls)
                 assert not errors, errors
                 print('PASS: Final 1.500.000 > Estimate 1.200.000 is blocked; request stays REPAIRING', flush=True)
                 return
         else:
-            tech.get_by_role('button', name='Thêm linh kiện / công việc phát sinh', exact=True).click()
+            tech.get_by_role('button', name='Thêm hạng mục phát sinh', exact=True).click()
             if mode == 'service':
                 tech.get_by_label('Loại hạng mục', exact=True).select_option('SERVICE')
-            tech.get_by_placeholder('Tên linh kiện...').fill('Linh kiện phát sinh 300k')
-            tech.get_by_placeholder('Đơn giá (VNĐ)').fill('300000')
-            tech.get_by_role('button', name='Xác nhận thêm', exact=True).click()
+            tech.get_by_label('Tên hạng mục', exact=True).fill('Linh kiện phát sinh 300k')
+            tech.get_by_label('Đơn giá (đ)', exact=True).fill('300000')
+            tech.get_by_role('button', name='Thêm hạng mục', exact=True).click()
             expect(final_input).to_have_value('1500000')
             tech.get_by_role('button', name=re.compile('^Tạo báo giá bổ sung')).click()
             tech.get_by_role('button', name='Gửi khách hàng', exact=True).click()
-            expect(tech.get_by_role('heading', name='Đã gửi báo giá tới khách hàng', exact=True)).to_be_visible(timeout=12000)
+            expect(tech.get_by_role('heading', name='Đã gửi chi phí phát sinh tới khách hàng', exact=True)).to_be_visible(timeout=12000)
             quote_posts = [payload for method, path, payload in calls if method == 'POST' and path.endswith('/quotes')]
             assert len(quote_posts) == 1, quote_posts
             payload = quote_posts[0]
@@ -114,19 +115,21 @@ def scenario(browser, mode, final_amount=1200000):
             expect(panel).to_contain_text('+300.000')
             expect(panel).to_contain_text('1.500.000')
             expect(panel).not_to_contain_text('Linh kiện ban đầu')
-            expect(tech.get_by_role('button', name='Bắt đầu / Tiếp tục sửa chữa', exact=True)).to_be_disabled()
+            expect(tech.get_by_role('button', name='Tiếp tục sửa chữa', exact=True)).to_be_disabled()
             if mode in ('create', 'service'):
                 user.reload(wait_until='networkidle')
                 tech.reload(wait_until='networkidle')
+                tech.get_by_role('button', name='Công việc', exact=True).click()
+                tech.get_by_text('REQUEST001', exact=False).first.click()
                 expect(user.get_by_role('heading', name='Yêu Cầu Duyệt Chi Phí Phát Sinh Bổ Sung', exact=True)).to_be_visible()
-                expect(tech.get_by_role('button', name='Bắt đầu / Tiếp tục sửa chữa', exact=True)).to_be_disabled()
+                expect(tech.get_by_role('button', name='Tiếp tục sửa chữa', exact=True)).to_be_disabled()
                 assert not errors, errors
                 print(f'PASS: {mode} adds only 300.000 and waits for customer approval', flush=True)
                 return
             if mode == 'approve':
                 user.get_by_role('button', name=re.compile('^Duyệt phát sinh')).click()
-                expect(tech.get_by_role('heading', name='Khách hàng đã đồng ý báo giá', exact=True)).to_be_visible(timeout=12000)
-                tech.get_by_role('button', name='Bắt đầu / Tiếp tục sửa chữa', exact=True).click()
+                expect(tech.get_by_role('heading', name='Khách hàng đã duyệt chi phí phát sinh', exact=True)).to_be_visible(timeout=12000)
+                tech.get_by_role('button', name='Tiếp tục sửa chữa', exact=True).click()
                 final_amount = 1500000
                 expect(final_input).to_be_enabled()
                 expect(final_input).to_have_value('1500000')
@@ -134,9 +137,9 @@ def scenario(browser, mode, final_amount=1200000):
             else:
                 user.get_by_role('button', name='Từ chối phát sinh', exact=True).click()
                 user.get_by_role('button', name='Xác nhận từ chối', exact=True).click()
-                expect(tech.get_by_role('heading', name='Khách hàng từ chối báo giá bổ sung', exact=True)).to_be_visible(timeout=12000)
+                expect(tech.get_by_role('heading', name='Khách hàng từ chối chi phí phát sinh', exact=True)).to_be_visible(timeout=12000)
                 assert harness.request['repair_quotes'][-1]['reject_reason'] == 'Không đồng ý'
-                tech.get_by_role('button', name='Tiếp tục sửa theo báo giá đã duyệt', exact=True).click()
+                tech.get_by_role('button', name='Tiếp tục sửa chữa', exact=True).click()
                 final_amount = 1200000
                 expect(final_input).to_be_enabled()
                 expect(final_input).to_have_value('1200000')

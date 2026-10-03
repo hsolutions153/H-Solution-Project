@@ -1,27 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  Search,
-  RefreshCw,
-  Eye,
-  UserCheck,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Plus,
-  Table,
-  LayoutGrid,
-  MapPin,
-  Phone,
-  User,
-  Wrench,
-  Calendar,
-} from "lucide-react";
-import { getStatusBadge, ISSUE_TYPE_LABELS, STATUS_CONFIG } from "@/constants/orderStatus";
 import { Pagination } from "@/components/common/Pagination";
-import { OrderDetailModal, type OrderRecord, type TechnicianItem } from "./OrderDetailModal";
+import { getStatusBadge,ISSUE_TYPE_LABELS,STATUS_CONFIG } from "@/constants/orderStatus";
+import {
+AlertTriangle,
+Calendar,
+CheckCircle2,
+Eye,
+LayoutGrid,
+MapPin,
+Phone,
+Plus,
+RefreshCw,
+Search,
+Table,
+User,
+UserCheck,
+Wrench,
+XCircle,
+} from "lucide-react";
+import { useEffect,useState } from "react";
 import { CreateOrderModal } from "./CreateOrderModal";
+import { OrderDetailModal,type OrderRecord,type TechnicianItem } from "./OrderDetailModal";
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -84,9 +84,9 @@ export const OrdersList = () => {
 
   const fetchOrdersAndTechs = async () => {
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [orderRes, techRes] = await Promise.all([
-        fetchApi<{ items?: OrderRecord[] } | OrderRecord[]>("/orders?limit=100"),
+        fetchApiPages<OrderRecord>("/orders?limit=100"),
         fetchApi<TechnicianItem[]>("/technicians"),
       ]);
 
@@ -108,10 +108,10 @@ export const OrdersList = () => {
 
   useEffect(() => {
     let active = true;
-    import("@/lib/api-client").then(async ({ fetchApi }) => {
+    import("@/lib/api-client").then(async ({ fetchApi, fetchApiPages }) => {
       try {
         const [orderRes, techRes] = await Promise.all([
-          fetchApi<{ items?: OrderRecord[] } | OrderRecord[]>("/orders?limit=100"),
+          fetchApiPages<OrderRecord>("/orders?limit=100"),
           fetchApi<TechnicianItem[]>("/technicians"),
         ]);
         if (!active) return;

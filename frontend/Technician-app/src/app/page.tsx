@@ -17,6 +17,9 @@ export default function HomePage() {
   const [currentView, setCurrentView] = useState<
     "login" | "forgot-password" | "verify-otp" | "reset-password"
   >("login");
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [developmentCode, setDevelopmentCode] = useState<string>();
   const [isMounted, setIsMounted] = useState(false);
 
   // Quản lý Tab hiển thị hiện tại trên BottomNav
@@ -72,18 +75,24 @@ export default function HomePage() {
         }}
       >
         
-        {activeTab === "home" && (
-          <TaskListScreen onCompleteRepair={handleCompleteRepair} />
+        {(activeTab === "home" || activeTab === "tasks") && (
+          // Keyed by tab so switching remounts it; the task flow restores itself from sessionStorage.
+          <TaskListScreen
+            key={activeTab}
+            view={activeTab as "home" | "tasks"}
+            onNavigate={setActiveTab}
+            onCompleteRepair={handleCompleteRepair}
+          />
         )}
 
         
         {activeTab === "schedule" && (
           <ScheduleScreen
             onOpenTask={(task) => {
-              // TaskListScreen restores this view when the Home tab mounts.
+              // TaskListScreen restores this view when the Tasks tab mounts.
               sessionStorage.setItem("selectedTask", JSON.stringify(task));
               sessionStorage.setItem("currentView", "detail");
-              setActiveTab("home");
+              setActiveTab("tasks");
             }}
           />
         )}
@@ -106,7 +115,7 @@ export default function HomePage() {
     return (
       <ForgotPasswordScreen
         onBackToLogin={() => setCurrentView("login")}
-        onSubmitSuccess={() => setCurrentView("verify-otp")}
+        onSubmitSuccess={(phone, code) => { setResetPhone(phone); setDevelopmentCode(code); setCurrentView("verify-otp"); }}
       />
     );
   }
@@ -114,8 +123,10 @@ export default function HomePage() {
   if (currentView === "verify-otp") {
     return (
       <VerifyOtpScreen
+        phone={resetPhone}
+        developmentCode={developmentCode}
         onBack={() => setCurrentView("forgot-password")}
-        onVerifySuccess={() => setCurrentView("reset-password")}
+        onVerifySuccess={(otp) => { setResetOtp(otp); setCurrentView("reset-password"); }}
       />
     );
   }
@@ -123,8 +134,11 @@ export default function HomePage() {
   if (currentView === "reset-password") {
     return (
       <ResetPasswordScreen
+        phone={resetPhone}
+        otpCode={resetOtp}
         onResetSuccess={() => {
           alert("Đặt lại mật khẩu thành công!");
+          setResetOtp(""); setResetPhone(""); setDevelopmentCode(undefined);
           setCurrentView("login");
         }}
         onBackToLogin={() => setCurrentView("login")}

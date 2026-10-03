@@ -177,6 +177,7 @@ class RepairRequestResponse(BaseModel):
     approved_estimate: Decimal = Decimal("0")
     payment_method: str | None = None
     created_at: datetime
+    payment_status: str = "UNPAID"
     created_by: str
     updated_at: datetime
     updated_by: str

@@ -44,8 +44,8 @@ export const CreateCustomerModal = ({
 
       onSuccess("Thêm khách hàng mới thành công!");
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Lỗi khi tạo tài khoản khách hàng.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Lỗi khi tạo tài khoản khách hàng.");
     } finally {
       setLoading(false);
     }

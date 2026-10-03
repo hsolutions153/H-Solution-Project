@@ -1,9 +1,15 @@
 from app.auth.utils import get_current_user
-from app.payments.schemas import MoMoPaymentResponse, QRResponse, SepayWebhookPayload, WebhookResponse
-from app.payments.service import confirm_momo_payment, create_momo_payment, fetch_qr, handle_sepay_webhook
-from fastapi import APIRouter, Depends, Header, Query
+from app.payments.schemas import MoMoPaymentResponse, MoMoWebhookPayload, QRResponse, SepayWebhookPayload, WebhookResponse
+from app.payments.service import confirm_momo_payment, create_momo_payment, fetch_qr, handle_momo_webhook, handle_sepay_webhook
+from fastapi import APIRouter, Depends, Header, Query, Response
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
+
+
+@router.post("/webhook/momo", status_code=204)
+def momo_webhook(payload: MoMoWebhookPayload):
+    handle_momo_webhook(payload)
+    return Response(status_code=204)
 
 @router.post("/webhook/sepay", response_model=WebhookResponse)
 def sepay_webhook(

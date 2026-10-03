@@ -174,7 +174,7 @@ export default function CompleteProfilePage() {
     try {
       await signOut({ redirectTo: "/login?logged_out=1" });
     } catch {
-      window.location.href = "/login?logged_out=1";
+      router.replace("/login?logged_out=1");
     }
   }
 

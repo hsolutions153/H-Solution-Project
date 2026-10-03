@@ -6,8 +6,11 @@ import {
   BatteryCharging,
   Wrench,
   RefreshCw,
+  Clock,
+  ChevronRight,
+  Siren,
 } from "lucide-react";
-import { StatusBadge } from "@h-mobility/ui";
+import { Badge, StatusBadge } from "@h-mobility/ui";
 
 interface TaskCardProps {
   task: Task;
@@ -15,73 +18,78 @@ interface TaskCardProps {
   onDetailClick?: (task: Task) => void;
 }
 
+const TASK_ICONS: Record<string, typeof Settings> = {
+  settings: Settings,
+  "battery-charging": BatteryCharging,
+  wrench: Wrench,
+  "refresh-cw": RefreshCw,
+};
+
 export const TaskCard = ({ task, onClick, onDetailClick }: TaskCardProps) => {
   const isHighlighted = task.status === "IN_PROGRESS";
-
-  // Hàm render icon linh hoạt dựa theo task.icon
-  const renderTaskIcon = (iconName?: string) => {
-    switch (iconName) {
-      case "settings":
-        return <Settings className="w-4 h-4 text-brand-900 shrink-0" />;
-      case "battery-charging":
-        return <BatteryCharging className="w-4 h-4 text-brand-900 shrink-0" />;
-      case "wrench":
-        return <Wrench className="w-4 h-4 text-brand-900 shrink-0" />;
-      case "refresh-cw":
-        return <RefreshCw className="w-4 h-4 text-brand-900 shrink-0" />;
-      default:
-        return <Settings className="w-4 h-4 text-brand-900 shrink-0" />;
-    }
-  };
+  const TaskIcon = TASK_ICONS[task.icon] ?? Settings;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`bg-surface rounded-card p-4 shadow-card border text-xs transition-shadow cursor-pointer hover:shadow-raised ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={`group rounded-card border bg-surface shadow-card transition-shadow hover:shadow-raised active:scale-[0.99] cursor-pointer ${
         isHighlighted ? "border-brand-300 ring-1 ring-brand-200" : "border-line"
       }`}
     >
-      
-      <div className="flex items-center justify-between mb-2">
-        <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700">
-          {task.code}
-        </span>
-        <StatusBadge status={task.status} label={task.statusText} />
-      </div>
-
-      
-      <h3 className="font-bold text-slate-900 text-sm mb-1">
-        {task.customerName}
-      </h3>
-
-      
-      <div className="text-slate-500 text-[11px] mb-2">
-        {task.time}
-      </div>
-
-      
-      <div className="flex items-start gap-1.5 text-slate-500 mb-3 leading-relaxed">
-        <MapPin className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
-        <span>{task.address}</span>
-      </div>
-
-      <hr className="border-slate-100 mb-3" />
-
-      
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-          {renderTaskIcon(task.icon)}
-          <span>{task.serviceName}</span>
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <span className="text-xs font-semibold tabular-nums text-slate-500">{task.code}</span>
+            {task.isEmergency ? (
+              <Badge tone="danger">
+                <Siren className="size-3" /> SOS
+              </Badge>
+            ) : null}
+          </span>
+          <StatusBadge status={task.status} label={task.statusText} className="shrink-0" />
         </div>
+
+        <h3 className="mt-2 truncate text-base font-bold text-ink">{task.customerName}</h3>
+
+        <div className="mt-2 space-y-1.5 text-[13px] text-slate-600">
+          {task.time ? (
+            <p className="flex items-center gap-2">
+              <Clock className="size-4 shrink-0 text-slate-400" />
+              <span className="tabular-nums">{task.time}</span>
+            </p>
+          ) : null}
+          <p className="flex items-start gap-2">
+            <MapPin className="mt-px size-4 shrink-0 text-slate-400" />
+            <span className="line-clamp-2 leading-snug">{task.address}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5">
+        <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-slate-700">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <TaskIcon className="size-4" />
+          </span>
+          <span className="truncate">{task.serviceName}</span>
+        </span>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDetailClick?.(task);
           }}
-          className="font-bold text-brand-800 hover:underline cursor-pointer flex items-center gap-0.5"
+          className="-mr-2 flex shrink-0 items-center gap-0.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-700 transition-colors hover:bg-brand-50 cursor-pointer"
         >
-          Chi tiết &gt;
+          Chi tiết
+          <ChevronRight className="size-4" />
         </button>
       </div>
     </div>

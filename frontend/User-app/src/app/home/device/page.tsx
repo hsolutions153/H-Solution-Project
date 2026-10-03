@@ -1,13 +1,13 @@
 "use client";
 
+import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
+import { HomeShell } from "@/components/home/home-shell";
+import type { Device } from "@/types/device";
+import { Bike,LoaderCircle,Plus,Star,Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { Bike, LoaderCircle, Plus, Star, Trash2 } from "lucide-react";
-import { HomeShell } from "@/components/home/home-shell";
-import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
-import type { Device } from "@/types/device";
+import { useCallback,useEffect,useState } from "react";
 
 export default function DevicesPage() {
   const router = useRouter();
@@ -23,7 +23,6 @@ export default function DevicesPage() {
       if (Array.isArray(list)) {
         const formatted: Device[] = list.map((item) => {
           const hasCustomNotes = item.notes && !item.notes.includes(":") && item.notes.length < 50;
-          const brand = item.manufacturer && item.manufacturer !== "Generic" ? item.manufacturer : "";
           const modelName = item.model_name || item.model || "";
 
           // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
@@ -106,13 +105,12 @@ export default function DevicesPage() {
   };
 
   return (
-    <HomeShell activeNav="device" title="Quản lý xe" mainClassName="device-page-content">
+    <HomeShell activeNav="device" mainClassName="device-page-content">
       <div className="device-list-page">
         <div className="device-heading-row">
           <div>
-            <p className="device-eyebrow">H-Mobility Care · Phương tiện kết nối</p>
             <h1>Xe của tôi</h1>
-            <p className="device-intro">Quản lý các dòng xe máy điện và gói dịch vụ chăm sóc H-Mobility Care.</p>
+            <p className="device-intro">Xe đã đăng ký để đặt lịch sửa chữa và gọi cứu hộ.</p>
           </div>
           <span className="device-count">{devices.length} phương tiện</span>
         </div>
@@ -158,7 +156,6 @@ export default function DevicesPage() {
                         )}
                       </div>
                     </div>
-                    <span className="device-status"><i /> Sẵn sàng</span>
                   </div>
                   <div className="device-card-actions">
                     <Link href={`/home/device/${device.id}`} className="device-primary-button">Chi tiết & Quản lý</Link>

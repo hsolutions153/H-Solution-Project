@@ -1,7 +1,9 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Phone, Mail, Award, CheckCircle2, Star, ShieldCheck, Wrench, ToggleLeft, ToggleRight, Camera, LoaderCircle } from "lucide-react";
+import { Phone, Mail, Award, CheckCircle2, Star, ShieldCheck, Wrench, Camera, LoaderCircle, UserRound } from "lucide-react";
+import { Badge, Button, Card, EmptyState } from "@h-mobility/ui";
+import { InfoRow, SkeletonList } from "@/components/ui";
 import { uploadTechnicianAvatar } from "@/lib/avatar";
 
 export function TechnicianProfileScreen() {
@@ -66,153 +68,166 @@ export function TechnicianProfileScreen() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-xs text-slate-500 font-medium pt-12">
-        Đang tải thông tin kỹ thuật viên...
+      <div className="space-y-3 px-4 pt-4" aria-busy="true" aria-label="Đang tải hồ sơ">
+        <SkeletonList count={1} className="h-56" />
+        <div className="grid grid-cols-2 gap-3">
+          <SkeletonList count={1} className="h-20" />
+          <SkeletonList count={1} className="h-20" />
+        </div>
+        <SkeletonList count={1} className="h-64" />
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="p-6 text-center text-xs text-rose-500 font-medium pt-12">
-        Không thể tải hồ sơ kỹ thuật viên.
+      <div className="px-4 pt-4">
+        <EmptyState
+          icon={<UserRound />}
+          title="Không tải được hồ sơ"
+          description="Kiểm tra kết nối mạng rồi thử lại."
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setLoading(true);
+                fetchProfile();
+              }}
+            >
+              Thử lại
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   const user = profile.user || {};
+  const rating = Number(profile.rating_avg || 5);
+  const kycApproved = profile.kyc_status === "APPROVED";
 
   return (
-    <div className="p-4 space-y-4 max-w-sm mx-auto">
-      
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-center relative overflow-hidden">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="relative mx-auto mb-3 block size-20 rounded-full cursor-pointer disabled:cursor-wait"
-          aria-label="Đổi ảnh đại diện"
-        >
-          <span className="flex size-full items-center justify-center overflow-hidden rounded-full bg-brand-600 text-white text-2xl font-bold shadow-md ring-4 ring-brand-50">
-            {user.avatar_url ? (
-              <img src={user.avatar_url} alt="" className="size-full object-cover" />
-            ) : (
-              (user.full_name || "K").charAt(0).toUpperCase()
-            )}
-          </span>
-          {isUploading ? (
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-950/45 text-white">
-              <LoaderCircle className="size-6 animate-spin" />
-            </span>
-          ) : null}
-          <span className="absolute -bottom-0.5 -right-0.5 flex size-7 items-center justify-center rounded-full border-2 border-white bg-brand-600 text-white shadow-sm">
-            <Camera className="size-3.5" />
-          </span>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={handleAvatarChange}
-        />
-        <h2 className="text-base font-bold text-slate-900">{user.full_name || "Kỹ thuật viên"}</h2>
-        <p className="text-xs text-slate-500 mt-0.5">{profile.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}</p>
-        {avatarMessage ? (
-          <p
-            role="status"
-            className={`mt-2 text-xs font-medium ${avatarMessage.type === "success" ? "text-emerald-700" : "text-rose-700"}`}
-          >
-            {avatarMessage.text}
-          </p>
-        ) : null}
-
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-600">Trạng thái làm việc:</span>
+    <div className="space-y-4 px-4 pt-4 pb-8">
+      <Card padded={false} className="overflow-hidden">
+        <div className="flex flex-col items-center px-5 pt-6 pb-5 text-center">
           <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="relative block size-24 rounded-full cursor-pointer disabled:cursor-wait"
+            aria-label="Đổi ảnh đại diện"
+          >
+            <span className="flex size-full items-center justify-center overflow-hidden rounded-full bg-brand-600 text-3xl font-bold text-white ring-4 ring-brand-50">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="size-full object-cover" />
+              ) : (
+                (user.full_name || "K").charAt(0).toUpperCase()
+              )}
+            </span>
+            {isUploading ? (
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-950/45 text-white">
+                <LoaderCircle className="size-6 animate-spin" />
+              </span>
+            ) : null}
+            <span className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full border-2 border-white bg-brand-600 text-white">
+              <Camera className="size-4" />
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+          <h2 className="mt-4 text-lg font-bold text-ink">{user.full_name || "Kỹ thuật viên"}</h2>
+          <p className="mt-0.5 text-sm text-slate-600">{profile.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}</p>
+          {avatarMessage ? (
+            <p
+              role="status"
+              className={`mt-2 text-xs font-medium ${avatarMessage.type === "success" ? "text-emerald-700" : "text-rose-700"}`}
+            >
+              {avatarMessage.text}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-3.5">
+          <div>
+            <p id="presence-label" className="text-sm font-semibold text-ink">Nhận việc mới</p>
+            <p className={`text-xs ${profile.is_online ? "text-emerald-700" : "text-slate-500"}`}>
+              {profile.is_online ? "Đang hoạt động" : "Ngoại tuyến"}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(profile.is_online)}
+            aria-labelledby="presence-label"
             onClick={handleToggleOnline}
             disabled={isToggling}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-              profile.is_online
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-slate-100 text-slate-600 border border-slate-200"
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait ${
+              profile.is_online ? "bg-emerald-600" : "bg-slate-300"
             }`}
           >
-            {profile.is_online ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4 text-slate-400" />}
-            {profile.is_online ? "Đang Online" : "Ngoại tuyến"}
+            <span
+              className={`absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow-card transition-transform ${
+                profile.is_online ? "translate-x-5" : ""
+              }`}
+            />
           </button>
         </div>
-      </div>
+      </Card>
 
-      
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-          </div>
+        <Card className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-amber-50">
+            <Star className="size-5 fill-amber-400 text-amber-400" />
+          </span>
           <div>
-            <span className="text-[10px] text-slate-400 font-semibold block">ĐÁNH GIÁ</span>
-            <span className="text-sm font-bold text-slate-900">{profile.rating_avg || 5.0} / 5.0</span>
+            <p className="text-xs text-slate-500">Đánh giá</p>
+            <p className="text-base font-bold tabular-nums text-ink">
+              {rating.toFixed(1)}
+              <span className="text-xs font-medium text-slate-500"> / 5</span>
+            </p>
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
+        </Card>
+        <Card className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-600">
+            <CheckCircle2 className="size-5" />
+          </span>
           <div>
-            <span className="text-[10px] text-slate-400 font-semibold block">ĐÃ HOÀN THÀNH</span>
-            <span className="text-sm font-bold text-slate-900">{profile.total_jobs_done || 0} ca</span>
+            <p className="text-xs text-slate-500">Đã hoàn thành</p>
+            <p className="text-base font-bold tabular-nums text-ink">
+              {profile.total_jobs_done || 0}
+              <span className="text-xs font-medium text-slate-500"> ca</span>
+            </p>
           </div>
-        </div>
+        </Card>
       </div>
 
-      
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3.5">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thông tin chi tiết</h3>
-
-        <div className="flex items-center gap-3">
-          <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="text-xs">
-            <span className="text-slate-400 block text-[10px]">Số điện thoại</span>
-            <span className="font-semibold text-slate-800">{user.phone || "Chưa cập nhật"}</span>
-          </div>
+      <Card className="py-1">
+        <h3 className="pt-3 text-sm font-semibold text-ink">Thông tin chi tiết</h3>
+        <div className="divide-y divide-line">
+          <InfoRow icon={<Phone />} label="Số điện thoại">
+            <span className="tabular-nums">{user.phone || "Chưa cập nhật"}</span>
+          </InfoRow>
+          <InfoRow icon={<Mail />} label="Email">
+            <span className="break-all">{user.email || "Chưa cập nhật"}</span>
+          </InfoRow>
+          <InfoRow icon={<Wrench />} label="Kỹ năng chuyên môn">
+            {profile.skills || "Sửa chữa xe lăn & Scooter"}
+          </InfoRow>
+          <InfoRow icon={<Award />} label="Kinh nghiệm">
+            {profile.experience_years || 0} năm
+          </InfoRow>
+          <InfoRow icon={<ShieldCheck />} label="Xác thực danh tính (KYC)">
+            <Badge tone={kycApproved ? "success" : "warning"} className="mt-0.5">
+              {kycApproved ? "Đã xác thực" : profile.kyc_status || "Chưa xác thực"}
+            </Badge>
+          </InfoRow>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="text-xs">
-            <span className="text-slate-400 block text-[10px]">Email</span>
-            <span className="font-semibold text-slate-800">{user.email || "Chưa cập nhật"}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Wrench className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="text-xs">
-            <span className="text-slate-400 block text-[10px]">Kỹ năng chuyên môn</span>
-            <span className="font-semibold text-slate-800">{profile.skills || "Sửa chữa xe lăn & Scooter"}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Award className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="text-xs">
-            <span className="text-slate-400 block text-[10px]">Kinh nghiệm</span>
-            <span className="font-semibold text-slate-800">{profile.experience_years || 0} năm</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
-          <div className="text-xs">
-            <span className="text-slate-400 block text-[10px]">Trạng thái KYC</span>
-            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {profile.kyc_status === "APPROVED" ? "ĐÃ XÁC THỰC KYC" : profile.kyc_status}
-            </span>
-          </div>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

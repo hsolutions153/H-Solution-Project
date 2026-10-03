@@ -3,21 +3,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
+import { Badge, Button, Card, Field, cn, inputClasses } from "@h-mobility/ui";
+import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses, selectClasses, textareaClasses } from "@/components/ui";
 import {
-  ArrowLeft,
   Play,
   Pause,
   Check,
   Plus,
-  Minus,
   Camera,
+  ChevronDown,
   Settings,
   FileText,
-  Info,
   Clock,
   MapPin,
   Trash2,
-  Loader2,
+  X,
   AlertTriangle,
   Send,
   FilePlus,
@@ -41,6 +41,43 @@ function generateHistoryId(): string {
   return `hist-${Date.now()}-${repairPartCounter++}`;
 }
 
+interface RepairTimerState {
+  isStarted: boolean;
+  isPaused: boolean;
+  seconds: number;
+}
+
+const timerKey = (taskId: string) => `repairTimer:${taskId}`;
+const noteKey = (taskId: string) => `repairNote:${taskId}`;
+
+/**
+ * Restores the repair timer when the technician comes back to this screen,
+ * e.g. after a supplementary quote was approved or rejected. A running timer
+ * also counts the time the screen was closed.
+ */
+function readRepairTimer(task?: Task): RepairTimerState {
+  if (task?.id) {
+    try {
+      const raw = sessionStorage.getItem(timerKey(task.id));
+      if (raw) {
+        const saved = JSON.parse(raw) as RepairTimerState & { savedAt: number };
+        const away = saved.isStarted && !saved.isPaused ? Math.floor((Date.now() - saved.savedAt) / 1000) : 0;
+        return { isStarted: saved.isStarted, isPaused: saved.isPaused, seconds: saved.seconds + Math.max(0, away) };
+      }
+    } catch {}
+  }
+  // Repair already started on the server but no local timer (other device, cleared storage): resume paused.
+  if (task?.repairStartedAt) return { isStarted: true, isPaused: true, seconds: 0 };
+  return { isStarted: false, isPaused: false, seconds: 0 };
+}
+
+function saveRepairTimer(taskId: string | undefined, timer: RepairTimerState) {
+  if (!taskId) return;
+  try {
+    sessionStorage.setItem(timerKey(taskId), JSON.stringify({ ...timer, savedAt: Date.now() }));
+  } catch {}
+}
+
 interface RepairScreenProps {
   task?: Task;
   onBack: () => void;
@@ -54,16 +91,23 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   onComplete,
   onSupplementaryQuoteCreated,
 }) => {
-  const [isStarted, setIsStarted] = useState<boolean>(false);
-  const [seconds, setSeconds] = useState<number>(0);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [initialTimer] = useState(() => readRepairTimer(task));
+  const [isStarted, setIsStarted] = useState<boolean>(initialTimer.isStarted);
+  const [seconds, setSeconds] = useState<number>(initialTimer.seconds);
+  const [isPaused, setIsPaused] = useState<boolean>(initialTimer.isPaused);
 
   const [components, setComponents] = useState<ComponentItem[]>([]);
 
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [note, setNote] = useState<string>("");
+  const [note, setNote] = useState<string>(() => {
+    try {
+      return (task?.id && sessionStorage.getItem(noteKey(task.id))) || "";
+    } catch {
+      return "";
+    }
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -97,6 +141,17 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     { name: "Chổi than & cổ góp động cơ", price: 180000 },
     { name: "Dây nguồn & Cáp sạc pin", price: 150000 },
   ];
+
+  useEffect(() => {
+    saveRepairTimer(task?.id, { isStarted, isPaused, seconds });
+  }, [task?.id, isStarted, isPaused, seconds]);
+
+  useEffect(() => {
+    if (!task?.id) return;
+    try {
+      sessionStorage.setItem(noteKey(task.id), note);
+    } catch {}
+  }, [task?.id, note]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -317,6 +372,10 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
       setIsSupplementaryModalOpen(false);
       setValidationWarning(null);
+      if (isStarted) {
+        setIsPaused(true);
+        saveRepairTimer(task.id, { isStarted, isPaused: true, seconds });
+      }
 
       if (onSupplementaryQuoteCreated) {
         onSupplementaryQuoteCreated();
@@ -461,508 +520,411 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       totalAmount: Number(lastResponse?.total_amount ?? finalCost),
     };
 
+    if (task?.id) {
+      try {
+        sessionStorage.removeItem(timerKey(task.id));
+        sessionStorage.removeItem(noteKey(task.id));
+      } catch {}
+    }
+
     if (onComplete) {
       onComplete(completedData);
     }
   };
 
+  const vnd = (n: number) => `${n.toLocaleString("vi-VN")} đ`;
+  const timerTone = !isStarted ? "neutral" : isPaused ? "warning" : "success";
+  const timerLabel = !isStarted ? "Chưa bắt đầu" : isPaused ? "Tạm dừng" : "Đang tính giờ";
+
   return (
-    <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-10 flex flex-col justify-between border-x border-slate-100 font-sans">
-      <div className="p-4 space-y-4">
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h1 className="text-base font-bold text-slate-800">
-              Sửa chữa & Báo giá
-            </h1>
-            <p className="text-xs text-slate-500">Mã đơn: {task?.code}</p>
-          </div>
+    <div className="space-y-5 px-4 pt-4">
+      <ScreenHeader title="Sửa chữa" subtitle={`Mã đơn ${task?.code ?? ""}`} onBack={onBack} />
+
+      <Card className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Badge tone={task?.isEmergency ? "danger" : "brand"}>
+            {task?.isEmergency ? "Cứu hộ khẩn cấp" : "Đơn đặt lịch hẹn"}
+          </Badge>
+          <span className="text-xs text-slate-500 tabular-nums">{task?.bookingDate || "Hôm nay"}</span>
         </div>
+        <p className="pt-1 text-sm font-bold text-ink">
+          {task?.customerName}
+          {task?.customerPhone ? <span className="font-medium text-slate-500 tabular-nums"> · {task.customerPhone}</span> : null}
+        </p>
+        <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+          {task?.address}
+        </p>
+      </Card>
 
-        
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md">
-              {task?.isEmergency ? "Cứu hộ khẩn cấp" : "Đơn đặt lịch hẹn"}
-            </span>
-            <span className="text-xs text-slate-400 font-medium">
-              {task?.bookingDate || "Hôm nay"}
-            </span>
-          </div>
-          <p className="text-xs font-bold text-slate-800">{task?.customerName} • {task?.customerPhone}</p>
-          <p className="text-[11px] text-slate-500 flex items-start gap-1">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-            {task?.address}
-          </p>
-        </div>
-
-        
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center space-y-3">
-          <div className="flex items-center justify-center gap-2 text-[#12537d]">
-            <Clock className="w-6 h-6" />
-            <span className="text-3xl font-bold font-mono tracking-wider">
-              {formatTime(seconds)}
-            </span>
-          </div>
-
-          <p className="text-xs text-slate-500">
-            {isStarted
-              ? isPaused
-                ? "Thời gian sửa chữa đang tạm dừng"
-                : "Đang ghi nhận thời gian sửa chữa thực tế"
-              : "Bấm nút bên dưới để bắt đầu tính thời gian sửa chữa"}
-          </p>
-
-          <span
-            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
-              !isStarted
-                ? "bg-slate-100 text-slate-500"
-                : isPaused
-                ? "bg-amber-50 text-amber-600"
-                : "bg-emerald-50 text-emerald-600"
-            }`}
-          >
-            {!isStarted
-              ? "Chưa bắt đầu"
-              : isPaused
-              ? "Đang tạm dừng"
-              : "Đang tính giờ"}
+      <Card className="text-center">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            <Clock className="size-4 text-brand-600" /> Thời gian sửa chữa
           </span>
-
-          {(!isStarted || isPaused) && (
-            <button
-              onClick={handleToggleTimer}
-              className="w-full py-2.5 bg-[#12537d] hover:bg-brand-900 text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              {!isStarted ? "Bắt đầu sửa chữa" : "Tiếp tục tính giờ"}
-            </button>
-          )}
+          <Badge tone={timerTone}>{timerLabel}</Badge>
         </div>
+        <p className="mt-3 text-4xl font-bold tracking-tight text-ink tabular-nums">{formatTime(seconds)}</p>
+        <p className="mt-1.5 text-[13px] text-slate-500">
+          {isStarted
+            ? isPaused
+              ? "Thời gian đang tạm dừng"
+              : "Đang ghi nhận thời gian thực tế"
+            : "Bấm bắt đầu khi bạn bắt tay vào sửa"}
+        </p>
+        {(!isStarted || isPaused) && (
+          <Button size="lg" fullWidth className="mt-4" icon={<Play className="size-4 fill-current" />} onClick={handleToggleTimer}>
+            {!isStarted ? "Bắt đầu sửa chữa" : "Tiếp tục tính giờ"}
+          </Button>
+        )}
+      </Card>
 
-        
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-              <Settings className="w-4 h-4 text-slate-500" /> Linh kiện & Vật tư thay thế
-            </div>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="text-xs font-bold text-brand-700 hover:text-brand-900 flex items-center gap-1 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> Thêm linh kiện
-            </button>
-          </div>
+      <section className="space-y-2.5">
+        <SectionTitle
+          icon={<Settings />}
+          action={
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setIsAddModalOpen(true)}>
+              Thêm mục
+            </Button>
+          }
+        >
+          Linh kiện & tiền công
+        </SectionTitle>
 
-          {components.length === 0 ? (
-            <div className="p-3 bg-white rounded-xl border border-dashed border-slate-200 text-center">
-              <p className="text-xs text-slate-400">Chưa có linh kiện nào (Chỉ tính tiền công)</p>
+        <Card padded={false} className="divide-y divide-line">
+          {isLoadingQuotes ? (
+            <div className="p-3.5">
+              <SkeletonList count={2} className="h-12" />
             </div>
+          ) : components.length === 0 ? (
+            <p className="p-3.5 text-center text-[13px] text-slate-500">Chưa có linh kiện nào, chỉ tính tiền công.</p>
           ) : (
             components.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-bold text-xs text-slate-800">{item.name}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Đơn giá: {item.price.toLocaleString("vi-VN")} đ
-                  </p>
+              <div key={item.id} className="flex items-center gap-3 p-3.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{item.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500 tabular-nums">{vnd(item.price)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg p-1 bg-slate-50">
-                    <button
-                      onClick={() => handleQuantityChange(item.id, -1)}
-                      className="w-5 h-5 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100 cursor-pointer"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-bold w-4 text-center">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => handleQuantityChange(item.id, 1)}
-                      className="w-5 h-5 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => handleRemovePart(item.id)}
-                    className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
-                    title="Xóa linh kiện"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <QtyStepper value={item.quantity} onChange={(delta) => handleQuantityChange(item.id, delta)} />
+                <button
+                  type="button"
+                  onClick={() => handleRemovePart(item.id)}
+                  className="-mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                  aria-label={`Xóa ${item.name}`}
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </div>
             ))
           )}
 
-          
-          <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="font-bold text-xs text-slate-800">Tiền công kỹ thuật viên</p>
-              <p className="text-[10px] text-slate-400">Kiểm tra & lắp ráp tại chỗ</p>
+          <div className="flex items-center justify-between gap-3 p-3.5">
+            <div className="min-w-0">
+              <label htmlFor="repair-labor" className="block text-sm font-semibold text-ink">
+                Tiền công kỹ thuật viên
+              </label>
+              <p className="text-xs text-slate-500">Kiểm tra & lắp ráp tại chỗ</p>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="relative w-36 shrink-0">
               <input
+                id="repair-labor"
                 type="number"
+                inputMode="numeric"
                 step={50000}
                 value={customLaborCost}
                 onChange={(e) => { setFinalCostOverride(null); setCustomLaborCost(Math.max(0, Number(e.target.value))); }}
-                className="w-24 p-1.5 text-right bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className={cn(inputClasses, "pr-8 text-right font-bold tabular-nums")}
               />
-              <span className="text-xs font-medium text-slate-500">đ</span>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">đ</span>
             </div>
+          </div>
+        </Card>
+      </section>
+
+      <section className="space-y-2.5">
+        <SectionTitle icon={<Camera />} action={<span className="text-xs text-slate-500">Sau khi sửa</span>}>
+          Ảnh nghiệm thu
+        </SectionTitle>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+        <div className="grid grid-cols-3 gap-2">
+          {images.map((img, idx) => (
+            <div key={idx} className="relative aspect-square overflow-hidden rounded-control border border-line bg-slate-100">
+              <img
+                src={img}
+                alt={`Ảnh sau sửa ${idx + 1}`}
+                className="size-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage(idx)}
+                aria-label={`Xóa ảnh ${idx + 1}`}
+                className="absolute top-1 right-1 flex size-7 items-center justify-center rounded-full bg-brand-950/70 text-white transition-colors hover:bg-brand-950 cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed border-slate-300 bg-white text-slate-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 cursor-pointer"
+          >
+            <Camera className="size-5" />
+            <span className="text-xs font-semibold">Chụp ảnh</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-2.5">
+        <SectionTitle icon={<FileText />}>
+          <label htmlFor="repair-note">Báo cáo sửa chữa</label>
+        </SectionTitle>
+        <textarea
+          id="repair-note"
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Những gì đã làm và tình trạng thiết bị sau sửa"
+          className={textareaClasses}
+        />
+      </section>
+
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Báo giá đã duyệt</p>
+            <p className="text-xs text-slate-500">Hạn mức khách hàng đã đồng ý</p>
+          </div>
+          <span className="text-base font-bold tabular-nums text-ink">
+            {hasApprovedQuote ? vnd(approvedEstimate) : "Chưa có"}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+          <div>
+            <label htmlFor="repair-final-cost" className="block text-sm font-semibold text-ink">
+              Chi phí thực tế
+            </label>
+            <p className="text-xs text-slate-500 tabular-nums">
+              {components.length} linh kiện ({vnd(partsCost)}) + công ({vnd(laborCost)})
+            </p>
+          </div>
+          <div className="relative w-40 shrink-0">
+            <input
+              id="repair-final-cost"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1000}
+              value={finalCost}
+              disabled={isLoadingQuotes}
+              onChange={(event) => setFinalCostOverride(Math.max(0, Number(event.target.value)))}
+              className={cn(
+                inputClasses,
+                "pr-8 text-right text-base font-bold tabular-nums",
+                additionalAmount > 0 ? "border-amber-300 text-amber-800" : "text-ink"
+              )}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">đ</span>
           </div>
         </div>
 
-        
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3 shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-sm text-slate-800">Thêm linh kiện / Vật tư</h3>
-                <button
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer"
-                >
-                  &times;
-                </button>
-              </div>
+        {isLoadingQuotes && <p role="status" className="text-xs text-slate-500">Đang tải báo giá đã duyệt...</p>}
+        {quoteLoadError && <p role="alert" className="text-xs font-medium text-rose-700">{quoteLoadError}</p>}
+        {hasPendingQuote && (
+          <p role="status" className="flex items-start gap-2 rounded-control bg-amber-50 px-3 py-2.5 text-[13px] text-amber-900">
+            <Clock className="mt-0.5 size-4 shrink-0" />
+            Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất.
+          </p>
+        )}
 
-              
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Linh kiện có sẵn:</p>
-                <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                  {PRESET_PARTS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleAddPart(preset.name, preset.price)}
-                      className="w-full text-left p-2 rounded-xl bg-slate-50 hover:bg-brand-50 border border-slate-100 flex items-center justify-between text-xs cursor-pointer transition-colors"
-                    >
-                      <span className="font-medium text-slate-700">{preset.name}</span>
-                      <span className="font-bold text-brand-800">{preset.price.toLocaleString("vi-VN")} đ</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              
-              <div className="border-t border-slate-100 pt-2 space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Hoặc nhập linh kiện khác:</p>
-                <label htmlFor="additional-item-type" className="text-xs text-slate-600">Loại hạng mục</label>
-                <select id="additional-item-type" value={newPartType} onChange={(event) => setNewPartType(event.target.value as "SPARE_PART" | "SERVICE")} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                  <option value="SPARE_PART">Linh kiện / vật tư</option>
-                  <option value="SERVICE">Công việc / dịch vụ</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Tên linh kiện..."
-                  value={newPartName}
-                  onChange={(e) => setNewPartName(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
-                <input
-                  type="number"
-                  placeholder="Đơn giá (VNĐ)"
-                  value={newPartPrice}
-                  onChange={(e) => setNewPartPrice(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
-                <button
-                  onClick={() => handleAddPart(newPartName, Math.max(0, Number(newPartPrice) || 0), newPartType)}
-                  disabled={!newPartName.trim()}
-                  className="w-full py-2 bg-[#12537d] disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Xác nhận thêm
-                </button>
-              </div>
-            </div>
+        {hasApprovedQuote && additionalAmount > 0 && !hasPendingQuote && (
+          <div className="space-y-3 rounded-control border border-amber-200 bg-amber-50 p-3.5">
+            <p className="flex items-start gap-2 text-[13px] leading-relaxed text-amber-900">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+              <span>
+                Vượt báo giá đã duyệt <strong className="font-bold tabular-nums">+{vnd(additionalAmount)}</strong>. Cần gửi
+                báo giá bổ sung để khách hàng duyệt trước khi hoàn tất.
+              </span>
+            </p>
+            <Button fullWidth icon={<FilePlus className="size-4" />} onClick={() => setIsSupplementaryModalOpen(true)}>
+              Tạo báo giá bổ sung
+            </Button>
           </div>
         )}
 
-        
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <Camera className="w-4 h-4 text-slate-500" /> Chụp ảnh sau khi sửa
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              className="hidden"
-            />
+        {hasApprovedQuote && additionalAmount === 0 && !hasPendingQuote && (
+          <Button variant="secondary" fullWidth icon={<FilePlus className="size-4" />} onClick={() => setIsAddModalOpen(true)}>
+            Thêm hạng mục phát sinh
+          </Button>
+        )}
+      </Card>
+
+      <ActionBar className="grid grid-cols-[1fr_2fr] gap-2.5">
+        <Button
+          size="lg"
+          variant="secondary"
+          icon={!isStarted || isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+          onClick={handleToggleTimer}
+        >
+          {!isStarted || isPaused ? "Tiếp tục" : "Tạm dừng"}
+        </Button>
+        <Button
+          size="lg"
+          onClick={handleFinishRepair}
+          loading={isUploading}
+          disabled={isLoadingQuotes || Boolean(quoteLoadError) || hasPendingQuote || !hasApprovedQuote}
+          icon={<Check className="size-5" />}
+        >
+          {isUploading ? "Đang hoàn tất..." : "Hoàn tất sửa chữa"}
+        </Button>
+      </ActionBar>
+
+      <Modal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} variant="sheet" title="Thêm linh kiện / vật tư">
+        <p className="mb-2 text-xs font-medium text-slate-500">Linh kiện có sẵn</p>
+        <div className="-mx-1 max-h-56 space-y-1 overflow-y-auto px-1">
+          {PRESET_PARTS.map((preset, idx) => (
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="h-24 border border-dashed border-slate-300 bg-white rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 cursor-pointer transition-colors"
+              key={idx}
+              type="button"
+              onClick={() => handleAddPart(preset.name, preset.price)}
+              className="flex w-full items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-left transition-colors hover:border-brand-300 hover:bg-brand-50 cursor-pointer"
             >
-              <Camera className="w-5 h-5 mb-1 text-slate-400" />
-              <span className="text-[11px] font-medium">Chụp ảnh</span>
+              <span className="text-sm font-medium text-ink">{preset.name}</span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-brand-700">{vnd(preset.price)}</span>
             </button>
-            {images.map((img, idx) => (
-              <div
-                key={idx}
-                className="h-24 rounded-2xl overflow-hidden border border-slate-200 relative bg-slate-100 group"
-              >
-                <img
-                  src={img}
-                  alt="Sau khi sửa"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/images/s1.jpg";
-                  }}
-                />
-                <button
-                  onClick={() => handleRemoveImage(idx)}
-                  className="absolute top-1.5 right-1.5 p-1 bg-black/50 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
 
-        
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <FileText className="w-4 h-4 text-slate-500" /> Báo cáo nội dung sửa chữa thực tế
+        <div className="mt-5 space-y-3 border-t border-line pt-4">
+          <p className="text-xs font-medium text-slate-500">Hoặc nhập hạng mục khác</p>
+          <div className="space-y-1.5">
+            <label htmlFor="additional-item-type" className={labelClasses}>Loại hạng mục</label>
+            <div className="relative">
+              <select
+                id="additional-item-type"
+                value={newPartType}
+                onChange={(event) => setNewPartType(event.target.value as "SPARE_PART" | "SERVICE")}
+                className={selectClasses}
+              >
+                <option value="SPARE_PART">Linh kiện / vật tư</option>
+                <option value="SERVICE">Công việc / dịch vụ</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            </div>
           </div>
+          <Field
+            label="Tên hạng mục"
+            type="text"
+            placeholder="Ví dụ: Ắc quy 12V"
+            value={newPartName}
+            onChange={(e) => setNewPartName(e.target.value)}
+          />
+          <Field
+            label="Đơn giá (đ)"
+            type="number"
+            inputMode="numeric"
+            value={newPartPrice}
+            onChange={(e) => setNewPartPrice(e.target.value)}
+          />
+          <Button
+            size="lg"
+            fullWidth
+            icon={<Plus className="size-5" />}
+            onClick={() => handleAddPart(newPartName, Math.max(0, Number(newPartPrice) || 0), newPartType)}
+            disabled={!newPartName.trim()}
+          >
+            Thêm hạng mục
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(validationWarning)} onClose={() => setValidationWarning(null)} hideClose>
+        <div className="text-center">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+            <AlertTriangle className="size-6" />
+          </span>
+          <h3 className="mt-4 text-base font-bold text-ink">Chưa thể hoàn tất đơn</h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{validationWarning}</p>
+        </div>
+        <div className="mt-5 space-y-2.5">
+          {additionalAmount > 0 && hasApprovedQuote && !hasPendingQuote && (
+            <Button
+              fullWidth
+              size="lg"
+              icon={<FilePlus className="size-4" />}
+              onClick={() => {
+                setValidationWarning(null);
+                setIsSupplementaryModalOpen(true);
+              }}
+            >
+              Tạo báo giá bổ sung
+            </Button>
+          )}
+          <Button fullWidth size="lg" variant="secondary" onClick={() => setValidationWarning(null)}>
+            Quay lại điều chỉnh
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={isSupplementaryModalOpen}
+        onClose={() => setIsSupplementaryModalOpen(false)}
+        variant="sheet"
+        title="Báo giá bổ sung"
+      >
+        <dl className="space-y-2 rounded-control bg-slate-100 p-3.5 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-slate-600">Báo giá đã duyệt</dt>
+            <dd className="font-semibold tabular-nums text-ink">{vnd(approvedEstimate)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-slate-600">Chi phí sau phát sinh</dt>
+            <dd className="font-semibold tabular-nums text-ink">{vnd(finalCost)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-slate-200 pt-2">
+            <dt className="font-semibold text-ink">Số tiền phát sinh</dt>
+            <dd className="font-bold tabular-nums text-amber-800">+{vnd(additionalAmount)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 space-y-1.5">
+          <label htmlFor="supplementary-note" className={labelClasses}>Lý do phát sinh</label>
           <textarea
+            id="supplementary-note"
             rows={3}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ghi chú về việc sửa chữa và tình trạng thiết bị..."
-            className="w-full p-3 bg-white border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder:text-slate-400"
+            value={supplementaryNote}
+            onChange={(e) => setSupplementaryNote(e.target.value)}
+            placeholder="Mô tả lý do phát sinh thêm linh kiện hoặc công việc"
+            className={textareaClasses}
           />
         </div>
 
-        
-        {/* Khối Tổng chi phí & Báo giá đã duyệt */}
-        <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-3 shadow-xs">
-          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <div>
-              <span className="text-xs font-bold text-slate-800 block">
-                Tổng báo giá đã duyệt
-              </span>
-              <span className="text-[10px] text-slate-400">
-                Hạn mức tối đa được khách hàng phê duyệt
-              </span>
-            </div>
-            <span className="text-sm font-bold text-slate-700">
-              {hasApprovedQuote ? `${approvedEstimate.toLocaleString("vi-VN")} đ` : "Chưa có"}
-            </span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <label htmlFor="repair-final-cost" className="text-xs font-bold text-slate-900">Chi phí thực tế (Final Cost)</label>
-            <input id="repair-final-cost" type="number" min={0} step={1000} value={finalCost} disabled={isLoadingQuotes} onChange={(event) => setFinalCostOverride(Math.max(0, Number(event.target.value)))} className={`w-36 p-2 text-right border border-slate-200 rounded-lg text-sm font-bold ${additionalAmount > 0 ? "text-amber-700" : "text-brand-900"}`} />
-          </div>
-
-          {isLoadingQuotes && <p role="status" className="text-xs text-slate-500">Đang tải báo giá đã duyệt...</p>}
-          {quoteLoadError && <p role="alert" className="text-xs text-rose-700">{quoteLoadError}</p>}
-          {hasPendingQuote && <p role="status" className="text-xs text-amber-800">Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất.</p>}
-
-          <div className="flex items-start gap-1.5 text-[10px] text-slate-500 leading-snug">
-            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-            <span>
-              Gồm {components.length} linh kiện ({partsCost.toLocaleString("vi-VN")} đ) + tiền công ({laborCost.toLocaleString("vi-VN")} đ).
-            </span>
-          </div>
-
-          {/* Cảnh báo nếu chi phí thực tế vượt Báo giá đã duyệt */}
-          {hasApprovedQuote && additionalAmount > 0 && !hasPendingQuote && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="text-[11px] text-amber-900 leading-tight">
-                  <span className="font-bold">Chi phí vượt báo giá đã duyệt: </span>
-                  <span className="font-extrabold text-rose-600">+{additionalAmount.toLocaleString("vi-VN")} đ</span>.
-                  <p className="mt-1 text-slate-600">
-                    Cần gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSupplementaryModalOpen(true)}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <FilePlus className="w-3.5 h-3.5" /> Tạo báo giá bổ sung (+{additionalAmount.toLocaleString("vi-VN")} đ)
-              </button>
-            </div>
-          )}
-
-          {/* Nút Tạo chi phí phát sinh nếu technician muốn chủ động tạo thêm */}
-          {hasApprovedQuote && additionalAmount === 0 && !hasPendingQuote && (
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="w-full py-2 bg-slate-50 hover:bg-brand-50 text-brand-800 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <FilePlus className="w-3.5 h-3.5" /> Thêm linh kiện / công việc phát sinh
-            </button>
-          )}
-        </div>
-
-        <div className="flex gap-2.5 pt-2">
-          <button
-            onClick={handleToggleTimer}
-            className="w-1/3 py-3 border border-slate-300 bg-white hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+        <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">
+          <Button size="lg" variant="secondary" onClick={() => setIsSupplementaryModalOpen(false)}>
+            Hủy
+          </Button>
+          <Button
+            size="lg"
+            loading={isSubmittingSupplementary}
+            disabled={additionalAmount <= 0 || hasPendingQuote || !hasApprovedQuote}
+            onClick={handleCreateSupplementaryQuote}
+            icon={<Send className="size-4" />}
           >
-            {!isStarted || isPaused ? (
-              <>
-                <Play className="w-4 h-4" /> Tiếp tục
-              </>
-            ) : (
-              <>
-                <Pause className="w-4 h-4" /> Tạm dừng
-              </>
-            )}
-          </button>
-          <button
-            onClick={handleFinishRepair}
-            disabled={isUploading || isLoadingQuotes || Boolean(quoteLoadError) || hasPendingQuote || !hasApprovedQuote}
-            className="flex-1 py-3 bg-[#12537d] hover:bg-brand-900 disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Đang tải ảnh & hoàn tất...
-              </>
-            ) : (
-              <>
-                Hoàn tất sửa chữa <Check className="w-4 h-4" />
-              </>
-            )}
-          </button>
+            {isSubmittingSupplementary ? "Đang gửi..." : "Gửi khách hàng"}
+          </Button>
         </div>
-
-        {/* Modal Cảnh báo khi bấm Hoàn tất mà vượt báo giá */}
-        {validationWarning && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in">
-              <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div className="text-center space-y-1.5">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Không thể hoàn tất đơn sửa chữa!
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {validationWarning}
-                </p>
-              </div>
-              <div className="space-y-2 pt-1">
-                {additionalAmount > 0 && hasApprovedQuote && !hasPendingQuote && <button
-                  type="button"
-                  onClick={() => {
-                    setValidationWarning(null);
-                    setIsSupplementaryModalOpen(true);
-                  }}
-                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
-                >
-                  Tạo báo giá bổ sung (+{additionalAmount.toLocaleString("vi-VN")} đ)
-                </button>}
-                <button
-                  type="button"
-                  onClick={() => setValidationWarning(null)}
-                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                >
-                  Quay lại điều chỉnh chi phí
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal Xác nhận gửi Báo giá phát sinh */}
-        {isSupplementaryModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
-                  <FilePlus className="w-4 h-4 text-brand-700" />
-                  <span>Tạo Báo Giá Bổ Sung</span>
-                </div>
-                <button
-                  onClick={() => setIsSupplementaryModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer"
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div className="bg-brand-50/70 p-3 rounded-xl border border-brand-100 space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Báo giá đã duyệt:</span>
-                    <span className="font-bold text-slate-800">{approvedEstimate.toLocaleString("vi-VN")} đ</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Chi phí sau phát sinh:</span>
-                    <span className="font-bold text-slate-900">{finalCost.toLocaleString("vi-VN")} đ</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-brand-200/60 text-brand-950 font-bold">
-                    <span>Số tiền phát sinh:</span>
-                    <span className="text-amber-700 font-black">
-                      +{additionalAmount.toLocaleString("vi-VN")} đ
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 block">Lý do phát sinh chi phí:</label>
-                  <textarea
-                    rows={2}
-                    value={supplementaryNote}
-                    onChange={(e) => setSupplementaryNote(e.target.value)}
-                    placeholder="Mô tả lý do phát sinh thêm linh kiện/công việc..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsSupplementaryModalOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmittingSupplementary || additionalAmount <= 0 || hasPendingQuote || !hasApprovedQuote}
-                  onClick={handleCreateSupplementaryQuote}
-                  className="flex-1 py-2.5 bg-brand-900 hover:bg-brand-950 disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm cursor-pointer"
-                >
-                  {isSubmittingSupplementary ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang gửi...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" /> Gửi khách hàng
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      </Modal>
     </div>
   );
 };

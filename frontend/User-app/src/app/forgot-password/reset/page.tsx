@@ -81,8 +81,8 @@ export default function ResetPasswordPage() {
               autoComplete="new-password"
               required
               minLength={8}
-              maxLength={128}
-              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
+              maxLength={72}
+              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,72}"
               title="Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
               placeholder="Nhập mật khẩu mới"
               value={password}
@@ -101,8 +101,8 @@ export default function ResetPasswordPage() {
               autoComplete="new-password"
               required
               minLength={8}
-              maxLength={128}
-              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
+              maxLength={72}
+              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,72}"
               title="Mật khẩu xác nhận phải đúng quy tắc và trùng với mật khẩu mới"
               placeholder="Nhập lại mật khẩu mới"
               value={confirmPassword}

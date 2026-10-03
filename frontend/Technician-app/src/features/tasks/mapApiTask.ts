@@ -71,6 +71,7 @@ export function mapApiTask(item: any): Task {
     status,
     statusText,
     rawStatus: item.status,
+    repairStartedAt: item.repairing_at || null,
     createdAt: item.created_at,
     description: item.issue_description || "Khách hàng yêu cầu kiểm tra sửa chữa thiết bị.",
     images: imgList,
@@ -81,6 +82,16 @@ export function mapApiTask(item: any): Task {
     quotes: item.quotes || (item.quote ? [item.quote] : []),
     approvedEstimate: Number(item.approved_estimate || 0),
   };
+}
+
+/**
+ * True when the quote under review is a supplementary (extra cost) quote sent
+ * during the repair, as opposed to the first quote sent before repair starts.
+ */
+export function isSupplementaryQuote(task: Pick<Task, "quote" | "quotes" | "repairStartedAt">): boolean {
+  if (task.repairStartedAt) return true;
+  const latestId = task.quote?.id;
+  return (task.quotes ?? []).some((quote: any) => quote.status === "ACCEPTED" && quote.id !== latestId);
 }
 
 export interface Appointment {

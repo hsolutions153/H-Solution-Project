@@ -21,23 +21,23 @@ export const AppLayout = ({
 }: AppLayoutProps) => {
   const handleTabChange = (tabName: string) => {
     onTabChange(tabName);
-    if (tabName === "home" && onResetHome) {
+    if ((tabName === "home" || tabName === "tasks") && onResetHome) {
       onResetHome();
     }
   };
 
   return (
-    <div className="h-full bg-slate-50 w-full flex flex-col relative overflow-hidden font-sans">
+    <div className="h-full bg-canvas w-full flex flex-col relative overflow-hidden font-sans">
       
       <Header onLogout={onLogout} />
 
       
-      <div className="flex-1 overflow-y-auto scroll-area pb-24">
+      <div className="flex-1 overflow-y-auto scroll-area">
         {children}
       </div>
 
       
-      <div id="fab-container" className="absolute bottom-20 right-4 z-30 pointer-events-auto" />
+      <div id="fab-container" className="absolute bottom-[5.5rem] right-4 z-30 pointer-events-auto" />
 
       
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />

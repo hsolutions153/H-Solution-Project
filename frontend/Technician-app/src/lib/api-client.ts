@@ -1,3 +1,5 @@
+import { fetchAllPages } from "@h-mobility/ui";
+
 function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 }
@@ -127,4 +129,8 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
 
   return data as T;
+}
+
+export async function fetchApiPages<T>(endpoint: string): Promise<{ items: T[] }> {
+  return { items: await fetchAllPages<T>((url) => fetchApi(url), endpoint) };
 }

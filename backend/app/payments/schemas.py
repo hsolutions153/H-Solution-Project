@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PaymentResponse(BaseModel):
@@ -25,13 +25,16 @@ class PaymentResponse(BaseModel):
 
 class QRResponse(BaseModel):
     payment: PaymentResponse
-    qr_url: str
+    qr_url: str | None = None
     pay_url: str | None = None
+    bank_account: str | None = None
+    bank_name: str | None = None
+    bank_account_name: str | None = None
 
 
 class MoMoPaymentResponse(BaseModel):
     success: bool
-    pay_url: str
+    pay_url: str | None = None
     qr_code_url: str | None = None
     order_id: str
     amount: float
@@ -45,7 +48,7 @@ class SepayWebhookPayload(BaseModel):
     code: str | None = None
     content: str | None = None
     transferType: str | None = None
-    transferAmount: float | None = None
+    transferAmount: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
     referenceCode: str | None = None
     accumulated: float | None = None
     subAccount: str | None = None
@@ -54,3 +57,19 @@ class SepayWebhookPayload(BaseModel):
 
 class WebhookResponse(BaseModel):
     success: bool
+
+
+class MoMoWebhookPayload(BaseModel):
+    partnerCode: str
+    orderId: str
+    requestId: str
+    amount: int = Field(ge=0)
+    orderInfo: str
+    orderType: str
+    transId: int
+    resultCode: int
+    message: str
+    payType: str
+    responseTime: int
+    extraData: str = ""
+    signature: str

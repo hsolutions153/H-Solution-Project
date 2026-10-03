@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, LogOut } from 'lucide-react';
+import { Bell, LogOut } from 'lucide-react';
+import { BrandMark, Button } from '@h-mobility/ui';
+import { Modal } from '@/components/ui';
 import { AVATAR_UPDATED_EVENT } from '@/lib/avatar';
 
 interface HeaderProps {
@@ -62,97 +64,98 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const avatarChar = techName ? techName.charAt(0).toUpperCase() : "K";
 
   return (
-    <div className="relative flex items-center justify-between p-4 bg-white border-b border-slate-100">
-      
-      <div 
-        ref={menuRef}
-        className="relative"
-      >
-        <div 
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-3 cursor-pointer select-none hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
-        >
-          <div className="w-10 h-10 rounded-full bg-brand-600 text-white overflow-hidden flex items-center justify-center font-bold text-sm shadow-xs">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              avatarChar
-            )}
-          </div>
-          <div>
-            <h2 className="font-bold text-slate-900 text-sm leading-tight">{techName}</h2>
-            <span className={`text-[11px] font-medium flex items-center gap-1 mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
-              <span className={`w-2 h-2 rounded-full inline-block ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></span> {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
-            </span>
-          </div>
-        </div>
-
-        
-        {isOpen && (
-          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                setShowLogoutModal(true);
-              }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer font-medium"
-            >
-              <LogOut className="w-4 h-4 text-rose-500" />
-              <span>Đăng xuất</span>
-            </button>
-          </div>
-        )}
+    <header className="relative z-20 flex items-center justify-between gap-3 bg-canvas px-4 pt-[calc(0.875rem+env(safe-area-inset-top))] pb-2.5">
+      <div className="flex min-w-0 items-center gap-2.5 select-none">
+        <BrandMark size={34} />
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-base font-extrabold tracking-wide text-ink">H-Mobility Care</span>
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-600">
+            Kỹ thuật viên cứu hộ 24/7
+          </span>
+        </span>
       </div>
 
-      {/* Modal xác nhận đăng xuất */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
-          <div className="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-600 shadow-xs">
-              <LogOut className="w-6 h-6 stroke-[2.2]" />
-            </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          aria-label="Thông báo"
+          className="relative flex size-10 items-center justify-center rounded-full bg-slate-200/70 text-ink transition-colors hover:bg-slate-200 cursor-pointer"
+        >
+          <Bell className="size-5" strokeWidth={2} />
+          <span className="absolute top-2 right-2 size-2 rounded-full bg-rose-500 ring-2 ring-canvas" aria-hidden />
+        </button>
 
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">
-                Xác nhận đăng xuất
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Bạn có chắc chắn muốn đăng xuất khỏi tài khoản kỹ thuật viên không?
-              </p>
-            </div>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-haspopup="menu"
+            aria-expanded={isOpen}
+            aria-label={`Tài khoản của ${techName}`}
+            className="relative block rounded-full cursor-pointer"
+          >
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-brand-600 text-sm font-bold text-white">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : avatarChar}
+            </span>
+            <span
+              className={`absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-canvas ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`}
+              aria-hidden
+            />
+          </button>
 
-            <div className="flex items-center gap-2 pt-1">
+          {isOpen && (
+            <div
+              role="menu"
+              className="anim-dialog absolute right-0 top-full z-50 mt-2 w-60 rounded-card border border-line bg-white p-1.5 shadow-raised"
+            >
+              <div className="border-b border-line px-3 pt-2 pb-2.5">
+                <p className="truncate text-sm font-bold text-ink">{techName}</p>
+                <p className={`mt-0.5 text-xs font-medium ${isOnline ? "text-emerald-700" : "text-slate-500"}`}>
+                  {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowLogoutModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
+                role="menuitem"
                 onClick={() => {
-                  setShowLogoutModal(false);
-                  if (onLogout) onLogout();
+                  setIsOpen(false);
+                  setShowLogoutModal(true);
                 }}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-rose-600/30"
+                className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 cursor-pointer"
               >
+                <LogOut className="size-4" />
                 Đăng xuất
               </button>
             </div>
-          </div>
+          )}
         </div>
-      )}
-
-      <div className="flex items-center gap-1">
-        <button className="p-2 text-slate-600 hover:bg-brand-50 rounded-full flex items-center justify-center transition-colors cursor-pointer">
-          <Search className="w-5 h-5 text-brand-900" strokeWidth={2.2} />
-        </button>
-        <button className="p-2 text-slate-600 hover:bg-brand-50 rounded-full relative flex items-center justify-center transition-colors cursor-pointer">
-          <Bell className="w-5 h-5 text-brand-900" strokeWidth={2.2} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full ring-2 ring-white"></span>
-        </button>
       </div>
-    </div>
+
+      <Modal open={showLogoutModal} onClose={() => setShowLogoutModal(false)} hideClose>
+        <div className="text-center">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+            <LogOut className="size-6" />
+          </span>
+          <h3 className="mt-4 text-base font-bold text-ink">Xác nhận đăng xuất</h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+            Bạn có chắc muốn đăng xuất khỏi tài khoản kỹ thuật viên?
+          </p>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <Button variant="secondary" onClick={() => setShowLogoutModal(false)}>
+            Hủy
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setShowLogoutModal(false);
+              if (onLogout) onLogout();
+            }}
+          >
+            Đăng xuất
+          </Button>
+        </div>
+      </Modal>
+    </header>
   );
 };

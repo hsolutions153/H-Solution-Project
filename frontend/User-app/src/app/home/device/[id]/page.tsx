@@ -1,12 +1,14 @@
 "use client";
 
+import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
+import { HomeShell } from "@/components/home/home-shell";
+import { PageHeader } from "@/components/home/page-header";
+import { Badge } from "@h-mobility/ui";
+import { BatteryCharging,CalendarDays,ChevronRight,CircleDollarSign,Pencil,RotateCw,Star,Trash2,Wrench } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
-import { ArrowLeft, BatteryCharging, CalendarDays, ChevronRight, CircleDollarSign, Pencil, RotateCw, Star, Trash2, Wrench } from "lucide-react";
-import { HomeShell } from "@/components/home/home-shell";
-import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
+import { use,useEffect,useState } from "react";
 
 export default function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -59,7 +61,6 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
         const data = await fetchApi<any>(`/devices/${id}`);
         if (data) {
           const hasCustomNotes = data.notes && !data.notes.includes(":") && data.notes.length < 50;
-          const brand = data.manufacturer && data.manufacturer !== "Generic" ? data.manufacturer : "";
           const modelName = data.model_name || data.model || "";
 
           // Tên thiết bị (Tên gợi nhớ độc lập, không tự động ghép model vào tên)
@@ -127,20 +128,15 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
   }
 
   return (
-    <HomeShell activeNav="device" title="Chi tiết xe" mainClassName="device-page-content">
+    <HomeShell activeNav="device" hideHeader mainClassName="device-page-content">
       <div className="device-detail-page">
-        <div className="device-detail-back"><Link href="/home/device"><ArrowLeft size={19} /> Danh sách xe của tôi</Link></div>
         <div className="device-detail-heading">
-          <div>
-            <p className="device-eyebrow">
-              {device.manufacturer ? `${device.manufacturer} · Xe máy điện` : "Xe máy điện H-Mobility Care"}
-            </p>
-            <h1>{device.nickname}</h1>
-            <p>
-              {device.manufacturer ? `${device.manufacturer} ${device.model}` : device.model} · ID/Biển số: <b>{device.serialNumber}</b>
-            </p>
-          </div>
-          <span className="device-status"><i /> Sẵn sàng hoạt động</span>
+          <PageHeader
+            title={device.nickname}
+            subtitle={`${device.manufacturer ? `${device.manufacturer} ${device.model}` : device.model} · Biển số ${device.serialNumber}`}
+            backHref="/home/device"
+            trailing={device.isDefault ? <Badge tone="brand">Mặc định</Badge> : null}
+          />
         </div>
 
         <div className="device-hero">

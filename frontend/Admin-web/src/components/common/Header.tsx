@@ -1,22 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Search, Bell, HelpCircle, User } from "lucide-react";
-import { getUserInfo, UserSession } from "@/lib/api-client";
+import { useUserInfo } from "@/lib/use-user-info";
+import { Bell,HelpCircle,User } from "lucide-react";
 
 export interface HeaderProps {
   title?: string;
 }
 
 export const Header = ({ title = "Bảng điều khiển" }: HeaderProps) => {
-  const [user, setUser] = useState<UserSession | null>(null);
-
-  useEffect(() => {
-    const userInfo = getUserInfo();
-    if (userInfo) {
-      setUser(userInfo);
-    }
-  }, []);
+  const user = useUserInfo();
 
   return (
     <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-30 flex-shrink-0">

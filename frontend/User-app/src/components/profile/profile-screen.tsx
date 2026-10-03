@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { PageHeader } from "@/components/home/page-header";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft,
   Bell,
   Camera,
   Check,
@@ -23,7 +23,6 @@ import {
   UserRound,
 } from "lucide-react";
 import { VIETNAM_PHONE_PATTERN } from "@/utils/auth-validation";
-import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 export type UserProfile = {
   id: string;
   name: string;
@@ -163,7 +162,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
       }
     }
     loadCustomerProfile();
-  }, []);
+  }, [initialProfile.name, initialProfile.email, initialProfile.phone, initialProfile.address, initialProfile.avatar, initialProfile.notifications]);
 
   async function saveChanges(changes: Partial<UserProfile>) {
     const { fetchApi } = await import("@/lib/api-client");
@@ -259,14 +258,8 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     return (
       <main className="profile-stage">
         <section className="profile-phone profile-phone--edit">
-          <header className="profile-topbar profile-topbar--centered">
-            <Link href="/home/profile" className="profile-icon-button" aria-label="Quay lại trang hồ sơ">
-              <ArrowLeft />
-            </Link>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <EMobiCareLogoIcon size={20} />
-              <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Chỉnh sửa hồ sơ H-Mobility Care</h1>
-            </div>
+          <header className="profile-topbar">
+            <PageHeader title="Chỉnh sửa hồ sơ" backHref="/home/profile" />
           </header>
 
           <form className="profile-edit-form" onSubmit={handleSubmit}>
@@ -361,16 +354,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     <main className="profile-stage">
       <section className="profile-phone">
         <header className="profile-topbar">
-          <Link href="/home" className="profile-icon-button" aria-label="Quay lại trang chủ">
-            <ArrowLeft />
-          </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <EMobiCareLogoIcon size={20} />
-            <h1 style={{ fontSize: "16px", fontWeight: 700 }}>Hồ sơ H-Mobility Care</h1>
-          </div>
-          <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Chỉnh sửa hồ sơ">
-            <Pencil />
-          </Link>
+          <PageHeader
+            title="Hồ sơ cá nhân"
+            backHref="/home"
+            trailing={
+              <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Chỉnh sửa hồ sơ">
+                <Pencil />
+              </Link>
+            }
+          />
         </header>
 
         <div className="profile-scroll-area">
@@ -541,7 +533,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                       try {
                         await signOut({ redirectTo: "/login?logged_out=1" });
                       } catch {
-                        window.location.href = "/login?logged_out=1";
+                        router.replace("/login?logged_out=1");
                       }
                     }}
                     style={{

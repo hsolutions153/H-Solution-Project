@@ -3,6 +3,8 @@ import os
 import secrets
 
 from app.auth import repository
+from app.auth.google import verify_google_id_token
+from app.auth.sms import send_password_reset_code
 from app.auth.utils import create_access_token, hash_password, verify_password
 from app.core.exceptions import AppException, ErrorCode
 
@@ -101,8 +103,9 @@ def register_customer(data):
 
 
 def authenticate_or_register_google_user(payload):
-    email = str(payload.email).strip().lower()
-    name = (payload.name or "").strip() or "Khách hàng Google"
+    claims = verify_google_id_token(payload.id_token)
+    email = str(claims["email"]).strip().lower()
+    name = str(claims.get("name") or "").strip() or "Khách hàng Google"
 
     user = repository.get_user_by_email(email)
     if isinstance(user, list) and len(user) > 0:
@@ -218,17 +221,27 @@ def request_password_reset(phone: str):
     if not created:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
 
-    if OTP_EXPOSE_IN_RESPONSE:
+    try:
+        send_password_reset_code(phone, otp_code)
+    except AppException:
+        repository.mark_otp_used(created["id"], now.isoformat())
+        raise
+
+    if OTP_EXPOSE_IN_RESPONSE and os.getenv("APP_ENV", "development").lower() != "production":
         generic_response["otp_code"] = otp_code
     return generic_response
 
 
-def reset_password(phone: str, otp_code: str, new_password: str):
+def verify_password_reset_code(phone: str, otp_code: str):
     user = repository.get_user_by_phone(phone)
     otp = repository.get_valid_otp(phone, datetime.now(timezone.utc).isoformat())
     if not user or not otp or not secrets.compare_digest(otp["otp_code"], otp_code):
         raise AppException(ErrorCode.OTP_INVALID)
+    return user, otp
 
+
+def reset_password(phone: str, otp_code: str, new_password: str):
+    user, otp = verify_password_reset_code(phone, otp_code)
     updated = repository.update_user_password(user["id"], hash_password(new_password))
     if not updated:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)

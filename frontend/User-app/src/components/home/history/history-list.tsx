@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
-import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
 
 type RepairStatus = "completed" | "cancelled" | "in_progress";
 
@@ -24,7 +23,7 @@ interface RepairHistoryItem {
 
 type FilterTab = "all" | "this_month" | "completed";
 
-function getServiceTitle(isSos: boolean, issueType?: string, description?: string): string {
+export function getServiceTitle(isSos: boolean, issueType?: string, description?: string): string {
   if (isSos) return "Cứu hộ khẩn cấp 24/7 (SOS)";
   const t = (issueType || "").toUpperCase();
   switch (t) {
@@ -61,62 +60,17 @@ function getServiceTitle(isSos: boolean, issueType?: string, description?: strin
   }
 }
 
+/** Icon per service, on the same tinted tile the Technician-app task cards use. */
 function getStyleForService(title: string, isSos?: boolean) {
-  if (isSos) {
-    return {
-      icon: "e911_emergency",
-      gradient: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
-      shadow: "0 4px 14px rgba(239, 68, 68, 0.32)",
-      color: "#ffffff",
-    };
-  }
+  const tile = (icon: string) => ({ icon, gradient: "var(--color-brand-50)", shadow: "none", color: "var(--color-brand-700)" });
+  if (isSos) return { icon: "e911_emergency", gradient: "#fff1f2", shadow: "none", color: "#e11d48" };
   const t = title.toLowerCase();
-  if (t.includes("pin") || t.includes("battery") || t.includes("lfp")) {
-    return {
-      icon: "battery_charging_full",
-      gradient: "linear-gradient(135deg, #2479ad 0%, #156495 100%)",
-      shadow: "0 4px 14px rgba(2, 132, 199, 0.32)",
-      color: "#ffffff",
-    };
-  }
-  if (t.includes("lốp") || t.includes("bánh") || t.includes("tire") || t.includes("wheel")) {
-    return {
-      icon: "settings",
-      gradient: "linear-gradient(135deg, #2479ad 0%, #156495 100%)",
-      shadow: "0 4px 14px rgba(6, 182, 212, 0.32)",
-      color: "#ffffff",
-    };
-  }
-  if (t.includes("động cơ") || t.includes("motor")) {
-    return {
-      icon: "electric_moped",
-      gradient: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-      shadow: "0 4px 14px rgba(245, 158, 11, 0.32)",
-      color: "#ffffff",
-    };
-  }
-  if (t.includes("phanh") || t.includes("brake")) {
-    return {
-      icon: "build_circle",
-      gradient: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-      shadow: "0 4px 14px rgba(16, 185, 129, 0.32)",
-      color: "#ffffff",
-    };
-  }
-  if (t.includes("ecu") || t.includes("điều khiển") || t.includes("điện")) {
-    return {
-      icon: "memory",
-      gradient: "linear-gradient(135deg, #7fb8da 0%, #4896c4 100%)",
-      shadow: "0 4px 14px rgba(139, 92, 246, 0.32)",
-      color: "#ffffff",
-    };
-  }
-  return {
-    icon: "handyman",
-    gradient: "linear-gradient(135deg, #156495 0%, #2479ad 100%)",
-    shadow: "0 4px 14px rgba(0, 119, 182, 0.32)",
-    color: "#ffffff",
-  };
+  if (t.includes("pin") || t.includes("battery") || t.includes("lfp")) return tile("battery_charging_full");
+  if (t.includes("lốp") || t.includes("bánh") || t.includes("tire") || t.includes("wheel")) return tile("settings");
+  if (t.includes("động cơ") || t.includes("motor")) return tile("electric_moped");
+  if (t.includes("phanh") || t.includes("brake")) return tile("build_circle");
+  if (t.includes("ecu") || t.includes("điều khiển") || t.includes("điện")) return tile("memory");
+  return tile("handyman");
 }
 
 function getStatusBadge(status: RepairStatus, rawStatus?: string) {
@@ -202,8 +156,8 @@ export function HistoryList() {
     isFetchingRef.current = true;
 
     try {
-      const { fetchApi } = await import("@/lib/api-client");
-      const res = await fetchApi<any>("/repair-requests/me?page=1&limit=30");
+      const { fetchApiPages } = await import("@/lib/api-client");
+      const res = await fetchApiPages<any>("/repair-requests/me");
       const items = res?.items || [];
       const mapped: RepairHistoryItem[] = items.map((item: any) => {
         let status: RepairStatus = "in_progress";
@@ -314,10 +268,6 @@ export function HistoryList() {
     <div className="rh-container">
       {/* Premium Header */}
       <div className="rh-page-header">
-        <div className="rh-brand-pill">
-          <EMobiCareLogoIcon size={16} />
-          <span className="rh-brand-text">H-MOBILITY CARE</span>
-        </div>
         <h1 className="rh-page-title">Lịch sử sửa chữa & cứu hộ</h1>
         <p className="rh-page-subtitle">Theo dõi & quản lý các yêu cầu bảo dưỡng xe máy điện</p>
       </div>

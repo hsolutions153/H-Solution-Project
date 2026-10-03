@@ -45,6 +45,8 @@ export interface Task {
   approvedEstimate?: number;
   /** Backend status code (e.g. "ACCEPTED"), kept alongside the app-level status. */
   rawStatus?: string;
+  /** When the repair first moved to REPAIRING (backend `repairing_at`); set once repair has started. */
+  repairStartedAt?: string | null;
   createdAt?: string;
 }
 

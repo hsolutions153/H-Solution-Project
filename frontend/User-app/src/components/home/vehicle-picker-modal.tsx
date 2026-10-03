@@ -52,7 +52,7 @@ export function VehiclePickerModal({
   const [customBrandName, setCustomBrandName] = useState("");
   const [customModelName, setCustomModelName] = useState("");
   const [customBatteryType, setCustomBatteryType] = useState("LFP");
-  const customDeviceType: "SCOOTER" = "SCOOTER";
+  const customDeviceType = "SCOOTER" as const;
   const [errorMsg, setErrorMsg] = useState("");
 
   // Lọc thương hiệu theo từ khóa

@@ -4,16 +4,17 @@ import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { VerifyOtpFormData } from '@/types/auth';
 
 interface VerifyOtpFormProps {
-  onSubmit: (data: VerifyOtpFormData) => void;
-  onResendOtp?: () => void;
+  loading?: boolean;
+  onSubmit: (data: VerifyOtpFormData) => void | Promise<void>;
+  onResendOtp?: () => void | Promise<void>;
 }
 
 export interface VerifyOtpFormRef {
-  resetOtp: () => void;
+  resetOtp: () => void | Promise<void>;
 }
 
 export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
-  ({ onSubmit, onResendOtp }, ref) => {
+  ({ onSubmit, onResendOtp, loading }, ref) => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -78,7 +79,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
             Nhập mã xác thực
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed max-w-[260px] mx-auto">
-            Mã xác thực OTP đã được gửi đến số điện thoại/email của bạn. Vui lòng nhập mã gồm 6 chữ số dưới đây.
+            Mã xác thực OTP đã được gửi đến số điện thoại của bạn. Vui lòng nhập mã gồm 6 chữ số dưới đây.
           </p>
         </div>
 
@@ -108,6 +109,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
             <button
               type="button"
               onClick={onResendOtp}
+              disabled={loading}
               className="text-xs font-bold text-brand-800 hover:underline inline-block"
             >
               Gửi lại mã
@@ -117,6 +119,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
           
           <button
             type="submit"
+            disabled={loading}
             className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
           >
             Xác nhận

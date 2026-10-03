@@ -1,15 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { SkeletonList } from "@/components/ui";
 import { HistoryTask } from "@/types/task";
-import {
-  Search,
-  SlidersHorizontal,
-  ChevronUp,
-  ChevronDown,
-  FileText,
-  RotateCw,
-} from "lucide-react";
+import { Badge,Button,Card,EmptyState,cn,inputClasses } from "@h-mobility/ui";
+import { ChevronDown,FileText,MapPin,RotateCw,Search } from "lucide-react";
+import React,{ useEffect,useState } from "react";
 
 interface TaskHistoryScreenProps {
   newCompletedTask?: HistoryTask | null;
@@ -28,8 +23,8 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     async function loadCompletedTasks() {
       try {
         setLoading(true);
-        const { fetchApi } = await import("@/lib/api-client");
-        const res = await fetchApi<any>("/repair-requests/technician/me?page=1&limit=50");
+        const { fetchApiPages } = await import("@/lib/api-client");
+        const res = await fetchApiPages<any>("/repair-requests/technician/me?page=1&limit=50");
         if (res && Array.isArray(res.items)) {
           const completedFromApi: HistoryTask[] = res.items
             .filter((item: any) => item.status === "COMPLETED" || item.status === "completed")
@@ -115,227 +110,188 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     return true;
   });
 
+  const FILTERS: { id: typeof activeTab; label: string }[] = [
+    { id: "all", label: "Tất cả" },
+    { id: "this_month", label: "Tháng này" },
+    { id: "maintenance", label: "Bảo trì" },
+    { id: "repair", label: "Sửa chữa" },
+  ];
+
   return (
-    <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-20 font-sans border-x border-slate-100">
-      <div className="p-4 space-y-4">
-        <h1 className="text-lg font-bold text-slate-800">Lịch sử công việc</h1>
+    <div className="space-y-4 px-4 pt-4 pb-8">
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-lg font-bold text-ink">Lịch sử công việc</h1>
+        {!loading ? (
+          <span className="text-xs font-medium text-slate-500 tabular-nums">{filteredList.length} công việc</span>
+        ) : null}
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Tìm theo Mã công việc hoặc Tên khách hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full text-xs bg-transparent focus:outline-none text-slate-700"
-            />
-          </div>
-          <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer shadow-sm">
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          aria-label="Tìm công việc"
+          placeholder="Mã công việc hoặc tên khách hàng"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={cn(inputClasses, "pl-10")}
+        />
+      </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "all"
-                ? "bg-brand-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Tất cả
-          </button>
-          <button
-            onClick={() => setActiveTab("this_month")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "this_month"
-                ? "bg-brand-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Tháng này
-          </button>
-          <button
-            onClick={() => setActiveTab("maintenance")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "maintenance"
-                ? "bg-brand-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Bảo trì
-          </button>
-          <button
-            onClick={() => setActiveTab("repair")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "repair"
-                ? "bg-brand-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Sửa chữa
-          </button>
-        </div>
+      <div className="scroll-area -mx-4 flex gap-2 overflow-x-auto px-4" role="tablist">
+        {FILTERS.map((f) => {
+          const active = activeTab === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(f.id)}
+              className={cn(
+                "shrink-0 rounded-full border px-4 py-1.5 text-[13px] transition-colors cursor-pointer",
+                active
+                  ? "border-brand-600 bg-brand-600 font-semibold text-white"
+                  : "border-line bg-white font-medium text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {loading ? (
-          <div className="py-14 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2.5">
-            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            <p className="font-medium text-slate-500">Đang tải lịch sử công việc...</p>
-          </div>
-        ) : filteredList.length === 0 ? (
-          <div className="py-12 px-6 bg-white rounded-2xl border border-slate-100 text-center space-y-2 shadow-2xs">
-            <div className="w-10 h-10 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-              <FileText className="w-5 h-5" />
-            </div>
-            <p className="font-bold text-slate-700 text-sm">Chưa có công việc nào hoàn thành</p>
-            <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-              Các đơn hàng sửa chữa sau khi bạn hoàn tất và nghiệm thu sẽ được hiển thị tại đây.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredList.map((item) => {
-              const isExpanded = expandedId === item.id;
+      {loading ? (
+        <SkeletonList count={4} className="h-24" />
+      ) : filteredList.length === 0 ? (
+        <EmptyState
+          icon={<FileText />}
+          title={searchTerm ? "Không tìm thấy công việc" : "Chưa có công việc hoàn thành"}
+          description={
+            searchTerm
+              ? "Thử tìm bằng mã công việc hoặc tên khách hàng khác."
+              : "Đơn sửa chữa sau khi hoàn tất và nghiệm thu sẽ hiện ở đây."
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          {filteredList.map((item) => {
+            const isExpanded = expandedId === item.id;
 
-              return (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all"
+            return (
+              <Card key={item.id} padded={false} className="overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(item.id)}
+                  aria-expanded={isExpanded}
+                  className="flex w-full p-4 text-left transition-colors hover:bg-slate-50/60 cursor-pointer"
                 >
-                  <div
-                    onClick={() => toggleExpand(item.id)}
-                    className="p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-brand-600">
-                        #{item.code}{" "}
-                        <span className="text-slate-400 font-normal">
-                          • {item.date} • {item.time}
-                        </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold tabular-nums text-slate-500">
+                        #{item.code} · {item.date} {item.time}
                       </span>
-                      <span className="px-2.5 py-0.5 bg-brand-100 text-brand-700 font-semibold text-[11px] rounded-full">
-                        {item.serviceType}
-                      </span>
+                      <ChevronDown
+                        className={cn("size-5 shrink-0 text-slate-400 transition-transform", isExpanded && "rotate-180")}
+                      />
                     </div>
-
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">
-                          {item.customerName}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {item.deviceInfo}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {item.address}
-                        </p>
-                      </div>
-                      <button className="text-slate-400 p-1">
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
+                    <h3 className="mt-1 truncate text-base font-bold text-ink">{item.customerName}</h3>
+                    <p className="mt-0.5 truncate text-[13px] text-slate-600">{item.deviceInfo}</p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <Badge tone={item.type === "repair" ? "brand" : "neutral"} className="min-w-0 max-w-[60%]">
+                        <span className="min-w-0 truncate">{item.serviceType}</span>
+                      </Badge>
+                      <span className="text-sm font-bold tabular-nums text-ink">
+                        {item.totalAmount.toLocaleString("vi-VN")} đ
+                      </span>
                     </div>
                   </div>
+                </button>
 
-                  {isExpanded && (
-                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/30 space-y-3 text-xs">
-                      {item.diagnosis && (
-                        <div>
-                          <p className="font-bold text-brand-900 mb-0.5">
-                            Chẩn đoán
-                          </p>
-                          <p className="text-slate-600 leading-relaxed">
-                            {item.diagnosis}
-                          </p>
-                        </div>
-                      )}
+                {isExpanded && (
+                  <div className="space-y-4 border-t border-line bg-slate-50/60 p-4">
+                    <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                      {item.address}
+                    </p>
 
-                      {item.solution && (
-                        <div>
-                          <p className="font-bold text-brand-900 mb-0.5">
-                            Nội dung xử lý
-                          </p>
-                          <p className="text-slate-600 leading-relaxed">
-                            {item.solution}
-                          </p>
-                        </div>
-                      )}
-
-                      {(item.images?.before || item.images?.after) && (
-                        <div>
-                          <p className="font-bold text-brand-900 mb-1.5">
-                            Hình ảnh thực tế
-                          </p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {item.images.before && (
-                              <div className="relative rounded-xl overflow-hidden h-24 bg-slate-200 border border-slate-200">
-                                <img
-                                  src={item.images.before}
-                                  alt="Trước khi làm"
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = "/images/s1.jpg";
-                                  }}
-                                />
-                                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
-                                  Trước khi làm
-                                </span>
-                              </div>
-                            )}
-                            {item.images.after && (
-                              <div className="relative rounded-xl overflow-hidden h-24 bg-slate-200 border border-slate-200">
-                                <img
-                                  src={item.images.after}
-                                  alt="Sau khi làm"
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = "/images/s1.jpg";
-                                  }}
-                                />
-                                <span className="absolute bottom-1 left-1 bg-brand-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
-                                  Sau khi làm
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-semibold uppercase">
-                            Tổng cộng
-                          </p>
-                          <p className="text-sm font-bold text-slate-900">
-                            {item.totalAmount.toLocaleString("vi-VN")} VND
-                          </p>
-                        </div>
-
-                        <button className="flex items-center gap-1 text-brand-700 font-semibold text-xs hover:underline">
-                          <FileText className="w-3.5 h-3.5" /> Xem hóa đơn
-                        </button>
+                    {item.diagnosis && (
+                      <div>
+                        <p className="text-sm font-semibold text-ink">Chẩn đoán</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
+                          {item.diagnosis.replace(/\[Hẹn:[^\]]*\]/, "").trim()}
+                        </p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    )}
 
-        {!loading && filteredList.length > 0 && (
-          <div className="pt-2 flex justify-center">
-            <button className="py-2.5 px-6 bg-slate-200/70 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition-colors">
-              <RotateCw className="w-3.5 h-3.5" /> Tải thêm công việc
-            </button>
-          </div>
-        )}
-      </div>
+                    {item.solution && (
+                      <div>
+                        <p className="text-sm font-semibold text-ink">Nội dung xử lý</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{item.solution}</p>
+                      </div>
+                    )}
+
+                    {(item.images?.before || item.images?.after) && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {item.images.before && (
+                          <figure>
+                            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line bg-slate-100">
+                              <img
+                                src={item.images.before}
+                                alt="Trước khi sửa"
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
+                              />
+                            </div>
+                            <figcaption className="mt-1 text-xs text-slate-500">Trước khi sửa</figcaption>
+                          </figure>
+                        )}
+                        {item.images.after && (
+                          <figure>
+                            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line bg-slate-100">
+                              <img
+                                src={item.images.after}
+                                alt="Sau khi sửa"
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
+                              />
+                            </div>
+                            <figcaption className="mt-1 text-xs text-slate-500">Sau khi sửa</figcaption>
+                          </figure>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between border-t border-line pt-3">
+                      <div>
+                        <p className="text-xs text-slate-500">Tổng cộng</p>
+                        <p className="text-base font-bold tabular-nums text-ink">
+                          {item.totalAmount.toLocaleString("vi-VN")} đ
+                        </p>
+                      </div>
+                      <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
+                        Xem hóa đơn
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && filteredList.length > 0 && (
+        <div className="flex justify-center pt-1">
+          <Button variant="ghost" icon={<RotateCw className="size-4" />}>
+            Tải thêm
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

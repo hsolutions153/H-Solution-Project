@@ -1,27 +1,26 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import {
-  Eye,
-  EyeOff,
-  LockKeyhole,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
-import {
-  digitsOnly,
-  EMAIL_PATTERN,
-  isStrongPassword,
-  VIETNAM_PHONE_PATTERN,
+digitsOnly,
+EMAIL_PATTERN,
+isStrongPassword,
+VIETNAM_PHONE_PATTERN,
 } from "@/utils/auth-validation";
 import { BrandLockup } from "@h-mobility/ui";
+import {
+Eye,
+EyeOff,
+LockKeyhole,
+Mail,
+MapPin,
+Phone,
+ShieldCheck,
+UserRound,
+} from "lucide-react";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
+import { useRouter,useSearchParams } from "next/navigation";
+import { useEffect,useState } from "react";
 
 type SocialAuthCardProps = {
   mode: "login" | "register";
@@ -106,7 +105,7 @@ export function SocialAuthCard({
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

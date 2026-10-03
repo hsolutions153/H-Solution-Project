@@ -3,7 +3,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { EMobiCareLogoIcon } from "@/components/brand/emobi-care-logo";
+import { PageHeader } from "@/components/home/page-header";
+import { Badge, Card, StatusBadge, buttonClasses } from "@h-mobility/ui";
+import { Activity, Phone, RefreshCw, Star, UserRound, Wrench, XCircle } from "lucide-react";
+
+/** Header subtitle on the technician step, by request status. */
+const TECH_SUBTITLE: Record<string, string> = {
+  ASSIGNED: "Đang chờ kỹ thuật viên nhận đơn",
+  ACCEPTED: "Kỹ thuật viên đã nhận đơn",
+  EN_ROUTE: "Kỹ thuật viên đang đến",
+  ARRIVED: "Kỹ thuật viên đã đến nơi",
+  DIAGNOSING: "Đang kiểm tra xe",
+  CANCELLED: "Yêu cầu đã hủy",
+};
 
 type SosStep = "PROBLEM" | "DETAILS" | "CAMERA" | "LOCATION" | "CALLING" | "TECHNICIAN";
 type SosIssue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -33,7 +45,6 @@ export default function SosPage() {
   const [connectingDots, setConnectingDots] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected">("connecting");
   const [smsStatus, setSmsStatus] = useState<"pending" | "sending" | "sent">("pending");
-  const [technicianEta, setTechnicianEta] = useState("~8 phút");
   const [assignedTech, setAssignedTech] = useState<any>(null);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
@@ -428,7 +439,6 @@ export default function SosPage() {
       setConnectionStatus("connecting");
       setSmsStatus("pending");
       setConnectingDots("");
-      setTechnicianEta("~8 phút");
       setStep("TECHNICIAN");
     } catch (err: any) {
       console.error("Failed to register SOS request", err);
@@ -464,27 +474,23 @@ export default function SosPage() {
   return (
     <div className="sos-flow-page">
       <header className="sos-flow-header">
-        <div className="sos-flow-header-main">
-          <button type="button" className="sos-flow-back-btn" onClick={handleCancel} aria-label="Quay về trang chủ">
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div className="sos-flow-logo">
-            <EMobiCareLogoIcon size={26} />
-            <span className="sos-flow-logo-text">H-Mobility Care</span>
-          </div>
-        </div>
-        {(step === "CALLING" || step === "TECHNICIAN") && (
-          <div className="sos-flow-header-badge">
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>emergency</span>
-            SOS
-          </div>
-        )}
+        <PageHeader
+          title="Gọi cứu hộ SOS"
+          subtitle={
+            step === "CALLING"
+              ? "Đang tìm kỹ thuật viên gần bạn"
+              : step === "TECHNICIAN"
+                ? TECH_SUBTITLE[currentRequestStatus] ?? "Đang điều phối kỹ thuật viên"
+                : "Mô tả sự cố để được hỗ trợ nhanh"
+          }
+          onBack={handleCancel}
+          trailing={step === "CALLING" || step === "TECHNICIAN" ? <Badge tone="danger">SOS</Badge> : null}
+        />
       </header>
 
       {step === "PROBLEM" && (
         <section className="sos-step-panel">
           <div className="sos-step-head">
-            <p className="sos-step-kicker">CHỌN SỰ CỐ</p>
             <h1 className="sos-step-title">Xe của bạn đang gặp vấn đề gì?</h1>
           </div>
 
@@ -815,86 +821,114 @@ export default function SosPage() {
       )}
 
       {step === "TECHNICIAN" && (
-        <section className="sos-step-panel sos-tech-panel">
+        <section className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-3 px-5 pt-1 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           {reassignedNotice && (
-            <div className="p-3.5 mb-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-amber-900 text-xs font-bold flex items-center gap-2.5 shadow-md animate-pulse">
-              <span className="material-symbols-outlined text-amber-600" style={{ fontSize: 22 }}>radar</span>
-              <span>{reassignedNotice}</span>
-            </div>
+            <p role="status" className="flex items-start gap-2.5 rounded-card border border-amber-200 bg-amber-50 p-3.5 text-[13px] font-medium text-amber-900">
+              <RefreshCw className="mt-0.5 size-4 shrink-0 text-amber-600" />
+              {reassignedNotice}
+            </p>
           )}
 
-          <div className="sos-tech-found flex items-center justify-center gap-1.5">
-            {currentRequestStatus === "ACCEPTED" || currentRequestStatus === "EN_ROUTE" || currentRequestStatus === "ARRIVED" ? (
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping mr-1"></span>
-            ) : (
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse mr-1"></span>
-            )}
-            {assignedTech ? "ĐÃ KẾT NỐI KỸ THUẬT VIÊN" : "ĐANG TÌM KỸ THUẬT VIÊN GẦN NHẤT"}
-          </div>
+          <Card className="space-y-2">
+            <StatusBadge status={currentRequestStatus} />
+            <p className="text-base font-semibold leading-snug text-ink">
+              {techStatusText || (assignedTech ? "Kỹ thuật viên đang tiếp nhận cứu hộ" : "Hệ thống đang điều phối kỹ thuật viên gần bạn.")}
+            </p>
+          </Card>
 
-          <h2 className="sos-tech-title">
-            {techStatusText || (assignedTech ? "Kỹ thuật viên đang tiếp nhận cứu hộ" : "Hệ thống đang tự động điều phối KTV...")}
-          </h2>
-
-          <article className="sos-tech-card">
-            <div className="sos-tech-avatar overflow-hidden flex items-center justify-center font-bold text-white bg-brand-600">
-              {assignedTech && assignedTech.avatar && assignedTech.avatar.startsWith("http") ? (
-                <img src={assignedTech.avatar} alt={assignedTech.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="material-symbols-outlined">person</span>
-              )}
-            </div>
-            <h3>{assignedTech ? assignedTech.name : "Kỹ thuật viên Cứu hộ"}</h3>
-            <p>{assignedTech ? (assignedTech.specialization || "Chuyên gia bảo trì xe máy điện") : "Trung tâm đang điều phối KTV khẩn cấp"}</p>
-
-            <div className="sos-tech-meta">
-              <span>{assignedTech ? `${assignedTech.rating || 4.9} (${assignedTech.reviews || 25} reviews)` : "Hỗ trợ 24/7"}</span>
-              <span className="text-emerald-600 font-bold">✓ Đã xác minh</span>
-            </div>
-
-            <div className="sos-tech-stats">
-              <div>
-                <span>KINH NGHIỆM</span>
-                <strong>{assignedTech ? `${assignedTech.experience_years || 3} năm` : "Nhiều năm"}</strong>
+          {assignedTech ? (
+            <Card padded={false}>
+              <div className="flex items-center gap-3 p-4">
+                <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-600 text-lg font-bold text-white">
+                  {assignedTech.avatar && String(assignedTech.avatar).startsWith("http") ? (
+                    <img src={assignedTech.avatar} alt="" className="size-full object-cover" />
+                  ) : (
+                    String(assignedTech.name || "K").charAt(0).toUpperCase()
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-lg font-bold text-ink">{assignedTech.name || "Kỹ thuật viên"}</h2>
+                  <p className="truncate text-[13px] text-slate-600">
+                    {assignedTech.specialization || "Kỹ thuật viên H-Mobility Care"}
+                  </p>
+                  {assignedTech.rating ? (
+                    <p className="mt-0.5 flex items-center gap-1 text-[13px] text-slate-600">
+                      <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-semibold text-ink tabular-nums">{Number(assignedTech.rating).toFixed(1)}</span>
+                      {assignedTech.reviews ? <span>({assignedTech.reviews} đánh giá)</span> : null}
+                    </p>
+                  ) : null}
+                </div>
+                {assignedTech.phone ? (
+                  <a
+                    href={`tel:${assignedTech.phone}`}
+                    aria-label={`Gọi ${assignedTech.name || "kỹ thuật viên"}`}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 active:scale-95"
+                  >
+                    <Phone className="size-5" />
+                  </a>
+                ) : null}
               </div>
+              {assignedTech.phone || assignedTech.experience_years ? (
+                <dl className="grid grid-cols-2 divide-x divide-line border-t border-line">
+                  <div className="px-4 py-3">
+                    <dt className="text-xs text-slate-500">Số điện thoại</dt>
+                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{assignedTech.phone || "Chưa cập nhật"}</dd>
+                  </div>
+                  <div className="px-4 py-3">
+                    <dt className="text-xs text-slate-500">Kinh nghiệm</dt>
+                    <dd className="mt-0.5 text-sm font-semibold text-ink">
+                      {assignedTech.experience_years ? `${assignedTech.experience_years} năm` : "Chưa cập nhật"}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
+            </Card>
+          ) : (
+            <Card className="flex items-center gap-3">
+              <span className="flex size-14 shrink-0 animate-pulse items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                <UserRound className="size-6" />
+              </span>
               <div>
-                <span>SỐ ĐIỆN THOẠI</span>
-                <strong>{assignedTech ? (assignedTech.phone || "0912 345 678") : "Đang cập nhật"}</strong>
+                <p className="text-sm font-semibold text-ink">Đang tìm kỹ thuật viên</p>
+                <p className="text-[13px] text-slate-600">Thông tin kỹ thuật viên sẽ hiện khi có người nhận đơn.</p>
               </div>
-              <div>
-                <span>THỜI GIAN</span>
-                <strong>{technicianEta}</strong>
-              </div>
-            </div>
-          </article>
+            </Card>
+          )}
 
-          <div className="sos-tech-issue-card">
-            <Image src="/electric-scooter.jpg" alt="issue" width={48} height={48} style={{ borderRadius: "8px", objectFit: "cover" }} />
-            <div>
-              <strong>Sự cố {selectedIssueLabel.toLowerCase()}</strong>
-              <p>Hệ thống tự động đồng bộ thời gian thực. Khi KTV nhận đơn, hành trình sẽ cập nhật ngay.</p>
+          <Card className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-slate-100 text-slate-700">
+              <Wrench className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">Sự cố {selectedIssueLabel.toLowerCase()}</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-slate-600">
+                {currentRequestStatus === "REQUESTED" || currentRequestStatus === "ASSIGNED"
+                  ? "Trạng thái được cập nhật tự động. Khi kỹ thuật viên nhận đơn, hành trình sẽ hiện ở đây."
+                  : "Trạng thái được cập nhật tự động theo hành trình của kỹ thuật viên."}
+              </p>
             </div>
-          </div>
+          </Card>
 
-          <div className="sos-tech-actions flex flex-col gap-2.5 w-full">
+          <div className="mt-auto space-y-2.5 pt-2">
             <button
               type="button"
-              className="sos-tech-confirm w-full flex items-center justify-center gap-2"
+              className={buttonClasses("primary", "lg", true)}
               onClick={() => router.push(activeRequestId ? `/home/history/${activeRequestId}` : "/home/history")}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>timeline</span>
-              Theo dõi tiến độ chi tiết
+              <Activity className="size-5" />
+              Theo dõi tiến độ
             </button>
             <button
               type="button"
-              className="sos-cancel-btn w-full"
+              className={buttonClasses("secondary", "lg", true, "text-rose-700 hover:border-rose-200 hover:bg-rose-50")}
               onClick={() => {
                 if (confirm("Bạn có chắc chắn muốn hủy yêu cầu cứu hộ khẩn cấp này không?")) {
                   handleCancel();
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>cancel</span>
+              <XCircle className="size-5" />
               Hủy yêu cầu cứu hộ
             </button>
           </div>

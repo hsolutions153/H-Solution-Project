@@ -62,7 +62,7 @@ def _enrich_orders(data: list[dict]):
         try:
             pay_resp = (
                 supabase.table("payments")
-                .select("repair_id,payment_method,status,amount")
+                .select("repair_id,payment_method,payment_status,amount")
                 .in_("repair_id", repair_ids)
                 .order("created_at", desc=True)
                 .execute()
@@ -102,7 +102,7 @@ def _enrich_orders(data: list[dict]):
         pay_info = payments_map.get(item.get("id"))
         if pay_info:
             item["payment_method"] = pay_info.get("payment_method")
-            item["payment_status"] = pay_info.get("status")
+            item["payment_status"] = pay_info.get("payment_status")
 
     return data
 

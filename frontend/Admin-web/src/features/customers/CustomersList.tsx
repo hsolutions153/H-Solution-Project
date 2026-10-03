@@ -1,26 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  Search,
-  UserPlus,
-  RefreshCw,
-  Phone,
-  Mail,
-  CheckCircle2,
-  XCircle,
-  Bike,
-  Loader2,
-  X,
-  Eye,
-  Pencil,
-  Trash2,
-} from "lucide-react";
 import { Pagination } from "@/components/common/Pagination";
+import {
+Bike,
+CheckCircle2,
+Eye,
+Loader2,
+Mail,
+Pencil,
+Phone,
+RefreshCw,
+Search,
+Trash2,
+UserPlus,
+X
+} from "lucide-react";
+import { useEffect,useState } from "react";
 import { CreateCustomerModal } from "./CreateCustomerModal";
-import { ViewCustomerModal } from "./ViewCustomerModal";
-import { EditCustomerModal } from "./EditCustomerModal";
 import { DeleteCustomerModal } from "./DeleteCustomerModal";
+import { EditCustomerModal } from "./EditCustomerModal";
+import { ViewCustomerModal } from "./ViewCustomerModal";
 
 interface CustomerItem {
   id: string;
@@ -34,13 +33,6 @@ interface CustomerItem {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
-}
-
-interface CustomerApiResponse {
-  items?: CustomerItem[];
-  total?: number;
-  page?: number;
-  limit?: number;
 }
 
 interface CustomerDeviceItem {
@@ -71,16 +63,12 @@ export const CustomersList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
-      const res = await fetchApi<CustomerApiResponse | CustomerItem[]>("/customers");
+      const { fetchApiPages } = await import("@/lib/api-client");
+      const res = await fetchApiPages<CustomerItem>("/customers");
       const list = Array.isArray(res) ? res : res?.items ?? [];
       setCustomers(list);
     } catch (err: unknown) {
@@ -221,7 +209,7 @@ export const CustomersList = () => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             placeholder="Tìm theo tên khách hàng, số điện thoại, email..."
             className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />

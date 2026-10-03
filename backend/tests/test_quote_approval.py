@@ -41,6 +41,7 @@ class QuoteApprovalTests(unittest.TestCase):
 
         database = self.start_patch("app.db.database.supabase")
         self.database = database
+        self.start_patch("app.payments.repository.get_payment_by_repair_id").return_value = None
         database.table.return_value.select.return_value.or_.return_value.maybe_single.return_value.execute.side_effect = (
             lambda: SimpleNamespace(data=deepcopy(self.request))
         )

@@ -1,43 +1,37 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  Search,
-  RefreshCw,
-  Eye,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  DollarSign,
-  Calendar,
-} from "lucide-react";
-import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
-import { OrderDetailModal } from "../orders/OrderDetailModal";
+import type { OrderRecord } from "@/features/orders/OrderDetailModal";
+import type { Technician } from "@/types/api";
+
 import { Pagination } from "@/components/common/Pagination";
+import { getStatusBadge } from "@/constants/orderStatus";
+import {
+Eye,
+RefreshCw,
+Search
+} from "lucide-react";
+import { useEffect,useState } from "react";
+import { OrderDetailModal } from "../orders/OrderDetailModal";
 
 export const HistoryList = () => {
-  const [historyOrders, setHistoryOrders] = useState<any[]>([]);
-  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [historyOrders, setHistoryOrders] = useState<OrderRecord[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset về trang 1 khi từ khóa tìm kiếm thay đổi
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [ordersRes, techRes] = await Promise.all([
-        fetchApi<any>("/orders"),
-        fetchApi<any>("/technicians"),
+        fetchApiPages<OrderRecord>("/orders"),
+        fetchApi<Technician[]>("/technicians"),
       ]);
 
       const list = Array.isArray(ordersRes?.items)
@@ -48,12 +42,12 @@ export const HistoryList = () => {
 
       // Filter only finished or cancelled orders
       const finished = list.filter(
-        (o: any) => o.status === "COMPLETED" || o.status === "CANCELLED"
+        (o) => o.status === "COMPLETED" || o.status === "CANCELLED"
       );
-      setHistoryOrders(finished.length > 0 ? finished : list);
+      setHistoryOrders(finished);
 
       setTechnicians(Array.isArray(techRes) ? techRes : []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Error fetching history:", err);
     } finally {
       setLoading(false);
@@ -61,7 +55,7 @@ export const HistoryList = () => {
   };
 
   useEffect(() => {
-    fetchHistory();
+    void Promise.resolve().then(fetchHistory);
   }, []);
 
   const filtered = historyOrders.filter((o) => {
@@ -108,7 +102,7 @@ export const HistoryList = () => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             placeholder="Tìm theo mã đơn, tên khách hàng..."
             className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800"
           />
@@ -146,7 +140,7 @@ export const HistoryList = () => {
                 </tr>
               ) : (
                 paginatedHistory.map((o) => {
-                  const badge = getStatusBadge(o.status);
+                  const badge = getStatusBadge(o.status || "REQUESTED");
                   return (
                     <tr key={o.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-4 font-bold text-slate-900">
@@ -163,7 +157,7 @@ export const HistoryList = () => {
                         {o.customer?.full_name || o.customer_name || "Khách hàng"}
                       </td>
                       <td className="py-3.5 px-4 text-xs text-slate-600">
-                        {o.device?.model_name || o.device?.device_type || "Thiết bị"}
+                        {(typeof o.device === "string" ? o.device : o.device?.model_name || o.device?.device_type) || "Thiết bị"}
                       </td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-slate-700">
                         {o.technician?.name || o.technician?.full_name || "---"}

@@ -1,23 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Briefcase,
-  Users,
-  Monitor,
-  UserRoundCog,
-  History,
-  Settings,
-  LogOut,
-  Plus,
-  Circle,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 import { BrandMark } from "@h-mobility/ui";
+import {
+Briefcase,
+History,
+LayoutDashboard,
+LogOut,
+Monitor,
+PanelLeftClose,
+PanelLeftOpen,
+Plus,
+Settings,
+UserRoundCog,
+Users
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export interface SidebarProps {
   activeTab: string;

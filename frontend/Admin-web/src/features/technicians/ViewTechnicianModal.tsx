@@ -1,10 +1,10 @@
 "use client";
+import type { Technician } from "@/types/api";
 
-import React from "react";
-import { X, User, Phone, Mail, Award, CheckCircle2, XCircle, Clock, ShieldCheck, Wrench, Star, CreditCard, FileCheck } from "lucide-react";
+import { CheckCircle2,Clock,Mail,Phone,Star,User,X,XCircle } from "lucide-react";
 
 export interface ViewTechnicianModalProps {
-  technician: any;
+  technician: Technician;
   onClose: () => void;
 }
 

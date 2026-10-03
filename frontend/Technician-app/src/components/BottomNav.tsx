@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Home, CalendarDays, History, User } from "lucide-react";
+import { Home, ClipboardList, CalendarDays, History, User } from "lucide-react";
 import { BottomNav as SharedBottomNav } from "@h-mobility/ui";
 
 interface BottomNavProps {
@@ -11,6 +11,7 @@ interface BottomNavProps {
 
 const NAV_ITEMS = [
   { id: "home", label: "Trang chủ", icon: <Home strokeWidth={2} /> },
+  { id: "tasks", label: "Công việc", icon: <ClipboardList strokeWidth={2} /> },
   { id: "schedule", label: "Lịch hẹn", icon: <CalendarDays strokeWidth={2} /> },
   { id: "history", label: "Lịch sử", icon: <History strokeWidth={2} /> },
   { id: "profile", label: "Cá nhân", icon: <User strokeWidth={2} /> },

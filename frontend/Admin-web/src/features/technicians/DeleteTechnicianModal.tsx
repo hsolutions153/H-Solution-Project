@@ -1,10 +1,11 @@
 "use client";
+import type { Technician } from "@/types/api";
 
 import React, { useState } from "react";
 import { AlertTriangle, Trash2, X, RefreshCw } from "lucide-react";
 
 export interface DeleteTechnicianModalProps {
-  technician: any;
+  technician: Technician;
   onClose: () => void;
   onSuccess: (msg: string) => void;
 }

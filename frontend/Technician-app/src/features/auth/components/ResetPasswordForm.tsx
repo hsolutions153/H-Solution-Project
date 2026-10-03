@@ -5,11 +5,12 @@ import { ResetPasswordFormData } from '@/types/auth';
 import { Eye, EyeOff, Info, LogIn } from 'lucide-react';
 
 interface ResetPasswordFormProps {
-  onSubmit: (data: ResetPasswordFormData) => void;
-  onBackToLogin: () => void;
+  loading?: boolean;
+  onSubmit: (data: ResetPasswordFormData) => void | Promise<void>;
+  onBackToLogin: () => void | Promise<void>;
 }
 
-export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordFormProps) => {
+export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPasswordFormProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -21,8 +22,8 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
     setErrorMessage('');
 
     // Kiểm tra độ dài tối thiểu 8 ký tự
-    if (newPassword.length < 8) {
-      setErrorMessage('Mật khẩu phải từ 8 ký tự trở lên.');
+    if (newPassword.length < 8 || newPassword.length > 72) {
+      setErrorMessage('Mật khẩu phải từ 8 đến 72 ký tự.');
       return;
     }
 
@@ -118,6 +119,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin }: ResetPasswordForm
         
         <button
           type="submit"
+            disabled={loading}
           className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-xs rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
         >
           <span>Lưu mật khẩu & Đăng nhập</span>

@@ -124,6 +124,9 @@ export interface OrderRecord {
   technician_id?: string;
   technician?: OrderTechnician;
   created_at?: string;
+  updated_at?: string;
+  completed_at?: string;
+  estimated_cost?: number;
   images?: (OrderImageItem | string)[];
   quote?: QuoteDetail;
   payment_method?: string;

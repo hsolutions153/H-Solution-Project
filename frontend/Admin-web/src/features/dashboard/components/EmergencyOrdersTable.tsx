@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  AlertTriangle,
-  Clock,
-  UserCheck,
-  Eye,
-  RefreshCw,
-  CheckCircle2,
-} from "lucide-react";
-import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
+import type { OrderRecord } from "@/features/orders/OrderDetailModal";
+import type { Technician } from "@/types/api";
+import { errorMessage } from "@/types/api";
+
+import { getStatusBadge,ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 import { OrderDetailModal } from "@/features/orders/OrderDetailModal";
+import {
+AlertTriangle,
+CheckCircle2,
+Eye,
+RefreshCw,
+UserCheck
+} from "lucide-react";
+import React,{ useEffect,useState } from "react";
 
 export interface EmergencyOrdersTableProps {
   onNavigateToOrders?: () => void;
@@ -19,26 +22,25 @@ export interface EmergencyOrdersTableProps {
 
 export const EmergencyOrdersTable = ({
   onNavigateToOrders,
-  onOpenCreateOrder,
 }: EmergencyOrdersTableProps) => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [selectedTechId, setSelectedTechId] = useState<string>("");
-  const [quickAssignOrder, setQuickAssignOrder] = useState<any | null>(null);
+  const [quickAssignOrder, setQuickAssignOrder] = useState<OrderRecord | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchOrdersAndTechs = async () => {
     setLoading(true);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [orderRes, techRes] = await Promise.all([
-        fetchApi<any>("/orders"),
-        fetchApi<any>("/technicians"),
+        fetchApiPages<OrderRecord>("/orders"),
+        fetchApi<Technician[]>("/technicians"),
       ]);
 
       const items = Array.isArray(orderRes?.items)
@@ -58,7 +60,7 @@ export const EmergencyOrdersTable = ({
   };
 
   useEffect(() => {
-    fetchOrdersAndTechs();
+    void Promise.resolve().then(fetchOrdersAndTechs);
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       fetchOrdersAndTechs();
@@ -66,7 +68,7 @@ export const EmergencyOrdersTable = ({
     return () => clearInterval(interval);
   }, []);
 
-  const handleOpenAssign = (order: any, e: React.MouseEvent) => {
+  const handleOpenAssign = (order: OrderRecord, e: React.MouseEvent) => {
     e.stopPropagation();
     setQuickAssignOrder(order);
     setSelectedTechId(
@@ -92,8 +94,8 @@ export const EmergencyOrdersTable = ({
       setTimeout(() => setToastMessage(null), 4000);
       setQuickAssignOrder(null);
       fetchOrdersAndTechs();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi phân công kỹ thuật viên");
+    } catch (err: unknown) {
+      alert(errorMessage(err, "Lỗi khi phân công kỹ thuật viên"));
     } finally {
       setIsAssigning(false);
     }
@@ -178,9 +180,9 @@ export const EmergencyOrdersTable = ({
                 </tr>
               ) : (
                 displayOrders.slice(0, 6).map((order) => {
-                  const badge = getStatusBadge(order.status);
+                  const badge = getStatusBadge(order.status || "REQUESTED");
                   const issueLabel =
-                    ISSUE_TYPE_LABELS[order.issue_type] ||
+                    ISSUE_TYPE_LABELS[order.issue_type || "OTHER"] ||
                     order.issue_type ||
                     "Sự cố";
 
@@ -219,8 +221,7 @@ export const EmergencyOrdersTable = ({
                       {/* Phương tiện / Lỗi */}
                       <td className="py-3 px-2 max-w-[150px]">
                         <div className="text-xs font-semibold text-slate-800 truncate">
-                          {order.device?.model_name ||
-                            order.device?.device_type ||
+                          {(typeof order.device === "string" ? order.device : order.device?.model_name || order.device?.device_type) ||
                             "Thiết bị"}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate">
@@ -305,7 +306,7 @@ export const EmergencyOrdersTable = ({
                   onChange={(e) => setSelectedTechId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-brand-800 outline-none"
                 >
-                  {technicians.map((t: any) => (
+                  {technicians.map((t: Technician) => (
                     <option key={t.user_id || t.id} value={t.user_id || t.id}>
                       {t.full_name || t.user?.full_name || t.name} (
                       {t.specialization || "Chung"}) -{" "}

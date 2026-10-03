@@ -1,9 +1,12 @@
-import hashlib
+﻿import hashlib
 import hmac
+import json
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 import requests
@@ -13,11 +16,13 @@ from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.payments import repository
 from app.repair_requests.models import TECHNICIAN_ROLE_CODE
 
-PAYMENT_CODE_PREFIX = os.getenv("PAYMENT_CODE_PREFIX")
-SEPAY_BANK_ACCOUNT = os.getenv("SEPAY_BANK_ACCOUNT")
-SEPAY_BANK_NAME = os.getenv("SEPAY_BANK_NAME")
-SEPAY_API_KEY = os.getenv("SEPAY_API_KEY")
-SEPAY_QR_BASE_URL = "https://qr.sepay.vn/img"
+PAYMENT_CODE_PREFIX = os.getenv('PAYMENT_CODE_PREFIX') or 'HS'
+SEPAY_BANK_ACCOUNT = os.getenv('SEPAY_BANK_ACCOUNT')
+SEPAY_BANK_NAME = os.getenv('SEPAY_BANK_NAME')
+SEPAY_BANK_ACCOUNT_NAME = os.getenv('SEPAY_BANK_ACCOUNT_NAME', '')
+SEPAY_API_KEY = os.getenv('SEPAY_API_KEY')
+SEPAY_QR_BASE_URL = 'https://qr.sepay.vn/img'
+MOMO_FINAL_FAILURE_CODES = {98, 99, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1017, 1026, 4001, 4002, 4100}
 
 
 def _payment_id() -> str:
@@ -25,322 +30,289 @@ def _payment_id() -> str:
 
 
 def _payment_code() -> str:
-    return f"{PAYMENT_CODE_PREFIX}{secrets.token_hex(4).upper()}"
-
-
-def _role_id(code: str) -> str:
-    role = auth_repository.get_role_by_code(code)
-    if not role:
-        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
-    return role["id"]
+    return f'{PAYMENT_CODE_PREFIX}{secrets.token_hex(4).upper()}'
 
 
 def _is_role(current_user: dict, code: str) -> bool:
-    if current_user.get("role") == code:
-        return True
+    if current_user.get('role'):
+        return current_user['role'] == code
+    role = auth_repository.get_role_by_code(code)
+    return bool(role and current_user.get('role_id') == role['id'])
+
+
+def _authorize_repair(repair_id: str, current_user: dict) -> dict:
+    repair = repository.get_repair_request(repair_id)
+    if not repair:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if not (
+        _is_role(current_user, ADMIN_ROLE_CODE)
+        or (_is_role(current_user, CUSTOMER_ROLE_CODE) and repair['customer_id'] == current_user['sub'])
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and repair.get('technician_id') == current_user['sub'])
+    ):
+        raise AppException(ErrorCode.FORBIDDEN)
+    return repair
+
+
+def _amount(value) -> Decimal:
     try:
-        return current_user.get("role_id") == _role_id(code)
-    except Exception:
-        return False
+        amount = Decimal(str(value))
+        if not amount.is_finite() or amount < 0 or amount != amount.to_integral_value():
+            raise ValueError('Invalid VND amount')
+        return amount
+    except (InvalidOperation, ValueError, TypeError) as error:
+        raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED) from error
+
+
+def _final_amount(repair: dict) -> Decimal:
+    if repair.get('status') != 'COMPLETED' or repair.get('total_amount') is None:
+        raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
+    return _amount(repair['total_amount'])
+
+
+def _metadata(payment: dict) -> dict:
+    try:
+        data = json.loads(payment.get('note') or '{}')
+        return data if isinstance(data, dict) else {}
+    except (ValueError, TypeError):
+        return {}
 
 
 def build_qr_url(payment_code: str, amount: int) -> str:
-    params = {
-        "acc": SEPAY_BANK_ACCOUNT,
-        "bank": SEPAY_BANK_NAME,
-        "amount": amount,
-        "des": payment_code,
-        "template": "compact",
-    }
-    return f"{SEPAY_QR_BASE_URL}?{urlencode(params)}"
+    return f'{SEPAY_QR_BASE_URL}?{urlencode({"acc": SEPAY_BANK_ACCOUNT, "bank": SEPAY_BANK_NAME, "amount": amount, "des": payment_code, "template": "compact"})}'
 
 
-def fetch_qr(repair_id: str, current_user: dict, payment_method: str = "BANK_TRANSFER"):
-    repair = repository.get_repair_request(repair_id)
-    if not repair:
-        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
-
-    is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
-    is_customer_owner = (
-        _is_role(current_user, CUSTOMER_ROLE_CODE)
-        and repair["customer_id"] == current_user["sub"]
-    )
-    is_assigned_technician = (
-        _is_role(current_user, TECHNICIAN_ROLE_CODE)
-        and repair.get("technician_id") == current_user["sub"]
-    )
-    if not (is_admin or is_customer_owner or is_assigned_technician):
-        raise AppException(ErrorCode.FORBIDDEN)
-
-    payment = repository.get_payment_by_repair_id(repair_id)
-    if payment and payment.get("payment_status") == "PAID":
+def _ensure_payment(repair: dict, current_user: dict, method: str) -> dict:
+    amount = _final_amount(repair)
+    payment = repository.get_payment_by_repair_id(repair['id'])
+    if payment and payment.get('payment_status') == 'PAID':
         raise AppException(ErrorCode.PAYMENT_ALREADY_PAID)
-
-    amount = repair.get("total_amount")
-    if not amount or float(amount) <= 0:
-        quote = repository.get_accepted_quote(repair_id)
-        if quote:
-            amount = quote["estimated_price"]
-        else:
-            # Fallback to latest quote for this repair request
-            try:
-                from app.db.database import supabase
-                from app.payments.models import REPAIR_QUOTES_TABLE
-                q_res = supabase.table(REPAIR_QUOTES_TABLE).select("estimated_price").eq("repair_id", repair_id).limit(1).execute()
-                if q_res and q_res.data and len(q_res.data) > 0:
-                    amount = q_res.data[0]["estimated_price"]
-            except Exception:
-                pass
-
-    if not amount or float(amount) <= 0:
-        amount = 250000  # Default minimum service fee fallback
-
+    fields = {'amount': str(amount), 'payment_method': method, 'updated_by': current_user['sub']}
     if payment:
-        updated_fields = {"amount": str(amount), "payment_method": payment_method}
-        repository.update_payment(payment["id"], updated_fields)
-        payment.update(updated_fields)
-    else:
-        payment_id = _payment_id()
-        payment = repository.create_payment({
-            "id": payment_id,
-            "repair_id": repair_id,
-            "payment_code": _payment_code(),
-            "amount": str(amount),
-            "currency": "VND",
-            "payment_method": payment_method,
-            "payment_status": "UNPAID",
-            "created_by": current_user["sub"],
-            "updated_by": current_user["sub"],
-        })
-        if not payment:
-            raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
-        repository.add_payment_history({
-            "id": _payment_id(),
-            "payment_id": payment_id,
-            "action": "CREATED",
-            "old_status": None,
-            "new_status": "UNPAID",
-            "amount": str(amount),
-            "changed_by": current_user["sub"],
-        })
+        if payment.get('payment_status') in {'FAILED', 'CANCELLED', 'EXPIRED'}:
+            fields.update(payment_status='UNPAID', payment_code=_payment_code(), note=None, failure_reason=None)
+        if payment.get('payment_status') == 'PENDING' and (
+            payment['payment_method'] != method or _amount(payment['amount']) != amount
+        ):
+            raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message='Giao dịch đang được xử lý. Vui lòng kiểm tra kết quả trước khi đổi phương thức thanh toán.')
+        updated = repository.update_unpaid_payment(payment['id'], fields)
+        if not updated:
+            raise AppException(ErrorCode.PAYMENT_ALREADY_PAID)
+        return updated
+    payment = repository.create_payment({
+        'id': _payment_id(), 'repair_id': repair['id'], 'payment_code': _payment_code(),
+        'currency': 'VND', 'payment_status': 'UNPAID', 'created_by': current_user['sub'], **fields,
+    })
+    if not payment:
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    repository.add_payment_history({
+        'id': _payment_id(), 'payment_id': payment['id'], 'action': 'CREATED',
+        'old_status': None, 'new_status': 'UNPAID', 'amount': str(amount), 'changed_by': current_user['sub'],
+    })
+    return payment
 
-    qr_url = build_qr_url(payment["payment_code"], int(float(str(amount))))
-    return {"payment": payment, "qr_url": qr_url}
+
+def _settle(payment: dict, transaction_code: str, changed_by: str | None = None) -> dict:
+    if payment.get('payment_status') == 'PAID':
+        return payment
+    repair = repository.get_repair_request(payment['repair_id'])
+    if not repair or _final_amount(repair) != _amount(payment['amount']):
+        raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED)
+    previous = repository.get_payment_by_transaction_code(transaction_code)
+    if previous and previous['id'] != payment['id']:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message='Giao dịch này đã được ghi nhận cho một khoản thanh toán khác.')
+    now = datetime.now(timezone.utc).isoformat()
+    updated = repository.update_unpaid_payment(payment['id'], {
+        'payment_status': 'PAID', 'transaction_code': transaction_code,
+        'paid_at': now, 'updated_by': changed_by or 'SYSTEM',
+    })
+    if not updated:
+        current = repository.get_payment_by_repair_id(payment['repair_id'])
+        if current and current.get('payment_status') == 'PAID':
+            return current
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    repository.add_payment_history({
+        'id': _payment_id(), 'payment_id': payment['id'], 'action': 'PAID',
+        'old_status': payment['payment_status'], 'new_status': 'PAID',
+        'amount': str(payment['amount']), 'transaction_code': transaction_code, 'changed_by': changed_by,
+    })
+    # Payment never changes the repair status or the final cost.
+    return updated
+
+
+def fetch_qr(repair_id: str, current_user: dict, payment_method: str = 'BANK_TRANSFER'):
+    repair = _authorize_repair(repair_id, current_user)
+    method = 'CASH' if payment_method == 'COD' else payment_method
+    if method not in {'CASH', 'BANK_TRANSFER'}:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message='Phương thức thanh toán không hợp lệ.')
+    amount = _final_amount(repair)
+    if amount > 0 and method == 'BANK_TRANSFER' and not (SEPAY_BANK_ACCOUNT and SEPAY_BANK_NAME):
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='Thanh toán chuyển khoản chưa được cấu hình.')
+    payment = _ensure_payment(repair, current_user, method)
+    if amount == 0:
+        payment = _settle(payment, f'FREE:{payment["id"]}', current_user['sub'])
+    return {
+        'payment': payment,
+        'qr_url': build_qr_url(payment['payment_code'], int(amount)) if amount > 0 and method == 'BANK_TRANSFER' else None,
+        'bank_account': SEPAY_BANK_ACCOUNT, 'bank_name': SEPAY_BANK_NAME, 'bank_account_name': SEPAY_BANK_ACCOUNT_NAME,
+    }
 
 
 def handle_sepay_webhook(payload, auth_header: str | None):
-    if not auth_header or not auth_header.startswith("Apikey "):
+    if not auth_header or not auth_header.startswith('Apikey ') or not SEPAY_API_KEY or not secrets.compare_digest(auth_header[7:], SEPAY_API_KEY):
         raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
-    provided_key = auth_header[len("Apikey "):]
-    if not SEPAY_API_KEY or not secrets.compare_digest(provided_key, SEPAY_API_KEY):
-        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
-
-    if payload.transferType and payload.transferType != "in":
-        return {"success": True}
-
-    target_code = payload.code.strip() if payload.code else None
-    payment = None
-
-    if target_code:
-        payment = repository.get_payment_by_code(target_code)
-
+    if payload.transferType != 'in':
+        return {'success': True}
+    if SEPAY_BANK_ACCOUNT and payload.accountNumber != SEPAY_BANK_ACCOUNT:
+        return {'success': True}
+    payment = repository.get_payment_by_code(payload.code.strip().upper()) if payload.code else None
     if not payment:
-        search_texts = [payload.content, payload.description]
-        for text in search_texts:
-            if not text:
-                continue
-            words = text.replace("-", " ").replace("_", " ").split()
-            for word in words:
-                clean_word = word.strip().upper()
-                if clean_word.startswith(PAYMENT_CODE_PREFIX or "HS"):
-                    candidate = repository.get_payment_by_code(clean_word)
-                    if candidate:
-                        payment = candidate
-                        break
-            if payment:
-                break
-
-    if not payment:
-        return {"success": True}
-
-    if payment["payment_status"] == "PAID":
-        return {"success": True}
-
-    now = datetime.now(timezone.utc).isoformat()
-    old_status = payment["payment_status"]
-
-    repository.update_payment(payment["id"], {
-        "payment_status": "PAID",
-        "transaction_code": payload.referenceCode,
-        "paid_at": now,
-        "updated_by": "SYSTEM",
-    })
-    repository.add_payment_history({
-        "id": _payment_id(),
-        "payment_id": payment["id"],
-        "action": "PAID",
-        "old_status": old_status,
-        "new_status": "PAID",
-        "amount": str(payment["amount"]),
-        "transaction_code": payload.referenceCode,
-        "changed_by": None,
-    })
-    repository.update_repair_payment_info(payment["repair_id"], {
-        "total_amount": str(payment["amount"]),
-        "updated_by": "SYSTEM",
-    })
-
-    return {"success": True}
+        for word in re.findall(r'[A-Z0-9]+', f'{payload.content or ""} {payload.description or ""}'.upper()):
+            if word.startswith(PAYMENT_CODE_PREFIX):
+                payment = repository.get_payment_by_code(word)
+                if payment:
+                    break
+    if not payment or payment.get('payment_status') == 'PAID':
+        return {'success': True}
+    if payment.get('payment_method') != 'BANK_TRANSFER' or payload.transferAmount is None:
+        return {'success': True}
+    # A partial transfer is acknowledged but must not settle the full invoice.
+    if _amount(payload.transferAmount) < _amount(payment['amount']):
+        return {'success': True}
+    reference = payload.referenceCode or str(payload.id)
+    _settle(payment, f'SEPAY:{reference}')
+    return {'success': True}
 
 
-def create_momo_payment(repair_id: str, current_user: dict, request_type: str = "payWithATM"):
-    repair = repository.get_repair_request(repair_id)
-    if not repair:
-        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+def _momo_config() -> dict:
+    config = {key: os.getenv(f'MOMO_{key.upper()}') for key in ('partner_code', 'access_key', 'secret_key')}
+    if not all(config.values()):
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='Thanh toán MoMo chưa được cấu hình.')
+    config['create_url'] = os.getenv('MOMO_API_URL', 'https://test-payment.momo.vn/v2/gateway/api/create')
+    config['query_url'] = os.getenv('MOMO_QUERY_URL', config['create_url'].rsplit('/', 1)[0] + '/query')
+    return config
 
-    is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
-    is_customer_owner = (
-        _is_role(current_user, CUSTOMER_ROLE_CODE)
-        and repair["customer_id"] == current_user["sub"]
-    )
-    is_assigned_technician = (
-        _is_role(current_user, TECHNICIAN_ROLE_CODE)
-        and repair.get("technician_id") == current_user["sub"]
-    )
-    if not (is_admin or is_customer_owner or is_assigned_technician):
-        raise AppException(ErrorCode.FORBIDDEN)
 
-    amount = repair.get("total_amount")
-    if not amount or float(amount) <= 0:
-        quote = repository.get_accepted_quote(repair_id)
-        if quote:
-            amount = quote["estimated_price"]
-        else:
-            try:
-                from app.db.database import supabase
-                from app.payments.models import REPAIR_QUOTES_TABLE
-                q_res = supabase.table(REPAIR_QUOTES_TABLE).select("estimated_price").eq("repair_id", repair_id).limit(1).execute()
-                if q_res and q_res.data and len(q_res.data) > 0:
-                    amount = q_res.data[0]["estimated_price"]
-            except Exception:
-                pass
+def _signature(data: dict, secret: str) -> str:
+    raw = '&'.join(f'{key}={data[key]}' for key in sorted(data))
+    return hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
 
-    if not amount or float(amount) <= 0:
-        amount = 250000
 
-    int_amount = int(float(str(amount)))
-
-    payment = repository.get_payment_by_repair_id(repair_id)
-    if payment:
-        repository.update_payment(payment["id"], {"amount": str(int_amount), "payment_method": "MOMO_ATM"})
-    else:
-        payment_id = _payment_id()
-        payment = repository.create_payment({
-            "id": payment_id,
-            "repair_id": repair_id,
-            "payment_code": _payment_code(),
-            "amount": str(int_amount),
-            "currency": "VND",
-            "payment_method": "MOMO_ATM",
-            "payment_status": "UNPAID",
-            "created_by": current_user["sub"],
-            "updated_by": current_user["sub"],
-        })
-
-    partner_code = os.getenv("MOMO_PARTNER_CODE", "MOMO")
-    access_key = os.getenv("MOMO_ACCESS_KEY", "F8BBA842ECF85")
-    secret_key = os.getenv("MOMO_SECRET_KEY", "K971N52YBDHBRh3K")
-    endpoint = os.getenv("MOMO_API_URL", "https://test-payment.momo.vn/v2/gateway/api/create")
-
-    order_id = f"HS_{repair_id[:8]}_{int(datetime.now().timestamp())}"
-    request_id = str(uuid.uuid4())
-    order_info = f"Thanh toan don sua chua #{repair_id[:8]}"
-    redirect_url = f"http://localhost:3000/home/history/{repair_id}"
-    ipn_url = "http://localhost:8000/api/payments/webhook/momo"
-    amount_str = str(int_amount)
-    extra_data = ""
-
-    raw_signature = (
-        f"accessKey={access_key}"
-        f"&amount={amount_str}"
-        f"&extraData={extra_data}"
-        f"&ipnUrl={ipn_url}"
-        f"&orderId={order_id}"
-        f"&orderInfo={order_info}"
-        f"&partnerCode={partner_code}"
-        f"&redirectUrl={redirect_url}"
-        f"&requestId={request_id}"
-        f"&requestType={request_type}"
-    )
-
-    signature = hmac.new(
-        secret_key.encode("utf-8"),
-        raw_signature.encode("utf-8"),
-        hashlib.sha256
-    ).hexdigest()
-
-    payload = {
-        "partnerCode": partner_code,
-        "partnerName": "H-Solution",
-        "storeId": "H-Solution",
-        "requestId": request_id,
-        "amount": int_amount,
-        "orderId": order_id,
-        "orderInfo": order_info,
-        "redirectUrl": redirect_url,
-        "ipnUrl": ipn_url,
-        "lang": "vi",
-        "requestType": request_type,
-        "autoCapture": True,
-        "extraData": extra_data,
-        "signature": signature
-    }
-
+def _momo_post(url: str, payload: dict) -> dict:
     try:
-        res = requests.post(endpoint, json=payload, headers={"Content-Type": "application/json"}, timeout=8)
-        res_data = res.json()
-        if res_data.get("resultCode") == 0 and res_data.get("payUrl"):
-            return {
-                "success": True,
-                "pay_url": res_data["payUrl"],
-                "qr_code_url": res_data.get("qrCodeUrl") or f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={res_data['payUrl']}",
-                "order_id": order_id,
-                "amount": float(int_amount),
-            }
-    except Exception as e:
-        print("MoMo API call error:", e)
+        response = requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError('Invalid gateway response')
+        return data
+    except (requests.RequestException, ValueError) as error:
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='Không thể kết nối dịch vụ MoMo. Vui lòng thử lại.') from error
 
-    sim_pay_url = f"https://test-payment.momo.vn/v2/gateway/pay?partnerCode=MOMO&orderId={order_id}&amount={amount_str}&requestType={request_type}"
-    sim_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={sim_pay_url}"
 
-    return {
-        "success": True,
-        "pay_url": sim_pay_url,
-        "qr_code_url": sim_qr_url,
-        "order_id": order_id,
-        "amount": float(int_amount),
+def _fail_momo(payment: dict, result_code: int, changed_by: str | None = None) -> dict:
+    if payment.get('payment_status') in {'PAID', 'FAILED'}:
+        return payment
+    updated = repository.update_unpaid_payment(payment['id'], {
+        'payment_status': 'FAILED', 'failure_reason': f'MoMo resultCode={result_code}',
+        'updated_by': changed_by or 'SYSTEM',
+    })
+    if not updated:
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    repository.add_payment_history({
+        'id': _payment_id(), 'payment_id': payment['id'], 'action': 'FAILED',
+        'old_status': payment['payment_status'], 'new_status': 'FAILED',
+        'amount': str(payment['amount']), 'changed_by': changed_by,
+    })
+    return updated
+
+
+def create_momo_payment(repair_id: str, current_user: dict, request_type: str = 'payWithATM'):
+    repair = _authorize_repair(repair_id, current_user)
+    amount = _final_amount(repair)
+    if request_type not in {'payWithATM', 'captureWallet'}:
+        raise AppException(ErrorCode.VALIDATION_ERROR)
+    config = _momo_config() if amount > 0 else None
+    payment = _ensure_payment(repair, current_user, 'QR')
+    if amount == 0:
+        _settle(payment, f'FREE:{payment["id"]}', current_user['sub'])
+        return {'success': True, 'pay_url': None, 'qr_code_url': None, 'order_id': payment['payment_code'], 'amount': 0}
+    metadata = _metadata(payment)
+    if metadata.get('provider') == 'MOMO' and metadata.get('pay_url') and payment.get('payment_status') == 'PENDING':
+        return {'success': True, 'pay_url': metadata['pay_url'], 'qr_code_url': metadata.get('qr_code_url'), 'order_id': payment['payment_code'], 'amount': float(amount)}
+    request_id = metadata.get('request_id') or str(uuid.uuid4())
+    payload = metadata.get('request') or {
+        'partnerCode': config['partner_code'], 'requestId': request_id,
+        'amount': int(amount), 'orderId': payment['payment_code'],
+        'orderInfo': f'Thanh toan don sua chua {repair_id}',
+        'redirectUrl': f'{os.getenv("USER_APP_URL", "http://localhost:3002").rstrip("/")}/home/history/{repair_id}',
+        'ipnUrl': os.getenv('MOMO_IPN_URL') or f'{os.getenv("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")}/api/v1/payments/webhook/momo',
+        'lang': 'vi', 'requestType': request_type, 'autoCapture': True, 'extraData': '',
     }
+    # Save the invoice before contacting the gateway, so a timeout does not lose
+    # its callback mapping. Retries reuse the same request for gateway idempotency.
+    metadata = {'provider': 'MOMO', 'request_id': request_id, 'request': dict(payload)}
+    pending = payment if payment.get('payment_status') == 'PENDING' and _metadata(payment).get('request') else repository.begin_momo_payment(payment['id'], {'payment_status': 'PENDING', 'note': json.dumps(metadata), 'updated_by': current_user['sub']})
+    if not pending:
+        current = repository.get_payment_by_repair_id(repair_id)
+        if current and (current.get('payment_status') == 'PAID' or (current.get('payment_status') == 'PENDING' and _metadata(current).get('provider') == 'MOMO')):
+            saved = _metadata(current)
+            return {'success': True, 'pay_url': saved.get('pay_url'), 'qr_code_url': saved.get('qr_code_url'), 'order_id': current['payment_code'], 'amount': float(amount)}
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    signed = {key: payload[key] for key in ('amount', 'extraData', 'ipnUrl', 'orderId', 'orderInfo', 'partnerCode', 'redirectUrl', 'requestId', 'requestType')}
+    payload['signature'] = _signature({'accessKey': config['access_key'], **signed}, config['secret_key'])
+    result = _momo_post(config['create_url'], payload)
+    if result.get('resultCode') in {40, 41}:
+        return {'success': True, 'pay_url': None, 'qr_code_url': None, 'order_id': payment['payment_code'], 'amount': float(amount)}
+    if result.get('resultCode') != 0:
+        _fail_momo(pending, result.get('resultCode', 99), current_user['sub'])
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='MoMo chưa thể tạo giao dịch thanh toán. Vui lòng thử lại.')
+    if not result.get('payUrl'):
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='MoMo chưa trả về đường dẫn thanh toán. Vui lòng kiểm tra kết quả giao dịch trước khi thử lại.')
+    metadata.update(pay_url=result['payUrl'], qr_code_url=result.get('qrCodeUrl'))
+    if not repository.update_unpaid_payment(payment['id'], {'payment_status': 'PENDING', 'note': json.dumps(metadata), 'updated_by': current_user['sub']}):
+        current = repository.get_payment_by_repair_id(repair_id)
+        if current and current.get('payment_status') == 'PAID':
+            return {'success': True, 'pay_url': None, 'qr_code_url': None, 'order_id': current['payment_code'], 'amount': float(amount)}
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    return {'success': True, 'pay_url': result['payUrl'], 'qr_code_url': result.get('qrCodeUrl'), 'order_id': payment['payment_code'], 'amount': float(amount)}
 
 
 def confirm_momo_payment(repair_id: str, current_user: dict):
-    repair = repository.get_repair_request(repair_id)
-    if not repair:
-        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
-
+    repair = _authorize_repair(repair_id, current_user)
+    _final_amount(repair)
     payment = repository.get_payment_by_repair_id(repair_id)
-    now = datetime.now(timezone.utc).isoformat()
+    if not payment:
+        raise AppException(ErrorCode.PAYMENT_NOT_FOUND)
+    if payment.get('payment_status') == 'PAID':
+        return {'success': True, 'payment_status': 'PAID'}
+    if _metadata(payment).get('provider') != 'MOMO':
+        raise AppException(ErrorCode.VALIDATION_ERROR, message='Đơn này chưa có giao dịch MoMo.')
+    config = _momo_config()
+    payload = {'partnerCode': config['partner_code'], 'requestId': str(uuid.uuid4()), 'orderId': payment['payment_code'], 'lang': 'vi'}
+    payload['signature'] = _signature({'accessKey': config['access_key'], **{key: payload[key] for key in ('orderId', 'partnerCode', 'requestId')}}, config['secret_key'])
+    result = _momo_post(config['query_url'], payload)
+    if result.get('partnerCode') != config['partner_code'] or result.get('orderId') != payment['payment_code'] or _amount(result.get('amount')) != _amount(payment['amount']):
+        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED, message='Thông tin giao dịch MoMo không khớp với đơn.')
+    if result.get('resultCode') != 0 or not result.get('transId'):
+        if result.get('resultCode') in MOMO_FINAL_FAILURE_CODES:
+            failed = _fail_momo(payment, result['resultCode'], current_user['sub'])
+            return {'success': False, 'payment_status': failed['payment_status'], 'message': 'Giao dịch MoMo không thành công. Bạn có thể tạo giao dịch mới hoặc chọn phương thức khác.'}
+        return {'success': False, 'payment_status': payment['payment_status'], 'message': 'Chưa ghi nhận thanh toán MoMo thành công. Vui lòng kiểm tra lại sau.'}
+    _settle(payment, f'MOMO:{result["transId"]}', current_user['sub'])
+    return {'success': True, 'payment_status': 'PAID'}
 
-    if payment:
-        repository.update_payment(payment["id"], {
-            "payment_status": "PAID",
-            "transaction_code": f"MOMO_ATM_{int(datetime.now().timestamp())}",
-            "paid_at": now,
-            "updated_by": current_user["sub"],
-        })
 
-    repository.update_repair_payment_info(repair_id, {
-        "status": "COMPLETED",
-        "updated_by": current_user["sub"],
-    })
-
-    return {"success": True, "status": "COMPLETED"}
+def handle_momo_webhook(payload):
+    config = _momo_config()
+    data = payload.model_dump()
+    signed = {key: data[key] for key in ('amount', 'extraData', 'message', 'orderId', 'orderInfo', 'orderType', 'partnerCode', 'payType', 'requestId', 'responseTime', 'resultCode', 'transId')}
+    expected = _signature({'accessKey': config['access_key'], **signed}, config['secret_key'])
+    if data['partnerCode'] != config['partner_code'] or not secrets.compare_digest(data['signature'], expected):
+        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
+    payment = repository.get_payment_by_code(data['orderId'])
+    if not payment or _metadata(payment).get('provider') != 'MOMO' or _metadata(payment).get('request_id') != data['requestId'] or _amount(data['amount']) != _amount(payment['amount']):
+        raise AppException(ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED)
+    if data['resultCode'] == 0 and data['transId']:
+        _settle(payment, f'MOMO:{data["transId"]}')
+    elif data['resultCode'] in MOMO_FINAL_FAILURE_CODES:
+        _fail_momo(payment, data['resultCode'])

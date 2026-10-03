@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import type { Technician } from "@/types/api";
+
 import { Users } from "lucide-react";
+import { useEffect,useState } from "react";
 
 export interface TechStaffStatusProps {
   onNavigateToTechs?: () => void;
 }
 
 export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => {
-  const [techs, setTechs] = useState<any[]>([]);
+  const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTechs = async () => {
       try {
         const { fetchApi } = await import("@/lib/api-client");
-        const res = await fetchApi<any>("/technicians");
+        const res = await fetchApi<Technician[]>("/technicians");
         setTechs(Array.isArray(res) ? res : []);
       } catch (err) {
         console.warn("Could not fetch technicians:", err);

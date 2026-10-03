@@ -39,6 +39,21 @@ def update_payment(payment_id: str, data: dict):
     return response.data[0] if response and response.data else None
 
 
+def update_unpaid_payment(payment_id: str, data: dict):
+    response = supabase.table(PAYMENTS_TABLE).update(data).eq("id", payment_id).neq("payment_status", "PAID").execute()
+    return response.data[0] if response and response.data else None
+
+
+def begin_momo_payment(payment_id: str, data: dict):
+    response = supabase.table(PAYMENTS_TABLE).update(data).eq("id", payment_id).eq("payment_status", "UNPAID").eq("payment_method", "QR").execute()
+    return response.data[0] if response and response.data else None
+
+
+def get_payment_by_transaction_code(transaction_code: str):
+    response = supabase.table(PAYMENTS_TABLE).select("id").eq("transaction_code", transaction_code).maybe_single().execute()
+    return response.data if response and hasattr(response, "data") else None
+
+
 def add_payment_history(data: dict):
     response = supabase.table(PAYMENT_HISTORY_TABLE).insert(data).execute()
     return response.data[0] if response and response.data else None
