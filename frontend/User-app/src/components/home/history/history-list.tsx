@@ -20,6 +20,9 @@ interface RepairHistoryItem {
   issueType?: string;
   isSos?: boolean;
   location?: string;
+  laborCost?: number;
+  partsCost?: number;
+  quote?: any;
 }
 
 type FilterTab = "all" | "this_month" | "completed";
@@ -238,6 +241,9 @@ export function HistoryList() {
           issueType: item.issue_type,
           isSos,
           location,
+          laborCost: item.quote?.labor_fee !== undefined && item.quote?.labor_fee !== null ? Number(item.quote.labor_fee) : undefined,
+          partsCost: item.quote?.parts_cost !== undefined && item.quote?.parts_cost !== null ? Number(item.quote.parts_cost) : undefined,
+          quote: item.quote || null,
           total: item.total_amount
             ? Number(item.total_amount)
             : item.quote?.estimated_price

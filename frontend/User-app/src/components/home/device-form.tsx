@@ -239,11 +239,20 @@ export function DeviceForm({ device }: Props) {
             accept="image/jpeg,image/png,image/webp,image/jpg"
             onChange={handleImageChange}
           />
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             className="device-upload"
-            disabled={uploadingImage}
-            onClick={() => imageInputRef.current?.click()}
+            aria-disabled={uploadingImage}
+            onClick={() => {
+              if (!uploadingImage) imageInputRef.current?.click();
+            }}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !uploadingImage) {
+                e.preventDefault();
+                imageInputRef.current?.click();
+              }
+            }}
           >
             {uploadingImage ? (
               <>
@@ -281,7 +290,7 @@ export function DeviceForm({ device }: Props) {
                 <span>Không bắt buộc · Giúp kỹ thuật viên dễ dàng nhận diện</span>
               </>
             )}
-          </button>
+          </div>
         </div>
 
         {/* 2. Banner chọn nhanh Thương hiệu & Dòng xe */}

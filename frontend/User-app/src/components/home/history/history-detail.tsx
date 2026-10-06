@@ -237,6 +237,12 @@ export function HistoryDetail() {
           const list = JSON.parse(cachedList);
           const found = list.find((it: any) => it.id === id || it.orderCode === id);
           if (found) {
+            const labor = found.laborCost !== undefined && found.laborCost !== null
+              ? Number(found.laborCost)
+              : (found.quote?.labor_fee !== undefined ? Number(found.quote.labor_fee) : 0);
+            const parts = found.partsCost !== undefined && found.partsCost !== null
+              ? Number(found.partsCost)
+              : (found.quote?.parts_cost !== undefined ? Number(found.quote.parts_cost) : 0);
             return {
               id: found.id,
               orderCode: found.orderCode,
@@ -259,9 +265,9 @@ export function HistoryDetail() {
               jobs: [],
               issueType: found.issueType,
               repairDesc: found.title,
-              parts: [],
-              laborCost: 0,
-              partsCost: 0,
+              parts: found.parts || [],
+              laborCost: labor,
+              partsCost: parts,
               paymentMethod: null,
               total: found.total || 0,
               images: [],
@@ -297,7 +303,10 @@ export function HistoryDetail() {
   const [paymentNotice, setPaymentNotice] = useState("");
   const [momoData, setMomoData] = useState<any>(null);
 
-  const isFetchingRef = useRef(false);
+  const statusRef = useRef(detail?.status);
+  useEffect(() => {
+    statusRef.current = detail?.status;
+  }, [detail?.status]);
 
   useEffect(() => {
     if (!id) return;
@@ -305,13 +314,20 @@ export function HistoryDetail() {
     let isMounted = true;
 
     async function fetchDetail() {
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
-
       try {
         const { fetchApi } = await import("@/lib/api-client");
-        // Backend /repair-requests/{id} returns full request, images, device, quotes and items in ONE fast mega-query
-        const res = await fetchApi<any>(`/repair-requests/${id}`);
+
+        // Concurrent fetch: Repair request detail + Quotes with items breakdown
+        const [requestRes, quotesRes] = await Promise.allSettled([
+          fetchApi<any>(`/repair-requests/${id}`),
+          fetchApi<any[]>(`/repair-requests/${id}/quotes`),
+        ]);
+
+        if (!isMounted) return;
+
+        const res = requestRes.status === "fulfilled" ? requestRes.value : null;
+        const extraQuotes = quotesRes.status === "fulfilled" && Array.isArray(quotesRes.value) ? quotesRes.value : [];
+
         if (res && res.id) {
           let status: "completed" | "cancelled" | "in_progress" = "in_progress";
           if (res.status === "completed" || res.status === "COMPLETED" || res.status === "PAID") status = "completed";
@@ -330,8 +346,22 @@ export function HistoryDetail() {
               }
             : null;
 
-          // Quotes are already included by backend, eliminating redundant network roundtrips
-          const quotesList: any[] = res.quotes || (res.quote ? [res.quote] : []);
+          // Merge quotes from both APIs to ensure we have complete quote items
+          const baseQuotes: any[] = res.quotes || (res.quote ? [res.quote] : []);
+          const allQuotes: any[] = extraQuotes.length > 0 ? extraQuotes : baseQuotes;
+
+          const quotesList = allQuotes.map((q: any) => {
+            if ((!q.items || q.items.length === 0) && baseQuotes.length > 0) {
+              const matched = baseQuotes.find((bq: any) => bq.id === q.id && bq.items && bq.items.length > 0);
+              if (matched) return { ...q, items: matched.items };
+            }
+            if ((!q.items || q.items.length === 0) && extraQuotes.length > 0) {
+              const matched = extraQuotes.find((eq: any) => eq.id === q.id && eq.items && eq.items.length > 0);
+              if (matched) return { ...q, items: matched.items };
+            }
+            return q;
+          });
+
           const pendingQuote = quotesList.find((q: any) => q.status === "PENDING") || null;
           const acceptedQuotes = quotesList.filter((q: any) => q.status === "ACCEPTED");
 
@@ -354,11 +384,11 @@ export function HistoryDetail() {
             approvedEstimate = initialEstimate;
           }
 
-          // Active quote to inspect
-          const activeQuote = pendingQuote || res.quote || (quotesList.length > 0 ? quotesList[0] : null);
+          // Active quote to inspect: pending quote first, then accepted, then latest quote
+          const activeQuote = pendingQuote || acceptedQuotes[0] || res.quote || (quotesList.length > 0 ? quotesList[0] : null);
           if (isMounted) setQuoteData(activeQuote);
 
-          // Check if this is a supplementary quote (i.e. already has an accepted quote and now a pending quote)
+          // Check if this is a supplementary quote
           const isSupplementaryQuote = Boolean(pendingQuote && (acceptedQuotes.length > 0 || approvedEstimate > 0));
           const additionalAmount = isSupplementaryQuote ? Number(pendingQuote?.estimated_price || 0) : 0;
 
@@ -377,22 +407,18 @@ export function HistoryDetail() {
             effectiveTotal = Number(activeQuote.estimated_price);
           }
 
-          // Phân loại linh kiện và tiền công — ưu tiên item_type từ backend thay vì regex tên
+          // Phân loại linh kiện và tiền công — ưu tiên item_type từ backend
           let parsedParts: Array<{ name: string; quantity: number; unitPrice: number; subtotal: number }> = [];
           let parsedLaborCost = 0;
           let parsedPartsCost = 0;
 
-          // Helper: kiểm tra item có phải tiền công hay không
           const isLaborItem = (it: any): boolean => {
-            // Ưu tiên item_type nếu backend trả về
             if (it.item_type) return it.item_type === "LABOR";
-            // Fallback: regex tên cho dữ liệu cũ
             const name = (it.item_name || it.name || "").toLowerCase();
-            return name.includes("tiền công") || name.includes("công sửa") || name.includes("công kỹ thuật");
+            return name.includes("tiền công") || name.includes("công sửa") || name.includes("công kỹ thuật") || name.includes("kiểm tra");
           };
 
           if (activeQuote && activeQuote.items && activeQuote.items.length > 0) {
-            // Tách items thành labor vs parts/service
             const partsItems = activeQuote.items.filter((it: any) => !isLaborItem(it));
             const laborItems = activeQuote.items.filter((it: any) => isLaborItem(it));
 
@@ -404,33 +430,33 @@ export function HistoryDetail() {
             }));
             parsedPartsCost = parsedParts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
 
-            // Tổng hợp tất cả mục tiền công (có thể > 1 item LABOR)
             parsedLaborCost = laborItems.reduce(
               (sum: number, it: any) => sum + Number(it.subtotal || it.unit_price || it.price || 0),
               0
             );
 
-            // Nếu không tìm thấy labor item nào, dùng labor_fee từ quote record
             if (parsedLaborCost === 0 && activeQuote.labor_fee) {
               parsedLaborCost = Number(activeQuote.labor_fee);
             }
+            if (parsedPartsCost === 0 && activeQuote.parts_cost) {
+              parsedPartsCost = Number(activeQuote.parts_cost);
+            }
           } else if (activeQuote) {
-            // Quote không có items chi tiết → dùng trực tiếp labor_fee / parts_cost từ backend
             parsedLaborCost = Number(activeQuote.labor_fee || activeQuote.laborCost || 0);
             parsedPartsCost = Number(activeQuote.parts_cost || activeQuote.partsCost || 0);
           }
 
-          // Fallback cuối: nếu có quote với labor_fee/parts_cost nhưng items parsing ra 0
-          // → ưu tiên dùng giá trị từ quote record thay vì bịa số
-          if (parsedLaborCost === 0 && parsedPartsCost === 0 && activeQuote) {
-            if (activeQuote.labor_fee) parsedLaborCost = Number(activeQuote.labor_fee);
-            if (activeQuote.parts_cost) parsedPartsCost = Number(activeQuote.parts_cost);
+          if (parsedLaborCost === 0 && activeQuote?.labor_fee) {
+            parsedLaborCost = Number(activeQuote.labor_fee);
+          }
+          if (parsedPartsCost === 0 && activeQuote?.parts_cost) {
+            parsedPartsCost = Number(activeQuote.parts_cost);
           }
 
           if (parsedParts.length === 0 && parsedPartsCost > 0) {
             parsedParts = [
               {
-                name: "Linh kiện thay thế",
+                name: "Phụ tùng thay thế",
                 quantity: 1,
                 unitPrice: parsedPartsCost,
                 subtotal: parsedPartsCost,
@@ -438,7 +464,7 @@ export function HistoryDetail() {
             ];
           }
 
-          // Fallback khi đơn hàng có tổng tiền (effectiveTotal > 0) nhưng chưa có danh sách bóc tách chi tiết (ví dụ đơn seed mẫu REQ0000001)
+          // Fallback khi không có quote chi tiết
           if (parsedLaborCost === 0 && parsedPartsCost === 0 && effectiveTotal > 0) {
             if (effectiveTotal === 450000) {
               parsedLaborCost = 200000;
@@ -474,7 +500,6 @@ export function HistoryDetail() {
                 },
               ];
             } else {
-              // Dưới 300k coi như phí công thợ / phí kiểm tra xử lý sự cố trọn gói
               parsedLaborCost = effectiveTotal;
               parsedPartsCost = 0;
             }
@@ -523,17 +548,15 @@ export function HistoryDetail() {
       } catch (err: any) {
         console.warn("Failed to fetch detail:", err);
       } finally {
-        isFetchingRef.current = false;
         if (isMounted) setLoading(false);
       }
     }
 
     fetchDetail();
 
-    // Background refresh every 8s (only if in progress and tab is visible)
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      if (detail?.status === "in_progress") {
+      if (statusRef.current === "in_progress") {
         fetchDetail();
       }
     }, 8000);
@@ -542,7 +565,7 @@ export function HistoryDetail() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [id, detail?.status]);
+  }, [id]);
 
   const [isApprovingQuote, setIsApprovingQuote] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);

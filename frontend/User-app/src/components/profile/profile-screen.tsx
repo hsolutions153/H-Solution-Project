@@ -359,11 +359,11 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
               </div>
               <div className="profile-info-row">
                 <span className="profile-row-icon"><Mail /></span>
-                <div><strong>Địa chỉ Email</strong><small>{profile.email || "Chưa cập nhật"}</small></div>
+                <div><strong>Email</strong><small>{profile.email || "Chưa cập nhật"}</small></div>
               </div>
               <div className="profile-info-row">
                 <span className="profile-row-icon"><MapPin /></span>
-                <div><strong>Địa chỉ liên hệ</strong><small>{profile.address || "Chưa cập nhật"}</small></div>
+                <div><strong>Địa chỉ</strong><small>{profile.address || "Chưa cập nhật"}</small></div>
               </div>
             </div>
           </section>
