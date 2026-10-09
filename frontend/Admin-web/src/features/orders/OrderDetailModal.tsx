@@ -47,6 +47,8 @@ export interface QuoteDetail {
   status?: string;
   payment_method?: string;
   items?: OrderItem[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TechnicianItem {
@@ -160,6 +162,11 @@ export const OrderDetailModal = ({
   const [selectedPresetReason, setSelectedPresetReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customReasonNote, setCustomReasonNote] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [quotesList, setQuotesList] = useState<QuoteDetail[]>(() => {
+    if (Array.isArray(order?.quotes) && order.quotes.length > 0) return order.quotes as QuoteDetail[];
+    if (order?.quote) return [order.quote as QuoteDetail];
+    return [];
+  });
   const [quoteData, setQuoteData] = useState<QuoteDetail | null>(order?.quote || null);
 
   // Fetch full details (images, quote, device, customer) on mount
@@ -168,32 +175,50 @@ export const OrderDetailModal = ({
     if (order?.id) {
       import("@/lib/api-client")
         .then(async ({ fetchApi }) => {
-          const [orderRes, quoteRes] = await Promise.allSettled([
-            fetchApi<OrderRecord>(`/orders/${order.id}`).catch(() =>
-              fetchApi<OrderRecord>(`/repair-requests/${order.id}`)
-            ),
+          const [orderRes, repairReqRes, quoteRes] = await Promise.allSettled([
+            fetchApi<OrderRecord>(`/orders/${order.id}`),
+            fetchApi<Record<string, unknown>>(`/repair-requests/${order.id}`),
             fetchApi<QuoteDetail[]>(`/repair-requests/${order.id}/quotes`),
           ]);
 
           if (!isMounted) return;
 
+          let mergedData: Record<string, unknown> = {};
+          if (repairReqRes.status === "fulfilled" && repairReqRes.value) {
+            mergedData = { ...mergedData, ...repairReqRes.value };
+          }
           if (orderRes.status === "fulfilled" && orderRes.value) {
-            const data = orderRes.value;
-            setOrderDetail((prev: OrderRecord) => ({ ...prev, ...data }));
-            if (Array.isArray(data.images) && data.images.length > 0) {
-              setImages(data.images);
+            mergedData = { ...mergedData, ...orderRes.value };
+          }
+
+          if (Object.keys(mergedData).length > 0) {
+            setOrderDetail((prev: OrderRecord) => ({ ...prev, ...mergedData }));
+            if (Array.isArray(mergedData.images) && mergedData.images.length > 0) {
+              setImages(mergedData.images as (OrderImageItem | string)[]);
             }
-            if (data.technician_id) {
-              setSelectedTechId(data.technician_id);
+            if (mergedData.technician_id) {
+              setSelectedTechId(mergedData.technician_id as string);
             }
           }
 
-          if (
-            quoteRes.status === "fulfilled" &&
-            Array.isArray(quoteRes.value) &&
-            quoteRes.value.length > 0
-          ) {
-            setQuoteData(quoteRes.value[0]);
+          // Lấy danh sách quotes có items đầy đủ nhất:
+          let resolvedQuotes: QuoteDetail[] = [];
+          if (quoteRes.status === "fulfilled" && Array.isArray(quoteRes.value) && quoteRes.value.length > 0) {
+            resolvedQuotes = quoteRes.value;
+          } else if (Array.isArray(mergedData.quotes) && mergedData.quotes.length > 0) {
+            resolvedQuotes = mergedData.quotes as QuoteDetail[];
+          } else if (Array.isArray(order?.quotes) && order.quotes.length > 0) {
+            resolvedQuotes = order.quotes as QuoteDetail[];
+          } else if (mergedData.quote) {
+            resolvedQuotes = [mergedData.quote as QuoteDetail];
+          }
+
+          if (resolvedQuotes.length > 0) {
+            const sorted = [...resolvedQuotes].sort((a, b) =>
+              String(a.created_at || "").localeCompare(String(b.created_at || ""))
+            );
+            setQuotesList(sorted);
+            setQuoteData(sorted[0]);
           }
         })
         .catch((err) => console.warn("Error fetching full order detail:", err));
@@ -201,7 +226,7 @@ export const OrderDetailModal = ({
     return () => {
       isMounted = false;
     };
-  }, [order?.id]);
+  }, [order?.id, order?.quotes]);
 
   const CANCEL_PRESETS = [
     "Khách hàng yêu cầu hủy",
@@ -526,113 +551,162 @@ export const OrderDetailModal = ({
             </div>
 
             {(() => {
-              const effectiveTotal = Number(
-                quoteData?.estimated_price ||
-                  quoteData?.total_amount ||
-                  orderDetail.total_amount ||
-                  order.total_amount ||
+              // 1. Gom danh sách toàn bộ báo giá
+              const rawQuotes = (quotesList && quotesList.length > 0)
+                ? quotesList
+                : (Array.isArray(orderDetail.quotes) && orderDetail.quotes.length > 0)
+                ? (orderDetail.quotes as QuoteDetail[])
+                : (orderDetail.quote ? [orderDetail.quote as QuoteDetail] : (quoteData ? [quoteData] : []));
+
+              // Sắp xếp các báo giá theo thời gian tạo tăng dần: quote đầu tiên là ban đầu, các quote sau là phát sinh
+              const sortedQuotes = [...rawQuotes].sort((a, b) =>
+                String(a.created_at || "").localeCompare(String(b.created_at || ""))
+              );
+
+              const initialQuote = sortedQuotes.length > 0 ? sortedQuotes[0] : (quoteData || null);
+              const supplementaryQuotes = sortedQuotes.slice(1);
+
+              const acceptedQuotes = sortedQuotes.filter(
+                (q) => q.status === "ACCEPTED" || q.status === "APPROVED"
+              );
+              const acceptedSupplementaryQuotes = supplementaryQuotes.filter(
+                (q) => q.status === "ACCEPTED" || q.status === "APPROVED"
+              );
+              const pendingSupplementaryQuote = supplementaryQuotes.find(
+                (q) => q.status === "PENDING"
+              );
+
+              // Giá báo ban đầu: lấy từ initial_estimate hoặc quote đầu tiên
+              const initialEstimate = Number(
+                (orderDetail.initial_estimate !== undefined && Number(orderDetail.initial_estimate) > 0)
+                  ? orderDetail.initial_estimate
+                  : (initialQuote?.estimated_price || 0)
+              );
+
+              // Tổng phát sinh đã duyệt
+              const approvedSupplementaryAmount = acceptedSupplementaryQuotes.reduce(
+                (sum, q) => sum + Number(q.estimated_price || 0),
+                0
+              );
+
+              // Phát sinh đang chờ duyệt
+              const pendingSupplementaryAmount = pendingSupplementaryQuote
+                ? Number(pendingSupplementaryQuote.estimated_price || 0)
+                : 0;
+
+              // Tổng các khoản đã duyệt: Giá gốc + phát sinh đã duyệt
+              const approvedTotal = (acceptedSupplementaryQuotes.length > 0 && initialEstimate > 0)
+                ? (initialEstimate + approvedSupplementaryAmount)
+                : (acceptedQuotes.length > 0
+                    ? acceptedQuotes.reduce((sum, q) => sum + Number(q.estimated_price || 0), 0)
+                    : (Number(orderDetail.approved_estimate || 0) || initialEstimate));
+
+              // Tính effectiveTotal: Đảm bảo nếu có phát sinh đã duyệt thì tổng = Giá gốc + Phát sinh (1m + 300k = 1m3)
+              const isCompleted =
+                orderDetail.status === "COMPLETED" ||
+                orderDetail.status === "DONE" ||
+                orderDetail.status === "PAID";
+
+              let effectiveTotal = 0;
+              if (isCompleted && orderDetail.total_amount != null && Number(orderDetail.total_amount) > 0) {
+                effectiveTotal = Number(orderDetail.total_amount);
+              } else if (acceptedSupplementaryQuotes.length > 0) {
+                effectiveTotal = initialEstimate + approvedSupplementaryAmount;
+              } else if (acceptedQuotes.length > 0) {
+                effectiveTotal = approvedTotal;
+              } else if (orderDetail.total_amount != null && Number(orderDetail.total_amount) > 0) {
+                effectiveTotal = Number(orderDetail.total_amount);
+              } else if (initialEstimate > 0) {
+                effectiveTotal = initialEstimate;
+              } else {
+                effectiveTotal = Number(order.total_amount || 0);
+              }
+
+              // Gộp linh kiện từ initialQuote và các supplementaryQuotes
+              const parsedItems: (OrderItem & { isSupplementary?: boolean; quoteStatus?: string })[] = [];
+
+              if (initialQuote?.items && initialQuote.items.length > 0) {
+                parsedItems.push(
+                  ...initialQuote.items.map((it) => ({ ...it, isSupplementary: false }))
+                );
+              }
+
+              supplementaryQuotes.forEach((sq) => {
+                if (sq.items && sq.items.length > 0) {
+                  parsedItems.push(
+                    ...sq.items.map((it) => ({
+                      ...it,
+                      isSupplementary: true,
+                      quoteStatus: sq.status,
+                    }))
+                  );
+                }
+              });
+
+              // Tiền công & tiền phụ tùng thực tế
+              let parsedLaborFee = 0;
+              let parsedPartsCost = 0;
+
+              if (acceptedSupplementaryQuotes.length > 0) {
+                parsedLaborFee = Number(initialQuote?.labor_fee || initialQuote?.laborCost || 0) +
+                  acceptedSupplementaryQuotes.reduce((sum, q) => sum + Number(q.labor_fee || q.laborCost || 0), 0);
+                parsedPartsCost = Number(initialQuote?.parts_cost || initialQuote?.partsCost || 0) +
+                  acceptedSupplementaryQuotes.reduce((sum, q) => sum + Number(q.parts_cost || q.partsCost || 0), 0);
+              } else if (acceptedQuotes.length > 0) {
+                parsedLaborFee = acceptedQuotes.reduce(
+                  (sum, q) => sum + Number(q.labor_fee || q.laborCost || 0),
                   0
-              );
+                );
+                parsedPartsCost = acceptedQuotes.reduce(
+                  (sum, q) => sum + Number(q.parts_cost || q.partsCost || 0),
+                  0
+                );
+              } else if (initialQuote) {
+                parsedLaborFee = Number(initialQuote.labor_fee || initialQuote.laborCost || 0);
+                parsedPartsCost = Number(initialQuote.parts_cost || initialQuote.partsCost || 0);
+              }
 
-              let parsedItems = quoteData?.items || [];
-              let parsedLaborFee = Number(
-                quoteData?.labor_fee || quoteData?.laborCost || 0
-              );
-              let parsedPartsCost = Number(
-                quoteData?.parts_cost || quoteData?.partsCost || 0
-              );
-
+              // Nếu có parsedItems, tính chính xác từ items
               if (parsedItems.length > 0) {
-                const laborItem = parsedItems.find(
-                  (it: OrderItem) =>
+                const laborItems = parsedItems.filter(
+                  (it) =>
+                    it.item_type === "LABOR" ||
                     it.item_name?.toLowerCase().includes("tiền công") ||
                     it.item_name?.toLowerCase().includes("công sửa") ||
                     it.item_name?.toLowerCase().includes("công kỹ thuật")
                 );
-                if (laborItem) {
-                  parsedLaborFee = Number(
-                    laborItem.subtotal || laborItem.unit_price || 0
-                  );
+                const computedLaborFromItems = laborItems.reduce(
+                  (sum, it) => sum + Number(it.subtotal || it.unit_price || 0),
+                  0
+                );
+                if (computedLaborFromItems > 0) {
+                  parsedLaborFee = computedLaborFromItems;
                 }
-                const partsList = parsedItems.filter(
-                  (it: OrderItem) =>
+
+                const partsItems = parsedItems.filter(
+                  (it) =>
+                    it.item_type !== "LABOR" &&
                     !it.item_name?.toLowerCase().includes("tiền công") &&
                     !it.item_name?.toLowerCase().includes("công sửa") &&
                     !it.item_name?.toLowerCase().includes("công kỹ thuật")
                 );
-                parsedPartsCost = partsList.reduce(
-                  (sum: number, it: OrderItem) =>
-                    sum + Number(it.subtotal || (it.unit_price || 0) * (it.quantity || 1) || 0),
+                const computedPartsFromItems = partsItems.reduce(
+                  (sum, it) =>
+                    sum + Number(it.subtotal || (Number(it.unit_price || 0) * Number(it.quantity || 1)) || 0),
                   0
                 );
-              } else if (effectiveTotal > 0) {
-                if (effectiveTotal === 1800000) {
-                  parsedLaborFee = 300000;
-                  parsedPartsCost = 1500000;
-                  parsedItems = [
-                    {
-                      item_name: "Pin xe lăn điện",
-                      quantity: 1,
-                      unit_price: 1500000,
-                      subtotal: 1500000,
-                    },
-                    {
-                      item_name: "Tiền công kỹ thuật viên",
-                      quantity: 1,
-                      unit_price: 300000,
-                      subtotal: 300000,
-                    },
-                  ];
-                } else if (effectiveTotal === 450000) {
-                  parsedLaborFee = 200000;
-                  parsedPartsCost = 250000;
-                  parsedItems = [
-                    {
-                      item_name: "Bộ xích truyền động",
-                      quantity: 1,
-                      unit_price: 250000,
-                      subtotal: 250000,
-                    },
-                    {
-                      item_name: "Tiền công kỹ thuật viên",
-                      quantity: 1,
-                      unit_price: 200000,
-                      subtotal: 200000,
-                    },
-                  ];
-                } else if (effectiveTotal >= 300000) {
-                  parsedLaborFee = 300000;
-                  parsedPartsCost = effectiveTotal - 300000;
-                  parsedItems = [
-                    {
-                      item_name: "Linh kiện thay thế",
-                      quantity: 1,
-                      unit_price: effectiveTotal - 300000,
-                      subtotal: effectiveTotal - 300000,
-                    },
-                    {
-                      item_name: "Tiền công kỹ thuật viên",
-                      quantity: 1,
-                      unit_price: 300000,
-                      subtotal: 300000,
-                    },
-                  ];
-                } else {
-                  parsedLaborFee = effectiveTotal;
-                  parsedPartsCost = 0;
-                  parsedItems = [
-                    {
-                      item_name: "Tiền công kỹ thuật viên",
-                      quantity: 1,
-                      unit_price: effectiveTotal,
-                      subtotal: effectiveTotal,
-                    },
-                  ];
+                if (computedPartsFromItems > 0) {
+                  parsedPartsCost = computedPartsFromItems;
                 }
               }
 
+              // Không bao giờ tạo dữ liệu ảo (hardcoded fake)
+              if (parsedLaborFee === 0 && parsedPartsCost === 0 && effectiveTotal > 0) {
+                parsedLaborFee = effectiveTotal;
+              }
+
               const partsOnlyList = parsedItems.filter(
-                (it: OrderItem) =>
+                (it) =>
                   !it.item_name?.toLowerCase().includes("tiền công") &&
                   !it.item_name?.toLowerCase().includes("công sửa") &&
                   !it.item_name?.toLowerCase().includes("công kỹ thuật")
@@ -648,7 +722,9 @@ export const OrderDetailModal = ({
                       <span>Bảng kê Báo giá & Chi phí sửa chữa (KTV đề xuất)</span>
                     </div>
                     <span className="text-[11px] font-bold px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
-                      {quoteData?.status === "APPROVED"
+                      {pendingSupplementaryQuote
+                        ? "Có phát sinh chờ duyệt ⏳"
+                        : acceptedQuotes.length > 0
                         ? "Khách đã duyệt ✓"
                         : quoteData?.status === "REJECTED"
                         ? "Khách từ chối ✕"
@@ -656,7 +732,7 @@ export const OrderDetailModal = ({
                     </span>
                   </div>
 
-                  {parsedItems.length > 0 ? (
+                  {(parsedItems.length > 0 || effectiveTotal > 0 || initialEstimate > 0) ? (
                     <div className="space-y-3">
                       <div className="bg-white rounded-xl p-4 border border-amber-200/80 shadow-2xs space-y-2.5 text-xs">
                         <div className="font-extrabold text-[11px] uppercase tracking-wider text-amber-950 mb-1">
@@ -679,7 +755,7 @@ export const OrderDetailModal = ({
                             Tiền phụ tùng thay thế (
                             {partsOnlyList.length > 0
                               ? `${partsOnlyList.length} loại: ${partsOnlyList
-                                  .map((p: OrderItem) => `${p.item_name} x${p.quantity}`)
+                                  .map((p) => `${p.item_name}${p.isSupplementary ? " (phát sinh)" : ""} x${p.quantity}`)
                                   .join(", ")}`
                               : "Không có"}
                             ):
@@ -689,7 +765,7 @@ export const OrderDetailModal = ({
                           </span>
                         </div>
 
-                        <div className="flex justify-between items-center text-slate-600 pt-0.5">
+                        <div className="flex justify-between items-center text-slate-600 pt-0.5 pb-1 border-b border-dashed border-slate-100">
                           <span className="flex items-center gap-1.5 font-medium">
                             <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                             Phương thức thanh toán:
@@ -717,15 +793,59 @@ export const OrderDetailModal = ({
                           </span>
                         </div>
 
-                        {quoteData?.estimated_price && (
+                        {initialEstimate > 0 && (
                           <div className="flex justify-between items-center text-slate-600 pt-0.5 pb-1 border-b border-dashed border-slate-100">
                             <span className="flex items-center gap-1.5 font-medium">
                               <Receipt className="w-3.5 h-3.5 text-slate-400" />
                               Báo giá KTV dự tính ban đầu:
                             </span>
                             <span className="font-semibold text-slate-700">
-                              {Number(quoteData.estimated_price).toLocaleString("vi-VN")} đ
+                              {initialEstimate.toLocaleString("vi-VN")} đ
                             </span>
+                          </div>
+                        )}
+
+                        {supplementaryQuotes.length > 0 && (
+                          <div className="space-y-1.5 pt-1 pb-1.5 border-b border-dashed border-slate-100">
+                            {supplementaryQuotes.map((sq, idx) => {
+                              const sqAmt = Number(sq.estimated_price || 0);
+                              const isAcc = sq.status === "ACCEPTED" || sq.status === "APPROVED";
+                              const isPend = sq.status === "PENDING";
+                              return (
+                                <div key={sq.id || idx} className="flex justify-between items-center text-xs">
+                                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                                    <AlertTriangle
+                                      className={`w-3.5 h-3.5 ${
+                                        isAcc ? "text-emerald-500" : isPend ? "text-amber-500" : "text-rose-500"
+                                      }`}
+                                    />
+                                    Chi phí phát sinh {supplementaryQuotes.length > 1 ? `#${idx + 1}` : ""}:
+                                    <span
+                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                        isAcc
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : isPend
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-rose-100 text-rose-800"
+                                      }`}
+                                    >
+                                      {isAcc ? "Khách đã duyệt ✓" : isPend ? "Chờ khách duyệt ⏳" : "Khách từ chối ✕"}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={`font-bold ${
+                                      isAcc
+                                        ? "text-emerald-700"
+                                        : isPend
+                                        ? "text-amber-700"
+                                        : "text-slate-400 line-through"
+                                    }`}
+                                  >
+                                    +{sqAmt.toLocaleString("vi-VN")} đ
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
 
@@ -735,7 +855,13 @@ export const OrderDetailModal = ({
                               Tổng chi phí thanh toán thực tế
                             </span>
                             <span className="text-[10px] text-amber-900 italic font-medium">
-                              * Đã gồm tiền công ({parsedLaborFee.toLocaleString("vi-VN")} đ) + linh kiện ({parsedPartsCost.toLocaleString("vi-VN")} đ)
+                              {acceptedSupplementaryQuotes.length > 0 ? (
+                                `* Gồm giá gốc (${initialEstimate.toLocaleString("vi-VN")} đ) + phát sinh đã duyệt (+${approvedSupplementaryAmount.toLocaleString("vi-VN")} đ)`
+                              ) : pendingSupplementaryQuote ? (
+                                `* Đã duyệt: ${approvedTotal.toLocaleString("vi-VN")} đ | Phát sinh +${pendingSupplementaryAmount.toLocaleString("vi-VN")} đ chờ duyệt (Dự kiến: ${(approvedTotal + pendingSupplementaryAmount).toLocaleString("vi-VN")} đ)`
+                              ) : (
+                                `* Đã gồm tiền công (${parsedLaborFee.toLocaleString("vi-VN")} đ) + linh kiện (${parsedPartsCost.toLocaleString("vi-VN")} đ)`
+                              )}
                             </span>
                           </div>
                           <span className="font-black text-lg text-amber-950">
@@ -744,14 +870,28 @@ export const OrderDetailModal = ({
                         </div>
                       </div>
 
-                      {(quoteData?.diagnosis_note || orderDetail.issue_description) && (
-                        <div className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-amber-200">
-                          <span className="font-bold text-amber-950">
-                            Chi tiết công việc sửa chữa & ghi chú KTV:
-                          </span>{" "}
-                          {quoteData?.diagnosis_note || orderDetail.issue_description}
-                        </div>
-                      )}
+                      {(() => {
+                        const notes = [
+                          initialQuote?.diagnosis_note ? `Ban đầu: ${initialQuote.diagnosis_note}` : null,
+                          ...supplementaryQuotes.map((sq, i) =>
+                            sq.diagnosis_note ? `Phát sinh ${supplementaryQuotes.length > 1 ? `#${i + 1}` : ""}: ${sq.diagnosis_note}` : null
+                          ),
+                          !initialQuote?.diagnosis_note && orderDetail.issue_description ? `Mô tả sự cố: ${orderDetail.issue_description}` : null,
+                        ].filter(Boolean);
+
+                        if (notes.length === 0) return null;
+
+                        return (
+                          <div className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-amber-200 space-y-1">
+                            <span className="font-bold text-amber-950 block">
+                              Chi tiết công việc sửa chữa & ghi chú KTV:
+                            </span>
+                            {notes.map((n, i) => (
+                              <p key={i} className="text-slate-600">{n}</p>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="p-4 bg-white rounded-xl border border-dashed border-amber-200 text-center text-xs text-slate-500">

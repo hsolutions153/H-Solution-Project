@@ -7,33 +7,96 @@ PROFILE_SELECT = (
 )
 
 
+def _sync_technician_stats(item: dict) -> dict:
+    if not item or not item.get("user_id"):
+        return item
+    uid = item["user_id"]
+    try:
+        c_resp = (
+            supabase.table("repair_requests")
+            .select("id", count="exact")
+            .eq("technician_id", uid)
+            .eq("status", "COMPLETED")
+            .execute()
+        )
+        if c_resp and c_resp.count is not None:
+            actual_done = c_resp.count
+            if item.get("total_jobs_done") != actual_done:
+                supabase.table(TECHNICIAN_PROFILES_TABLE).update({"total_jobs_done": actual_done}).eq("user_id", uid).execute()
+                item["total_jobs_done"] = actual_done
+    except Exception:
+        pass
+
+    try:
+        rev_resp = (
+            supabase.table("repair_reviews")
+            .select("rating")
+            .eq("technician_id", uid)
+            .execute()
+        )
+        if rev_resp and rev_resp.data:
+            ratings = [float(r["rating"]) for r in rev_resp.data if r.get("rating") is not None]
+            if ratings:
+                avg_r = round(sum(ratings) / len(ratings), 1)
+                if float(item.get("rating_avg") or 0) != avg_r:
+                    supabase.table(TECHNICIAN_PROFILES_TABLE).update({"rating_avg": avg_r}).eq("user_id", uid).execute()
+                    item["rating_avg"] = avg_r
+    except Exception:
+        pass
+
+    return item
+
+
 def get_all_technicians(kyc_status: str | None = None):
+    data = []
     try:
         query = supabase.table(TECHNICIAN_PROFILES_TABLE).select(PROFILE_SELECT).order("created_at", desc=True)
         if kyc_status:
             query = query.eq("kyc_status", kyc_status)
         response = query.execute()
         if response and response.data is not None:
-            return response.data
+            data = response.data
     except Exception:
         pass
 
-    query = supabase.table(TECHNICIAN_PROFILES_TABLE).select("*").order("created_at", desc=True)
-    if kyc_status:
-        query = query.eq("kyc_status", kyc_status)
-    response = query.execute()
-    data = response.data or []
+    if not data:
+        query = supabase.table(TECHNICIAN_PROFILES_TABLE).select("*").order("created_at", desc=True)
+        if kyc_status:
+            query = query.eq("kyc_status", kyc_status)
+        response = query.execute()
+        data = response.data or []
 
-    user_ids = [item["user_id"] for item in data if item.get("user_id")]
-    users_map = {}
-    if user_ids:
-        users_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").in_("id", user_ids).execute()
-        if users_resp and users_resp.data:
-            users_map = {u["id"]: u for u in users_resp.data}
+        user_ids = [item["user_id"] for item in data if item.get("user_id")]
+        users_map = {}
+        if user_ids:
+            users_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").in_("id", user_ids).execute()
+            if users_resp and users_resp.data:
+                users_map = {u["id"]: u for u in users_resp.data}
 
-    for item in data:
-        if "user" not in item or not item["user"]:
-            item["user"] = users_map.get(item.get("user_id"))
+        for item in data:
+            if "user" not in item or not item["user"]:
+                item["user"] = users_map.get(item.get("user_id"))
+
+    # Đếm số ca hoàn thành thực tế từ repair_requests
+    try:
+        req_resp = (
+            supabase.table("repair_requests")
+            .select("technician_id")
+            .eq("status", "COMPLETED")
+            .execute()
+        )
+        if req_resp and req_resp.data:
+            counts_map = {}
+            for r in req_resp.data:
+                tid = r.get("technician_id")
+                if tid:
+                    counts_map[tid] = counts_map.get(tid, 0) + 1
+            for item in data:
+                uid = item.get("user_id")
+                if uid and uid in counts_map:
+                    item["total_jobs_done"] = counts_map[uid]
+    except Exception:
+        pass
 
     return data
 
@@ -48,7 +111,7 @@ def get_technician_by_user_id(user_id: str):
             .execute()
         )
         if response and response.data:
-            return response.data
+            return _sync_technician_stats(response.data)
     except Exception:
         pass
 
@@ -65,7 +128,7 @@ def get_technician_by_user_id(user_id: str):
             user_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").eq("id", item["user_id"]).maybe_single().execute()
             if user_resp and user_resp.data:
                 item["user"] = user_resp.data
-        return item
+        return _sync_technician_stats(item)
 
     # Auto-create technician profile if user exists in users table
     try:

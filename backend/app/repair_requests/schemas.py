@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from typing import Any
+from pydantic import BaseModel, Field, model_validator
 
 
 class RepairImageResponse(BaseModel):
@@ -78,13 +79,40 @@ class QuoteCreateRequest(BaseModel):
 
 
 class QuoteItemResponse(BaseModel):
-    id: str
-    quote_id: str
-    item_name: str
+    id: str | None = None
+    quote_id: str | None = None
+    item_name: str | None = None
     item_type: str | None = "SPARE_PART"
-    quantity: float
-    unit_price: float
-    subtotal: float
+    quantity: float | None = 1.0
+    unit_price: float | None = 0.0
+    subtotal: float | None = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def prepare_fields(cls, data: Any):
+        if isinstance(data, dict):
+            item_name = data.get("item_name") or data.get("name") or "Linh kiện / Dịch vụ"
+            data["item_name"] = item_name
+            try:
+                qty = float(data.get("quantity") or 1.0)
+            except (ValueError, TypeError):
+                qty = 1.0
+            data["quantity"] = qty
+
+            try:
+                price = float(data.get("unit_price") or data.get("price") or 0.0)
+            except (ValueError, TypeError):
+                price = 0.0
+            data["unit_price"] = price
+
+            if data.get("subtotal") is None:
+                data["subtotal"] = qty * price
+            else:
+                try:
+                    data["subtotal"] = float(data["subtotal"])
+                except (ValueError, TypeError):
+                    data["subtotal"] = qty * price
+        return data
 
 
 class QuoteResponse(BaseModel):
@@ -94,10 +122,10 @@ class QuoteResponse(BaseModel):
     severity: str | None = None
     labor_fee: float | None = 0
     parts_cost: float | None = 0
-    estimated_price: float
+    estimated_price: float | None = 0
     status: str
     reject_reason: str | None = None
-    created_at: datetime | str
+    created_at: datetime | str | None = None
     payment_method: str | None = None
     items: list[QuoteItemResponse] = []
 

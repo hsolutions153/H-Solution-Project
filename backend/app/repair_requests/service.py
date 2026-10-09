@@ -971,6 +971,22 @@ def update_request_status(request_id: str, current_user: dict, data):
         if not updated_request:
             raise AppException(ErrorCode.DATABASE_ERROR)
 
+        if new_status == "COMPLETED" and updated_request.get("technician_id"):
+            tech_id = updated_request["technician_id"]
+            try:
+                from app.db.database import supabase
+                c_resp = (
+                    supabase.table("repair_requests")
+                    .select("id", count="exact")
+                    .eq("technician_id", tech_id)
+                    .eq("status", "COMPLETED")
+                    .execute()
+                )
+                if c_resp and c_resp.count is not None:
+                    supabase.table("technician_profiles").update({"total_jobs_done": c_resp.count}).eq("user_id", tech_id).execute()
+            except Exception as t_err:
+                logger.warning(f"Failed to update total_jobs_done for tech {tech_id}: {t_err}")
+
         history_note = payload.get("cancel_reason")
         if not history_note:
             if new_status == "ACCEPTED":
@@ -1334,6 +1350,17 @@ def submit_technician_rating(request_id: str, data: dict, current_user: dict):
         })
         if not saved:
             raise AppException(ErrorCode.DATABASE_ERROR)
+
+        try:
+            from app.db.database import supabase
+            rev_resp = supabase.table("repair_reviews").select("rating").eq("technician_id", tech_id).execute()
+            if rev_resp and rev_resp.data:
+                ratings = [float(r["rating"]) for r in rev_resp.data if r.get("rating") is not None]
+                if ratings:
+                    avg_r = round(sum(ratings) / len(ratings), 1)
+                    supabase.table("technician_profiles").update({"rating_avg": avg_r}).eq("user_id", tech_id).execute()
+        except Exception as r_err:
+            logger.warning(f"Failed to recalculate rating_avg for tech {tech_id}: {r_err}")
     except AppException:
         raise
     except Exception as error:

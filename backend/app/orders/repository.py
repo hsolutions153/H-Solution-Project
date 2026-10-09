@@ -58,6 +58,7 @@ def _enrich_orders(data: list[dict]):
 
     images_map = {}
     payments_map = {}
+    quotes_map = {}
     if repair_ids:
         try:
             pay_resp = (
@@ -89,6 +90,62 @@ def _enrich_orders(data: list[dict]):
                     images_map[rid].append(img)
         except Exception:
             pass
+        try:
+            q_resp = (
+                supabase.table("repair_quotes")
+                .select("id,repair_id,status,estimated_price,labor_fee,parts_cost,diagnosis_note,created_at")
+                .in_("repair_id", repair_ids)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            if q_resp and q_resp.data:
+                quote_ids = [q["id"] for q in q_resp.data if q.get("id")]
+                quote_items_map = {}
+                if quote_ids:
+                    try:
+                        qi_resp = supabase.table("repair_quote_items").select("*").in_("quote_id", quote_ids).execute()
+                        if qi_resp and qi_resp.data:
+                            for qi in qi_resp.data:
+                                qid = qi.get("quote_id")
+                                if qid not in quote_items_map:
+                                    quote_items_map[qid] = []
+                                qty = float(qi.get("quantity") or 1)
+                                price = float(qi.get("unit_price") or qi.get("price") or 0)
+                                if qi.get("subtotal") is None:
+                                    qi["subtotal"] = qty * price
+                                if not qi.get("item_name") and qi.get("name"):
+                                    qi["item_name"] = qi["name"]
+                                quote_items_map[qid].append(qi)
+                    except Exception:
+                        pass
+
+                    missing_qids = [qid for qid in quote_ids if qid not in quote_items_map]
+                    if missing_qids:
+                        try:
+                            qi_resp2 = supabase.table("quote_items").select("*").in_("quote_id", missing_qids).execute()
+                            if qi_resp2 and qi_resp2.data:
+                                for qi in qi_resp2.data:
+                                    qid = qi.get("quote_id")
+                                    if qid not in quote_items_map:
+                                        quote_items_map[qid] = []
+                                    qty = float(qi.get("quantity") or 1)
+                                    price = float(qi.get("unit_price") or qi.get("price") or 0)
+                                    if qi.get("subtotal") is None:
+                                        qi["subtotal"] = qty * price
+                                    if not qi.get("item_name") and qi.get("name"):
+                                        qi["item_name"] = qi["name"]
+                                    quote_items_map[qid].append(qi)
+                        except Exception:
+                            pass
+
+                for q in q_resp.data:
+                    rid = q.get("repair_id")
+                    if rid not in quotes_map:
+                        quotes_map[rid] = []
+                    q["items"] = quote_items_map.get(q["id"], [])
+                    quotes_map[rid].append(q)
+        except Exception:
+            pass
 
     for item in data:
         if "customer" not in item or not item["customer"]:
@@ -103,6 +160,29 @@ def _enrich_orders(data: list[dict]):
         if pay_info:
             item["payment_method"] = pay_info.get("payment_method")
             item["payment_status"] = pay_info.get("payment_status")
+        q_list = quotes_map.get(item.get("id"), [])
+        if q_list:
+            item["quotes"] = q_list
+            initial_q = q_list[0]
+            item["initial_estimate"] = float(initial_q.get("estimated_price") or 0)
+            accepted_q = [q for q in q_list if q.get("status") in {"ACCEPTED", "APPROVED"}]
+            if accepted_q:
+                item["approved_estimate"] = sum(float(q.get("estimated_price") or 0) for q in accepted_q)
+            else:
+                item["approved_estimate"] = 0.0
+
+            pending_q = [q for q in q_list if q.get("status") == "PENDING"]
+            if pending_q:
+                item["pending_quote"] = pending_q[-1]
+
+            # Gán quote đại diện là báo giá ban đầu (chứ không gán đè quote phát sinh)
+            item["quote"] = initial_q
+
+            # Nếu có khoản đã duyệt, total_amount phản ánh tổng các khoản đã duyệt
+            if accepted_q and item.get("status") not in {"COMPLETED", "CANCELLED"}:
+                item["total_amount"] = item.get("approved_estimate")
+            elif (item.get("total_amount") is None or float(item.get("total_amount") or 0) == 0):
+                item["total_amount"] = item.get("approved_estimate") if accepted_q else item.get("initial_estimate")
 
     return data
 

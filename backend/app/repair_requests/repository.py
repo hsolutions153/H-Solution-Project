@@ -240,10 +240,38 @@ def get_quotes_by_repair_id(repair_id: str):
 
 
 def get_quote_items(quote_id: str):
-    response = (
-        supabase.table("repair_quote_items")
-        .select("*")
-        .eq("quote_id", quote_id)
-        .execute()
-    )
-    return response.data if response and hasattr(response, "data") else []
+    items = []
+    try:
+        response = (
+            supabase.table("repair_quote_items")
+            .select("*")
+            .eq("quote_id", quote_id)
+            .execute()
+        )
+        if response and getattr(response, "data", None):
+            items = response.data
+    except Exception:
+        pass
+
+    if not items:
+        try:
+            response = (
+                supabase.table("quote_items")
+                .select("*")
+                .eq("quote_id", quote_id)
+                .execute()
+            )
+            if response and getattr(response, "data", None):
+                items = response.data
+        except Exception:
+            pass
+
+    for it in items:
+        qty = float(it.get("quantity") or 1)
+        price = float(it.get("unit_price") or it.get("price") or 0)
+        if it.get("subtotal") is None:
+            it["subtotal"] = qty * price
+        if not it.get("item_name") and it.get("name"):
+            it["item_name"] = it["name"]
+
+    return items

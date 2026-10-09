@@ -50,6 +50,10 @@ class OrderResponse(BaseModel):
     payment_method: str | None = None
     payment_status: str | None = None
     quote: dict[str, Any] | None = None
+    quotes: list[dict[str, Any]] | None = None
+    initial_estimate: Decimal | float | None = None
+    approved_estimate: Decimal | float | None = None
+    pending_quote: dict[str, Any] | None = None
 
 
 class OrderListResponse(BaseModel):
