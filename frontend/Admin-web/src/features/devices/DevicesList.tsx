@@ -36,7 +36,7 @@ export const DevicesList = () => {
         : [];
       setCustomers(custList);
     } catch (err: unknown) {
-      console.warn("Error fetching devices and customers:", err);
+      console.warn("Lỗi tải danh sách thiết bị và khách hàng:", err);
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,6 @@ export const DevicesList = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900">
@@ -114,10 +113,8 @@ export const DevicesList = () => {
         </button>
       </div>
 
-      {/* Search & Filter */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        {/* Ô Tìm kiếm */}
-        <div className="relative flex-1 min-w-[260px]">
+        <div className="relative flex-1 min-w-65">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -139,7 +136,6 @@ export const DevicesList = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -178,12 +174,10 @@ export const DevicesList = () => {
 
                   return (
                     <tr key={d.id} className="hover:bg-slate-50/80 transition">
-                      {/* Mã TB */}
                       <td className="py-3.5 px-4 font-mono text-xs text-slate-500 font-bold">
                         {d.id}
                       </td>
 
-                      {/* Loại thiết bị (Đã đổi từ Xe lăn điện sang dạng Scooter điện) */}
                       <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${typeBadge.bg}`}
@@ -193,7 +187,6 @@ export const DevicesList = () => {
                         </span>
                       </td>
 
-                      {/* Model & Hãng */}
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-900">
                           {d.model_name || "Chưa rõ model"}
@@ -203,7 +196,6 @@ export const DevicesList = () => {
                         </div>
                       </td>
 
-                      {/* Số Serial / Khung */}
                       <td className="py-3.5 px-4 font-mono text-xs text-slate-700">
                         <div>SN: <span className="font-bold">{d.serial_number || "---"}</span></div>
                         {d.frame_number && (
@@ -211,7 +203,6 @@ export const DevicesList = () => {
                         )}
                       </td>
 
-                      {/* Chủ sở hữu (Hiển thị Tên chủ sở hữu thay vì Mã) */}
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-900 text-xs">
                           {ownerName}
@@ -221,7 +212,6 @@ export const DevicesList = () => {
                         </div>
                       </td>
 
-                      {/* Ngày đăng ký */}
                       <td className="py-3.5 px-4 text-xs text-slate-500">
                         {d.created_at
                           ? new Date(d.created_at).toLocaleDateString("vi-VN")
@@ -235,7 +225,6 @@ export const DevicesList = () => {
           </table>
         </div>
 
-        {/* Component Pagination */}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

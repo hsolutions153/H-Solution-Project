@@ -116,7 +116,6 @@ export default function HomePage() {
           <div className="sos-outer">
             <Link href="/home/sos" className="sos-button" aria-label="Nút gọi trợ giúp khẩn cấp SOS">
               <div className="sos-icon">
-                {/* Medical asterisk */}
                 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <rect x="20" y="4" width="8" height="40" rx="4" fill="white" />
                   <rect x="4" y="20" width="40" height="8" rx="4" fill="white" />

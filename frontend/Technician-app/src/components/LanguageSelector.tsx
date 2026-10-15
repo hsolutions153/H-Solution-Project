@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { Globe } from 'lucide-react'; // Import icon Globe
+import { Globe } from 'lucide-react';
 
 export const LanguageSelector = () => {
   return (

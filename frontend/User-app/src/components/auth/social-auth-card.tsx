@@ -63,7 +63,7 @@ export function SocialAuthCard({
   const errorMessage = formError || oauthError;
   const isLogin = mode === "login";
 
-  // Check if user authenticated via NextAuth (e.g. Google OAuth redirect)
+  // Kiểm tra phiên xác thực NextAuth (sau chuyển hướng Google OAuth)
   useEffect(() => {
     let isMounted = true;
     async function checkNextAuthSession() {
@@ -185,7 +185,7 @@ export function SocialAuthCard({
     setFormError("");
     setLoadingProvider(provider);
     try {
-      await signIn(provider, { redirectTo: "/home" });
+      await signIn(provider, { callbackUrl: "/home" });
     } catch {
       setFormError("Không thể bắt đầu đăng nhập với nhà cung cấp này.");
       setLoadingProvider(null);
@@ -246,7 +246,7 @@ export function SocialAuthCard({
                   maxLength={100}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
             </div>
@@ -272,7 +272,7 @@ export function SocialAuthCard({
                   title="Nhập email đúng định dạng, ví dụ: ten@example.com"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
             </div>
@@ -299,7 +299,7 @@ export function SocialAuthCard({
                 placeholder="0912345678"
                 value={phone}
                 onChange={(event) => setPhone(digitsOnly(event.target.value))}
-                className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
           </div>
@@ -322,7 +322,7 @@ export function SocialAuthCard({
                   placeholder="Ví dụ: 123 Nguyễn Trãi, Q.1, TP.HCM"
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
-                  className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
             </div>
@@ -353,7 +353,7 @@ export function SocialAuthCard({
                 }
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full h-[56px] pl-12 pr-14 bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-14 pl-12 pr-14 bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
               <button
                 type="button"
@@ -405,7 +405,7 @@ export function SocialAuthCard({
                     title="Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
-                    className="w-full h-[56px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                   />
                 </div>
               </div>
@@ -424,7 +424,7 @@ export function SocialAuthCard({
           <button
             type="submit"
             disabled={isBusy}
-            className="w-full h-[56px] bg-primary text-on-primary font-headline-md text-headline-md rounded-xl shadow-md active:scale-[0.98] transition-transform disabled:opacity-60 cursor-pointer"
+            className="w-full h-14 bg-primary text-on-primary font-headline-md text-headline-md rounded-xl shadow-md active:scale-[0.98] transition-transform disabled:opacity-60 cursor-pointer"
           >
             {loadingProvider === "credentials"
               ? "Đang xử lý..."
@@ -435,9 +435,9 @@ export function SocialAuthCard({
         </form>
 
         <div className="flex items-center gap-md my-lg">
-          <div className="flex-grow h-px bg-outline-variant" />
+          <div className="grow h-px bg-outline-variant" />
           <span className="text-xs text-outline">HOẶC</span>
-          <div className="flex-grow h-px bg-outline-variant" />
+          <div className="grow h-px bg-outline-variant" />
         </div>
 
         <div className="grid grid-cols-2 gap-md">
@@ -450,7 +450,7 @@ export function SocialAuthCard({
                 ? "Đăng nhập bằng Google"
                 : "Google chưa được cấu hình"
             }
-            className="flex items-center justify-center gap-sm h-[56px] border border-outline-variant rounded-xl bg-surface-container-lowest disabled:opacity-60 cursor-pointer"
+            className="flex items-center justify-center gap-sm h-14 border border-outline-variant rounded-xl bg-surface-container-lowest disabled:opacity-60 cursor-pointer"
           >
             <svg fill="none" height="24" viewBox="0 0 24 24" width="24" aria-hidden="true">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#7fb8da" />
@@ -470,7 +470,7 @@ export function SocialAuthCard({
                 ? "Đăng nhập bằng Apple"
                 : "Apple chưa được cấu hình"
             }
-            className="flex items-center justify-center gap-sm h-[56px] bg-black text-white rounded-xl disabled:opacity-60 cursor-pointer"
+            className="flex items-center justify-center gap-sm h-14 bg-black text-white rounded-xl disabled:opacity-60 cursor-pointer"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.79 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.1ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z" />

@@ -1,5 +1,3 @@
-"use client";
-
 import { useAdmin } from "@/context/AdminContext";
 import { BrandMark } from "@h-mobility/ui";
 import {
@@ -30,7 +28,7 @@ export const Sidebar = ({
   onOpenCreateOrder,
 }: SidebarProps) => {
   const router = useRouter();
-  const { sidebarCollapsed, toggleSidebar } = useAdmin();
+  const { sidebarCollapsed, toggleSidebar, showToast } = useAdmin();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
@@ -50,12 +48,11 @@ export const Sidebar = ({
 
   return (
     <aside
-      className={`bg-white border-r border-slate-200 flex flex-col justify-between h-screen sticky top-0 flex-shrink-0 z-40 transition-all duration-300 ease-in-out select-none ${
+      className={`bg-white border-r border-slate-200 flex flex-col justify-between h-screen sticky top-0 shrink-0 z-40 transition-all duration-300 ease-in-out select-none ${
         sidebarCollapsed ? "w-20 p-3" : "w-72 p-5"
       }`}
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-        {/* Logo & Toggle Button */}
         <div
           className={`flex items-center ${
             sidebarCollapsed ? "justify-center flex-col gap-2.5 mb-4" : "justify-between mb-5"
@@ -78,7 +75,7 @@ export const Sidebar = ({
           <button
             type="button"
             onClick={toggleSidebar}
-            className="p-2 rounded-xl text-slate-400 hover:text-brand-900 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+            className="p-2 rounded-xl text-slate-400 hover:text-brand-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
             title={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
             aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
           >
@@ -90,7 +87,6 @@ export const Sidebar = ({
           </button>
         </div>
 
-        {/* Action Button: Tạo đơn mới */}
         <button
           type="button"
           onClick={onOpenCreateOrder}
@@ -101,11 +97,10 @@ export const Sidebar = ({
           }`}
           title="Tạo đơn mới"
         >
-          <Plus className="w-5 h-5 stroke-[2.5] flex-shrink-0" />
+          <Plus className="w-5 h-5 stroke-[2.5] shrink-0" />
           {!sidebarCollapsed && <span className="truncate">Tạo đơn mới</span>}
         </button>
 
-        {/* Menu Items */}
         <nav className="space-y-1.5 text-sm font-semibold flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -128,7 +123,7 @@ export const Sidebar = ({
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <Icon
-                  className={`w-5 h-5 flex-shrink-0 ${
+                  className={`w-5 h-5 shrink-0 ${
                     isActive ? "text-brand-900" : "text-slate-400"
                   }`}
                 />
@@ -143,11 +138,10 @@ export const Sidebar = ({
         </nav>
       </div>
 
-      {/* Footer */}
-      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold flex-shrink-0">
+      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold shrink-0">
         <button
           type="button"
-          onClick={() => alert("Cài đặt hệ thống đang được phát triển.")}
+          onClick={() => showToast("Chức năng Cài đặt hệ thống đang được phát triển.")}
           className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-slate-50 cursor-pointer ${
             sidebarCollapsed
               ? "justify-center p-3 h-11"
@@ -155,11 +149,10 @@ export const Sidebar = ({
           }`}
           title={sidebarCollapsed ? "Cài đặt hệ thống" : undefined}
         >
-          <Settings className="w-5 h-5 text-slate-400 flex-shrink-0" />
+          <Settings className="w-5 h-5 text-slate-400 shrink-0" />
           {!sidebarCollapsed && <span className="truncate">Cài đặt hệ thống</span>}
         </button>
 
-        {/* Logout */}
         <button
           type="button"
           onClick={() => setShowLogoutConfirm(true)}
@@ -170,12 +163,11 @@ export const Sidebar = ({
           }`}
           title={sidebarCollapsed ? "Đăng xuất" : undefined}
         >
-          <LogOut className="w-5 h-5 flex-shrink-0" />
+          <LogOut className="w-5 h-5 shrink-0" />
           {!sidebarCollapsed && <span className="truncate">Đăng xuất</span>}
         </button>
       </div>
 
-      {/* Modal xác nhận đăng xuất */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">

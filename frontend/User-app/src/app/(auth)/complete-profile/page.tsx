@@ -41,7 +41,7 @@ export default function CompleteProfilePage() {
     async function init() {
       let token = getAuthToken();
 
-      // Check NextAuth session if token not in localStorage
+      // Kiểm tra phiên đăng nhập nếu chưa có token trong localStorage
       if (!token) {
         try {
           const res = await fetch("/api/auth/session");
@@ -54,7 +54,7 @@ export default function CompleteProfilePage() {
             }
           }
         } catch (err) {
-          console.warn("Session check error:", err);
+          console.warn("Lỗi kiểm tra phiên đăng nhập:", err);
         }
       }
 
@@ -63,7 +63,7 @@ export default function CompleteProfilePage() {
         return;
       }
 
-      // Prefill from cache or /customers/me
+      // Điền trước thông tin từ bộ nhớ đệm hoặc API
       const cached = getUserInfo();
       if (cached) {
         if (cached.name) setName(cached.name);
@@ -84,7 +84,7 @@ export default function CompleteProfilePage() {
             setPhone(customer.phone);
           }
 
-          // If profile is already complete, redirect to home
+          // Nếu đã hoàn tất hồ sơ thì chuyển hướng về trang chủ
           if (
             customer.is_profile_complete &&
             customer.address &&
@@ -100,7 +100,7 @@ export default function CompleteProfilePage() {
           }
         }
       } catch (err) {
-        console.warn("Fetch /customers/me error:", err);
+        console.warn("Lỗi tải thông tin cá nhân:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -194,7 +194,6 @@ export default function CompleteProfilePage() {
   return (
     <div className="responsive-container bg-background text-on-background font-sans selection:bg-primary/20 selection:text-primary">
       <main className="responsive-card px-margin-mobile py-lg w-full">
-        {/* Header Bar */}
         <div className="flex flex-col items-center mb-lg text-center responsive-header w-full">
           <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 rounded-full">
             <EMobiCareLogoIcon size={20} />
@@ -210,7 +209,6 @@ export default function CompleteProfilePage() {
           </p>
         </div>
 
-        {/* Alerts */}
         {errorMessage && (
           <div className="mb-md p-sm bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-medium flex items-start gap-2.5 w-full">
             <span className="material-symbols-outlined text-rose-500 text-[18px] shrink-0 mt-0.5">
@@ -227,9 +225,7 @@ export default function CompleteProfilePage() {
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-md w-full">
-          {/* Full Name */}
           <div className="flex flex-col gap-xs w-full">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="name">
               Họ và tên <span className="text-rose-500">*</span>
@@ -247,12 +243,11 @@ export default function CompleteProfilePage() {
                 placeholder="Ví dụ: Nguyễn Văn A"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full h-[54px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
+                className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
           </div>
 
-          {/* Email (Readonly info if present) */}
           {email && (
             <div className="flex flex-col gap-xs w-full">
               <label className="font-label-lg text-label-lg text-on-surface-variant">
@@ -267,7 +262,7 @@ export default function CompleteProfilePage() {
                   type="email"
                   disabled
                   value={email}
-                  className="w-full h-[54px] pl-12 pr-28 bg-surface-container-low border border-outline-variant/60 rounded-xl text-sm font-medium text-on-surface-variant cursor-not-allowed"
+                  className="w-full h-13.5 pl-12 pr-28 bg-surface-container-low border border-outline-variant/60 rounded-xl text-sm font-medium text-on-surface-variant cursor-not-allowed"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
                   <ShieldCheck className="size-3" />
@@ -277,7 +272,6 @@ export default function CompleteProfilePage() {
             </div>
           )}
 
-          {/* Phone */}
           <div className="flex flex-col gap-xs w-full">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="phone">
               Số điện thoại liên hệ <span className="text-rose-500">*</span>
@@ -296,7 +290,7 @@ export default function CompleteProfilePage() {
                 placeholder="0912345678"
                 value={phone}
                 onChange={(e) => setPhone(digitsOnly(e.target.value))}
-                className="w-full h-[54px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
+                className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
             <p className="text-[11px] text-on-surface-variant">
@@ -304,7 +298,6 @@ export default function CompleteProfilePage() {
             </p>
           </div>
 
-          {/* Address */}
           <div className="flex flex-col gap-xs w-full">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="address">
               Địa chỉ của bạn <span className="text-rose-500">*</span>
@@ -322,7 +315,7 @@ export default function CompleteProfilePage() {
                 placeholder="Số nhà, tên đường, phường/xã, quận/huyện, TP"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full h-[54px] pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
+                className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
             <p className="text-[11px] text-on-surface-variant">
@@ -330,12 +323,11 @@ export default function CompleteProfilePage() {
             </p>
           </div>
 
-          {/* Buttons */}
           <div className="pt-2 flex flex-col items-center gap-3 w-full">
             <button
               type="submit"
               disabled={submitting || success}
-              className="w-full h-[52px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-semibold shadow-lg shadow-brand-500/25 transition active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
+              className="w-full h-13 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-semibold shadow-lg shadow-brand-500/25 transition active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
             >
               {submitting ? (
                 <>

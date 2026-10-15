@@ -48,6 +48,11 @@ class TokenResponse(BaseModel):
     is_profile_complete: bool = True
 
 
+class RefreshResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class ForgotPasswordRequest(BaseModel):
     phone: str = Field(pattern=r"^0(3|5|7|8|9)\d{8}$")
 

@@ -1,4 +1,6 @@
+import hashlib
 import os
+import secrets
 import jwt
 import bcrypt
 from datetime import datetime, timedelta, timezone
@@ -12,7 +14,8 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-change-it")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -37,6 +40,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     expire = datetime.now(timezone.utc) + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def generate_refresh_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def get_current_user(

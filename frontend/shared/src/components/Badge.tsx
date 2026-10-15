@@ -26,9 +26,7 @@ export function Badge({ tone = "neutral", children, className }: BadgeProps) {
 }
 
 interface StatusBadgeProps {
-  /** Backend status code, e.g. "EN_ROUTE". */
   status: string;
-  /** Overrides the shared label when a screen needs its own wording. */
   label?: string;
   className?: string;
 }

@@ -101,12 +101,14 @@ export const ViewTechnicianModal = ({
     {
       label: "Trạng thái trực tuyến",
       value: technician.is_online ? (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          🟢 Đang hoạt động (Online)
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          Đang hoạt động (Online)
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
-          ⚪ Ngoại tuyến (Offline)
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+          <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+          Ngoại tuyến (Offline)
         </span>
       ),
     },
@@ -149,7 +151,6 @@ export const ViewTechnicianModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-brand-900/60 border border-brand-400/30 flex items-center justify-center text-brand-400">
@@ -171,7 +172,6 @@ export const ViewTechnicianModal = ({
           </button>
         </div>
 
-        {/* Content: Bảng 2 cột Tên trường và Giá trị */}
         <div className="p-6">
           <div className="overflow-hidden border border-slate-200 rounded-2xl">
             <table className="w-full text-left text-sm border-collapse">
@@ -203,7 +203,6 @@ export const ViewTechnicianModal = ({
             </table>
           </div>
 
-          {/* Footer actions */}
           <div className="mt-6 flex justify-end">
             <button
               type="button"

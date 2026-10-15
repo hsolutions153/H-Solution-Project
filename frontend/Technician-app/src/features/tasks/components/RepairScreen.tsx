@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
 import { Badge, Button, Card, Field, cn, inputClasses } from "@h-mobility/ui";
 import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses, selectClasses, textareaClasses } from "@/components/ui";
+import { SlideToConfirm } from "./SlideToConfirm";
 import {
   Play,
   Pause,
@@ -21,6 +22,7 @@ import {
   AlertTriangle,
   Send,
   FilePlus,
+  CheckCircle2,
 } from "lucide-react";
 
 interface ComponentItem {
@@ -50,11 +52,7 @@ interface RepairTimerState {
 const timerKey = (taskId: string) => `repairTimer:${taskId}`;
 const noteKey = (taskId: string) => `repairNote:${taskId}`;
 
-/**
- * Restores the repair timer when the technician comes back to this screen,
- * e.g. after a supplementary quote was approved or rejected. A running timer
- * also counts the time the screen was closed.
- */
+// Khôi phục đồng hồ bấm giờ sửa chữa khi KTV quay lại màn hình
 function readRepairTimer(task?: Task): RepairTimerState {
   if (task?.id) {
     try {
@@ -66,7 +64,7 @@ function readRepairTimer(task?: Task): RepairTimerState {
       }
     } catch {}
   }
-  // Repair already started on the server but no local timer (other device, cleared storage): resume paused.
+  // Đơn đã bắt đầu sửa trên máy chủ nhưng chưa có đồng hồ cục bộ: mở ở trạng thái tạm dừng
   if (task?.repairStartedAt) return { isStarted: true, isPaused: true, seconds: 0 };
   return { isStarted: false, isPaused: false, seconds: 0 };
 }
@@ -129,6 +127,118 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const [isSupplementaryModalOpen, setIsSupplementaryModalOpen] = useState<boolean>(false);
   const [supplementaryNote, setSupplementaryNote] = useState<string>("Chi phí linh kiện / công việc phát sinh trong quá trình sửa chữa");
   const [isSubmittingSupplementary, setIsSubmittingSupplementary] = useState<boolean>(false);
+
+  // Quản lý bước nghiệm thu thanh toán (Handshake 2 chiều: Khách nộp -> Thợ duyệt)
+  const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
+  const [settlementData, setSettlementData] = useState<{
+    completedData: HistoryTask;
+    finalCost: number;
+  } | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState<any>(null);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
+
+  const loadPaymentInfo = useCallback(async () => {
+    if (!task?.id) return;
+    try {
+      const res = await fetchApi<any>(`/payments/repair/${task.id}/qr`);
+      setPaymentInfo(res);
+    } catch (err) {
+      console.warn("Lỗi tải thông tin thanh toán:", err);
+    }
+  }, [task]);
+
+  useEffect(() => {
+    if (!isSettlementModalOpen || !task?.id || paymentSuccessMessage) return;
+    loadPaymentInfo();
+    const interval = setInterval(() => {
+      loadPaymentInfo();
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isSettlementModalOpen, task, paymentSuccessMessage, loadPaymentInfo]);
+
+  const handleConfirmPaymentAndComplete = async () => {
+    if (!task?.id || !settlementData) return;
+    setIsConfirmingPayment(true);
+    const method = paymentInfo?.payment?.payment_method || "CASH";
+    try {
+      // Xác nhận thanh toán qua API payments (backend tự động cập nhật trạng thái đơn COMPLETED trong DB)
+      await fetchApi<any>(`/payments/repair/${task.id}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ payment_method: method }),
+      });
+
+      // Cập nhật trạng thái sửa chữa sang COMPLETED với chi phí thực tế (idempotent / fallback)
+      try {
+        await fetchApi<any>(`/repair-requests/${task.id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: "COMPLETED",
+            final_cost: settlementData.finalCost,
+          }),
+        });
+      } catch (statusErr) {
+        console.warn("Đơn sửa chữa đã được cập nhật hoàn thành từ trước:", statusErr);
+      }
+
+      const msg = "Đã xác nhận thanh toán và hoàn tất đơn sửa chữa thành công!";
+      setPaymentSuccessMessage(msg);
+
+      if (task?.id) {
+        try {
+          sessionStorage.removeItem(timerKey(task.id));
+          sessionStorage.removeItem(noteKey(task.id));
+        } catch {}
+      }
+
+      setTimeout(() => {
+        setIsSettlementModalOpen(false);
+        if (onComplete) {
+          onComplete({
+            ...settlementData.completedData,
+            paymentStatus: "PAID",
+            paymentMethod: method,
+          });
+        }
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
+    } finally {
+      setIsConfirmingPayment(false);
+    }
+  };
+
+  const handleFinishWithoutPayment = async () => {
+    if (!settlementData || !task?.id) return;
+    setIsConfirmingPayment(true);
+    try {
+      await fetchApi<any>(`/repair-requests/${task.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "COMPLETED",
+          final_cost: settlementData.finalCost,
+        }),
+      });
+      if (task?.id) {
+        try {
+          sessionStorage.removeItem(timerKey(task.id));
+          sessionStorage.removeItem(noteKey(task.id));
+        } catch {}
+      }
+      setIsSettlementModalOpen(false);
+      if (onComplete) {
+        onComplete({
+          ...settlementData.completedData,
+          paymentStatus: paymentInfo?.payment?.payment_status || "UNPAID",
+          paymentMethod: paymentInfo?.payment?.payment_method || undefined,
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || "Không thể cập nhật trạng thái đơn.");
+    } finally {
+      setIsConfirmingPayment(false);
+    }
+  };
 
   const PRESET_PARTS = [
     { name: "Ắc quy 12V-20Ah (Cặp)", price: 1200000 },
@@ -436,27 +546,13 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   uploadedUrls = afterImgs;
                 }
               }
-            } catch (uploadErr) {
-              console.error("Lỗi khi upload ảnh nghiệm thu:", uploadErr);
+            } catch (fileErr) {
+              console.warn("Lỗi khi upload ảnh:", fileErr);
             }
           }
         }
-
-        // 2. Cập nhật trạng thái hoàn thành với tổng tiền
-        const statusRes = await fetchApi<any>(`/repair-requests/${task.id}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            status: "COMPLETED",
-            final_cost: finalCost,
-          }),
-        });
-        if (statusRes.status !== "COMPLETED") throw new Error("Đơn chưa được hoàn tất. Vui lòng thử lại.");
-        lastResponse = statusRes;
       } catch (err: any) {
-        console.error("Lỗi khi hoàn tất đơn:", err);
-        alert(err.message || "Không thể hoàn tất đơn sửa chữa. Vui lòng kiểm tra lại báo giá đã duyệt.");
-        setIsUploading(false);
-        return; // KHÔNG gọi onComplete nếu API thất bại!
+        console.warn("Lỗi khi upload ảnh nghiệm thu:", err);
       } finally {
         setIsUploading(false);
       }
@@ -512,24 +608,35 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         "Kiểm tra và khắc phục lỗi hoạt động của thiết bị theo lịch hẹn.",
       solution:
         note ||
-        `Đã thay thế linh kiện và hoàn tất căn chỉnh thiết bị. Tổng chi phí: ${Number(lastResponse?.total_amount ?? finalCost).toLocaleString("vi-VN")} đ.`,
+        `Đã thay thế linh kiện và hoàn tất căn chỉnh thiết bị. Tổng chi phí: ${Number(finalCost).toLocaleString("vi-VN")} đ.`,
       images: {
         before: beforeImage,
         after: afterImage,
       },
-      totalAmount: Number(lastResponse?.total_amount ?? finalCost),
+      totalAmount: Number(finalCost),
+      paymentStatus: "UNPAID",
+      paymentMethod: undefined,
     };
 
-    if (task?.id) {
-      try {
-        sessionStorage.removeItem(timerKey(task.id));
-        sessionStorage.removeItem(noteKey(task.id));
-      } catch {}
+    if (finalCost <= 0 || !task?.id) {
+      if (task?.id) {
+        try {
+          sessionStorage.removeItem(timerKey(task.id));
+          sessionStorage.removeItem(noteKey(task.id));
+        } catch {}
+      }
+      if (onComplete) {
+        onComplete(completedData);
+      }
+      return;
     }
 
-    if (onComplete) {
-      onComplete(completedData);
-    }
+    setSettlementData({
+      completedData,
+      finalCost,
+    });
+    setPaymentSuccessMessage(null);
+    setIsSettlementModalOpen(true);
   };
 
   const vnd = (n: number) => `${n.toLocaleString("vi-VN")} đ`;
@@ -923,6 +1030,62 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           >
             {isSubmittingSupplementary ? "Đang gửi..." : "Gửi khách hàng"}
           </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={isSettlementModalOpen}
+        onClose={handleFinishWithoutPayment}
+        variant="sheet"
+        title="Nghiệm thu & Hoàn tất"
+      >
+        <div className="space-y-3.5">
+          <div className="rounded-card border border-brand-100 bg-brand-50/70 p-3 text-center">
+            <p className="text-xs font-medium text-slate-500">Tổng tiền</p>
+            <p className="mt-0.5 text-2xl font-black tabular-nums text-brand-700">
+              {settlementData?.finalCost.toLocaleString("vi-VN")} đ
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              #{task?.code || task?.id} · {task?.customerName || "Khách hàng"}
+            </p>
+          </div>
+
+          {paymentSuccessMessage ? (
+            <div className="flex items-center gap-2.5 rounded-control border border-emerald-200 bg-emerald-50 p-3.5 text-emerald-800">
+              <CheckCircle2 className="size-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="text-sm font-bold text-emerald-900">Hoàn tất thành công!</p>
+                <p className="text-xs text-emerald-700 mt-0.5">{paymentSuccessMessage}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {paymentInfo?.payment?.payment_status === "PENDING" ? (
+                <div className="flex items-center justify-between rounded-control border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
+                  <span className="font-semibold">
+                    Khách đã trả: {paymentInfo?.payment?.payment_method === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                  </span>
+                  <span className="text-[11px] font-medium text-emerald-700">Kiểm tra & gạt xác nhận</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-control border border-line bg-slate-50 px-3.5 py-2.5 text-xs text-slate-600">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+                  </span>
+                  <span>Chờ khách thanh toán trên app...</span>
+                </div>
+              )}
+
+              <div className="pt-1">
+                <SlideToConfirm
+                  onConfirm={handleConfirmPaymentAndComplete}
+                  isConfirming={isConfirmingPayment}
+                  isSuccess={Boolean(paymentSuccessMessage)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>

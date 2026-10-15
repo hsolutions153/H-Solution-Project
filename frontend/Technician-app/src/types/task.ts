@@ -29,7 +29,6 @@ export interface Task {
   status: TaskStatus;
   statusText: string;
   icon: string;
-  // Bổ sung các trường chi tiết cho Modal
   urgency?: 'KHẨN CẤP' | 'BÌNH THƯỜNG';
   requestedTime?: string;
   distance?: string;
@@ -43,11 +42,11 @@ export interface Task {
   quote?: any;
   quotes?: any[];
   approvedEstimate?: number;
-  /** Backend status code (e.g. "ACCEPTED"), kept alongside the app-level status. */
   rawStatus?: string;
-  /** When the repair first moved to REPAIRING (backend `repairing_at`); set once repair has started. */
   repairStartedAt?: string | null;
   createdAt?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
 }
 
 export interface HistoryTask {
@@ -59,7 +58,7 @@ export interface HistoryTask {
   customerName: string;
   deviceInfo: string;
   address: string;
-  type: "maintenance" | "repair"; // "Bảo trì" | "Sửa chữa"
+  type: "maintenance" | "repair";
   diagnosis?: string;
   solution?: string;
   images?: {
@@ -67,6 +66,8 @@ export interface HistoryTask {
     after?: string;
   };
   totalAmount: string | number;
+  paymentStatus?: string;
+  paymentMethod?: string;
 }
 
 export type QuoteItemType = "SPARE_PART" | "LABOR" | "SERVICE";

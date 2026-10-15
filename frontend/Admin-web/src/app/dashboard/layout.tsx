@@ -45,7 +45,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -53,20 +52,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Sidebar with dynamic active tab (Fixed & Collapsible) */}
       <Sidebar
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as AdminTab)}
         onOpenCreateOrder={openCreateOrder}
       />
 
-      {/* Main Content Area (Scrolls independently) */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Header title={TAB_TITLES[activeTab] || "Bảng điều khiển"} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
 
-      {/* Global Create Order Modal */}
       {showCreateOrder && (
         <CreateOrderModal
           onClose={closeCreateOrder}

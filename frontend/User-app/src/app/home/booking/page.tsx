@@ -343,7 +343,7 @@ export default function BookingPage() {
             })
           );
         } catch (uploadErr) {
-          console.warn("Could not upload some booking photos", uploadErr);
+          console.warn("Lỗi tải lên hình ảnh đặt lịch:", uploadErr);
         }
       }
 

@@ -94,7 +94,7 @@ export default function SosPage() {
   const [currentRequestStatus, setCurrentRequestStatus] = useState<string>("ASSIGNED");
   const previousTechIdRef = useRef<string | null>(null);
 
-  // Real-time polling when at TECHNICIAN step (1.5s interval)
+  // Thăm dò trạng thái KTV thời gian thực (chu kỳ 1.5s)
   useEffect(() => {
     if (step !== "TECHNICIAN") return;
 
@@ -111,7 +111,6 @@ export default function SosPage() {
           try {
             reqData = await fetchApi<any>(`/repair-requests/${reqId}`);
           } catch {
-            // fallback
           }
         }
 
@@ -181,7 +180,7 @@ export default function SosPage() {
           }
         }
       } catch (e) {
-        console.warn("Realtime polling error:", e);
+        console.warn("Lỗi thăm dò trạng thái cứu hộ:", e);
       }
     };
 
@@ -381,7 +380,7 @@ export default function SosPage() {
           deviceId = devices[0].id;
         }
       } catch (devErr) {
-        console.warn("Could not fetch devices list, using default deviceId", devErr);
+        console.warn("Lỗi tải danh sách thiết bị, sử dụng deviceId mặc định:", devErr);
       }
 
       const payload = {
@@ -417,7 +416,7 @@ export default function SosPage() {
                 })
               );
             } catch (uploadErr) {
-              console.warn("Could not upload some customer photos", uploadErr);
+              console.warn("Lỗi tải lên một số ảnh của khách hàng:", uploadErr);
             }
           }
         }
@@ -430,18 +429,17 @@ export default function SosPage() {
               setAssignedTech(detailReq.technician);
             }
           } catch (detErr) {
-            console.warn("Could not fetch repair request detail", detErr);
+            console.warn("Lỗi tải chi tiết yêu cầu sửa chữa:", detErr);
           }
         }
       }
 
-      // Start connection animation and step transition only after request is successfully registered
       setConnectionStatus("connecting");
       setSmsStatus("pending");
       setConnectingDots("");
       setStep("TECHNICIAN");
     } catch (err: any) {
-      console.error("Failed to register SOS request", err);
+      console.error("Lỗi đăng ký yêu cầu cứu hộ SOS:", err);
       if (err.status === 401) {
         router.push("/login?redirect=/home/sos");
       } else {
@@ -459,7 +457,7 @@ export default function SosPage() {
           body: JSON.stringify({ status: "CANCELLED", cancel_reason: "Khách hàng hủy yêu cầu trên màn hình SOS" }),
         });
       } catch (err) {
-        console.warn("Failed to cancel request", err);
+        console.warn("Lỗi hủy yêu cầu cứu hộ:", err);
       }
     }
     sessionStorage.removeItem("activeSosId");
@@ -821,7 +819,7 @@ export default function SosPage() {
       )}
 
       {step === "TECHNICIAN" && (
-        <section className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-3 px-5 pt-1 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        <section className="mx-auto flex w-full max-w-120 flex-1 flex-col gap-3 px-5 pt-1 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           {reassignedNotice && (
             <p role="status" className="flex items-start gap-2.5 rounded-card border border-amber-200 bg-amber-50 p-3.5 text-[13px] font-medium text-amber-900">
               <RefreshCw className="mt-0.5 size-4 shrink-0 text-amber-600" />

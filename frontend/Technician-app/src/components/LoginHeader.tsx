@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { BrandLockup } from '@h-mobility/ui';
 
 export const LoginHeader = () => {

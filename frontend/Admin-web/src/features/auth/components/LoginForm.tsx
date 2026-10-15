@@ -45,10 +45,13 @@ export const LoginForm = () => {
         return;
       }
 
-      setAuthToken(loginRes.access_token, {
-        ...loginRes.user,
-        role: loginRes.role,
-      });
+      setAuthToken(
+        loginRes.access_token,
+        {
+          ...loginRes.user,
+          role: loginRes.role,
+        }
+      );
       localStorage.setItem("isLoggedIn", "true");
       router.push("/dashboard");
     } catch (err: unknown) {
@@ -104,7 +107,7 @@ export const LoginForm = () => {
                 className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
                 aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               >
-                {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+                {showPassword ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
               </button>
             }
           />

@@ -17,8 +17,7 @@ export interface StatusConfig {
   border: string;
 }
 
-// Labels and colors come from the shared palette so a status reads the same
-// in the admin console, the technician app and the customer app.
+// Đồng bộ nhãn và màu trạng thái dùng chung giữa Admin, KTV và Khách hàng.
 export const STATUS_CONFIG: Record<string, StatusConfig> = Object.fromEntries(
   Object.entries(REPAIR_STATUS).map(([code, meta]) => {
     const tone = TONE_CLASSES[meta.tone];

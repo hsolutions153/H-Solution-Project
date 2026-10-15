@@ -16,7 +16,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
     async function checkAuth() {
       let token = getAuthToken();
 
-      // Check if logged in via NextAuth (e.g. Google OAuth)
+      // Đồng bộ phiên đăng nhập NextAuth (Google OAuth)
       if (!token) {
         try {
           const res = await fetch("/api/auth/session");
@@ -36,7 +36,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
             }
           }
         } catch (err) {
-          console.warn("Session sync error:", err);
+          console.warn("Lỗi đồng bộ phiên đăng nhập:", err);
         }
       }
 
@@ -45,7 +45,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
         return;
       }
 
-      // Check if user has completed their profile
+      // Kiểm tra hoàn thiện hồ sơ người dùng
       try {
         const { getUserInfo, fetchApi, updateUserInfo } = await import("@/lib/api-client");
         const user = getUserInfo();
@@ -55,7 +55,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        // Double check against /customers/me if address is missing or placeholder
+        // Đối soát lại thông tin từ API /customers/me
         if (!user?.address || user.address === "Chưa cập nhật" || !user?.phone || user.is_profile_complete === undefined) {
           const customer = await fetchApi<any>("/customers/me");
           if (customer) {
@@ -80,7 +80,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
           }
         }
       } catch (err) {
-        console.warn("Verify profile error:", err);
+        console.warn("Lỗi xác minh thông tin hồ sơ:", err);
       }
 
       if (isMounted) setIsAuthenticated(true);

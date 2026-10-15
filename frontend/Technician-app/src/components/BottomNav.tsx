@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Home, ClipboardList, CalendarDays, History, User } from "lucide-react";
 import { BottomNav as SharedBottomNav } from "@h-mobility/ui";
 

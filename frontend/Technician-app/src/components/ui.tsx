@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft, Minus, Plus, X } from "lucide-react";
 import { cn, inputClasses } from "@h-mobility/ui";
 
-/* Form classes that extend the shared input style to textareas and selects. */
+// Kiểu giao diện form mở rộng cho textarea và select
 export const labelClasses = "block text-sm font-semibold text-slate-700";
 export const textareaClasses = cn(
   inputClasses,
@@ -12,7 +12,7 @@ export const textareaClasses = cn(
 );
 export const selectClasses = cn(inputClasses, "appearance-none pr-10 cursor-pointer");
 
-/** Top bar for pushed screens: back button, title, optional subtitle and trailing slot. */
+// Thanh tiêu đề màn hình con
 export function ScreenHeader({
   title,
   subtitle,
@@ -45,7 +45,7 @@ export function ScreenHeader({
   );
 }
 
-/** Heading above a group of cards or fields. */
+// Tiêu đề nhóm trường dữ liệu
 export function SectionTitle({ icon, children, action }: { icon?: ReactNode; children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -58,7 +58,7 @@ export function SectionTitle({ icon, children, action }: { icon?: ReactNode; chi
   );
 }
 
-/** Primary actions pinned to the bottom of the scroll area so they stay in thumb reach. */
+// Thanh thao tác cố định ở dưới màn hình
 export function ActionBar({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
@@ -72,7 +72,7 @@ export function ActionBar({ children, className }: { children: ReactNode; classN
   );
 }
 
-/** Label / value row used in summaries. */
+// Hàng thông tin tóm tắt
 export function InfoRow({ icon, label, children }: { icon?: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-3 py-3">
@@ -89,7 +89,7 @@ export function InfoRow({ icon, label, children }: { icon?: ReactNode; label: st
   );
 }
 
-/** Quantity stepper with 32px touch targets. */
+// Bộ tăng giảm số lượng
 export function QtyStepper({ value, onChange }: { value: number; onChange: (delta: number) => void }) {
   const btn =
     "flex size-8 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-white active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
@@ -106,10 +106,7 @@ export function QtyStepper({ value, onChange }: { value: number; onChange: (delt
   );
 }
 
-/**
- * Dialog rendered inside the app frame. "center" is for confirmations,
- * "sheet" slides up from the bottom for pickers and longer forms.
- */
+// Modal hiển thị dạng ở giữa hoặc trượt từ dưới lên
 export function Modal({
   open,
   onClose,
@@ -168,7 +165,6 @@ export function Modal({
   );
 }
 
-/** Placeholder blocks shaped like the content that is loading. */
 export function SkeletonList({ count = 3, className = "h-28" }: { count?: number; className?: string }) {
   return (
     <div className="space-y-3" aria-hidden>

@@ -89,7 +89,7 @@ export const MetricCards = () => {
           completed: comp,
         });
       } catch (err) {
-        console.warn("Could not fetch live metrics:", err);
+        console.warn("Lỗi tải số liệu thống kê:", err);
       } finally {
         setLoading(false);
       }

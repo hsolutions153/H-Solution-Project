@@ -32,6 +32,22 @@ class QRResponse(BaseModel):
     bank_account_name: str | None = None
 
 
+class CustomerPaymentSubmitRequest(BaseModel):
+    payment_method: str = "BANK_TRANSFER"
+    note: str | None = None
+
+
+class TechnicianPaymentConfirmRequest(BaseModel):
+    payment_method: str | None = None
+    note: str | None = None
+
+
+class PaymentActionResponse(BaseModel):
+    success: bool = True
+    message: str
+    payment: PaymentResponse
+
+
 class MoMoPaymentResponse(BaseModel):
     success: bool
     pay_url: str | None = None

@@ -115,6 +115,27 @@ class PaymentVerificationTests(MockedTest):
     def test_unassigned_technician_cannot_pay(self):
         self.rejects(403, payments.fetch_qr, "REPAIR0001", {"sub": "TECH000002", "role": "TECHNICIAN"})
 
+    def test_customer_submit_payment_moves_to_pending(self):
+        result = payments.customer_submit_payment("REPAIR0001", self.customer, "BANK_TRANSFER")
+        self.assertTrue(result["success"])
+        self.assertEqual(self.payment["payment_status"], "PENDING")
+        self.assertEqual(self.payment["payment_method"], "BANK_TRANSFER")
+
+    def test_technician_confirm_payment_moves_to_paid(self):
+        assigned_tech = {"sub": "TECH000001", "role": "TECHNICIAN"}
+        result = payments.technician_confirm_payment("REPAIR0001", assigned_tech, "CASH")
+        self.assertTrue(result["success"])
+        self.assertEqual(self.payment["payment_status"], "PAID")
+        self.assertEqual(self.payment["payment_method"], "CASH")
+
+    def test_unassigned_or_admin_cannot_confirm_technician_payment(self):
+        foreign_tech = {"sub": "TECH000002", "role": "TECHNICIAN"}
+        admin = {"sub": "ADMIN00001", "role": "ADMIN"}
+        customer = {"sub": "CUSTOMER01", "role": "CUSTOMER"}
+        self.rejects(403, payments.technician_confirm_payment, "REPAIR0001", foreign_tech)
+        self.rejects(403, payments.technician_confirm_payment, "REPAIR0001", admin)
+        self.rejects(403, payments.technician_confirm_payment, "REPAIR0001", customer)
+
     def test_partial_sepay_transfer_does_not_settle_invoice(self):
         self.assertTrue(payments.handle_sepay_webhook(self.sepay(1), "Apikey test-key")["success"])
         self.writes.assert_not_called(); self.history.assert_not_called()
@@ -149,7 +170,7 @@ class PaymentVerificationTests(MockedTest):
         self.gateway.assert_not_called()
 
     def test_unfinished_order_or_missing_final_amount_cannot_pay(self):
-        for changes in ({"status": "REPAIRING"}, {"total_amount": None}):
+        for changes in ({"status": "CANCELLED"}, {"total_amount": None}):
             self.repair.update(status="COMPLETED", total_amount=1200000); self.repair.update(changes)
             self.rejects(409, payments.fetch_qr, "REPAIR0001", self.customer)
         self.writes.assert_not_called()

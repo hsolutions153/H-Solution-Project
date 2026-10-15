@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { fetchApi } from "@/lib/api-client";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { LoginHeader } from "@/components/LoginHeader";
 import { ForgotPasswordForm } from "./components/ForgotPasswordForm";
 import { ForgotPasswordFormData } from "@/types/auth";
-import { ArrowLeft } from "lucide-react"; // Import icon ArrowLeft
+import { ArrowLeft } from "lucide-react";
 
 interface ForgotPasswordScreenProps {
   onBackToLogin: () => void;

@@ -20,7 +20,7 @@ export function TechnicianProfileScreen() {
       const me = await fetchApi<any>("/technicians/me");
       setProfile(me);
     } catch (err) {
-      console.error("Failed to load profile:", err);
+      console.error("Lỗi tải thông tin cá nhân KTV:", err);
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export function TechnicianProfileScreen() {
       });
       setProfile((prev: any) => ({ ...prev, is_online: updated.is_online }));
     } catch (err) {
-      console.error("Failed to toggle presence:", err);
+      console.error("Lỗi chuyển đổi trạng thái trực tuyến:", err);
     } finally {
       setIsToggling(false);
     }

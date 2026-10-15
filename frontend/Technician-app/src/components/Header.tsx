@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Bell, LogOut } from 'lucide-react';
 import { BrandMark, Button } from '@h-mobility/ui';
 import { Modal } from '@/components/ui';
@@ -37,7 +37,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
           setIsOnline(me.is_online);
         }
       } catch (err) {
-        console.warn("Header profile fetch error:", err);
+        console.warn("Lỗi tải thông tin KTV trên header:", err);
       }
     }
     loadProfile();

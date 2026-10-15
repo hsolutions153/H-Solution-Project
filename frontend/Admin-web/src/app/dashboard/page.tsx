@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useAdmin } from "@/context/AdminContext";
 import { DashboardFeature } from "@/features/dashboard";
 import { OrdersList } from "@/features/orders/OrdersList";

@@ -1,9 +1,6 @@
-import React from 'react';
-
 interface TaskTabsProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  /** Number of tasks per tab id, shown next to each label. */
   counts?: Record<string, number>;
 }
 

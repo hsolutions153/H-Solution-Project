@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { LoginHeader } from '@/components/LoginHeader';
 import { VerifyOtpForm, VerifyOtpFormRef } from './components/VerifyOtpForm';

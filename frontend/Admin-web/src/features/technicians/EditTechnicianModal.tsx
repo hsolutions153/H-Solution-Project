@@ -73,7 +73,6 @@ export const EditTechnicianModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
@@ -95,7 +94,6 @@ export const EditTechnicianModal = ({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
@@ -103,9 +101,8 @@ export const EditTechnicianModal = ({
             </div>
           )}
 
-          {/* Mã KTV - Không cho sửa */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase mb-1.5">
               <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span>Mã Kỹ thuật viên (Cố định)</span>
             </label>
@@ -118,7 +115,6 @@ export const EditTechnicianModal = ({
             />
           </div>
 
-          {/* Họ và tên */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
               Họ và tên <span className="text-rose-500">*</span>
@@ -133,9 +129,8 @@ export const EditTechnicianModal = ({
             />
           </div>
 
-          {/* Số điện thoại */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Phone className="w-4 h-4 text-brand-700" />
               Số điện thoại
             </label>
@@ -148,9 +143,8 @@ export const EditTechnicianModal = ({
             />
           </div>
 
-          {/* Chuyên môn */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Award className="w-4 h-4 text-brand-700" />
               Chuyên môn kỹ thuật
             </label>
@@ -163,7 +157,6 @@ export const EditTechnicianModal = ({
             />
           </div>
 
-          {/* Kinh nghiệm & Kỹ năng */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
@@ -195,7 +188,6 @@ export const EditTechnicianModal = ({
             </div>
           </div>
 
-          {/* Trạng thái hoạt động */}
           <div className="pt-1">
             <label className="text-xs font-bold text-slate-700 uppercase mb-2 block">
               Trạng thái sẵn sàng nhận đơn
@@ -212,15 +204,14 @@ export const EditTechnicianModal = ({
               >
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                    isOnline ? "bg-emerald-500" : "bg-slate-400"
                   }`}
                 />
-                <span>{isOnline ? "🟢 Đang Online (Nhận đơn)" : "⚪ Đang Offline"}</span>
+                <span>{isOnline ? "Đang Online (Sẵn sàng nhận việc)" : "Đang Offline (Ngoại tuyến)"}</span>
               </button>
             </div>
           </div>
 
-          {/* Footer buttons */}
           <div className="pt-3 flex justify-end gap-3 border-t border-slate-100">
             <button
               type="button"

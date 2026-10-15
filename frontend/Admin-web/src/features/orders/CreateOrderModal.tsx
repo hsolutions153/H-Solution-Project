@@ -31,7 +31,6 @@ export const CreateOrderModal = ({
   const [devices, setDevices] = useState<Device[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  // Form fields
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
@@ -45,7 +44,7 @@ export const CreateOrderModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Close customer dropdown when clicking outside
+  // Đóng dropdown khách hàng khi bấm ra ngoài
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -83,7 +82,7 @@ export const CreateOrderModal = ({
         setDevices(devList);
         setDeviceId(devList.find((device: Device) => device.customer_id === custList[0]?.id)?.id || "");
       } catch (err: unknown) {
-        console.warn("Could not fetch customers/devices:", err);
+        console.warn("Lỗi tải khách hàng hoặc thiết bị:", err);
       } finally {
         setLoadingInitial(false);
       }
@@ -91,7 +90,7 @@ export const CreateOrderModal = ({
     fetchData();
   }, []);
 
-  // Filter devices by selected customer
+  // Lọc thiết bị theo khách hàng đã chọn
   const filteredDevices = customerId
     ? devices.filter((d) => d.customer_id === customerId)
     : devices;
@@ -148,7 +147,6 @@ export const CreateOrderModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div>
             <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
@@ -164,7 +162,6 @@ export const CreateOrderModal = ({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
@@ -172,7 +169,6 @@ export const CreateOrderModal = ({
             </div>
           )}
 
-          {/* SOS Priority Switch */}
           <div
             onClick={() => setIsSos(!isSos)}
             className={`p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
@@ -208,7 +204,6 @@ export const CreateOrderModal = ({
             />
           </div>
 
-          {/* Customer selection with Search */}
           <div className="relative" ref={customerDropdownRef}>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
@@ -261,7 +256,6 @@ export const CreateOrderModal = ({
               </div>
             </div>
 
-            {/* Dropdown Results */}
             {isCustomerDropdownOpen && (
               <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto z-50 py-1">
                 {filteredCustomers.length === 0 ? (
@@ -304,7 +298,6 @@ export const CreateOrderModal = ({
               </div>
             )}
 
-            {/* Currently Selected Customer Badge */}
             {selectedCustomer && (
               <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 bg-brand-50/50 border border-brand-100 px-3 py-1.5 rounded-lg">
                 <span>
@@ -315,9 +308,8 @@ export const CreateOrderModal = ({
             )}
           </div>
 
-          {/* Device selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Wrench className="w-4 h-4 text-brand-700" />
               Thiết bị cần sửa
             </label>
@@ -338,7 +330,6 @@ export const CreateOrderModal = ({
             </select>
           </div>
 
-          {/* Issue Type */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
               Loại sự cố / Hạng mục hư hỏng
@@ -356,9 +347,8 @@ export const CreateOrderModal = ({
             </select>
           </div>
 
-          {/* Address */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <MapPin className="w-4 h-4 text-rose-500" />
               Địa chỉ sự cố / Nơi tiếp nhận
             </label>
@@ -372,9 +362,8 @@ export const CreateOrderModal = ({
             />
           </div>
 
-          {/* Description */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <FileText className="w-4 h-4 text-slate-500" />
               Mô tả chi tiết triệu chứng lỗi
             </label>
@@ -387,7 +376,6 @@ export const CreateOrderModal = ({
             />
           </div>
 
-          {/* Footer Buttons */}
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
             <button
               type="button"

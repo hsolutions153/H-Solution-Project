@@ -17,11 +17,7 @@ interface QuoteStatusScreenProps {
 
 const vnd = (n: number) => `${n.toLocaleString("vi-VN")} đ`;
 
-/**
- * Customer decision on a quote. Two cases share this screen:
- * - the first quote, sent before repair starts ("Bắt đầu sửa chữa"), and
- * - a supplementary quote for extra cost found during the repair ("Tiếp tục sửa chữa").
- */
+// Màn hình trạng thái phản hồi báo giá từ khách hàng
 export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   task,
   onBack,
@@ -57,7 +53,7 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
     pending: { tone: "warning" as const, badge: "Chờ phê duyệt", icon: Clock, iconClass: "bg-amber-50 text-amber-600" },
   }[state];
   const StateIcon = STATE_UI.icon;
-  // A rejected supplementary quote still leaves the approved part to finish.
+  // Nếu từ chối chi phí phát sinh, KTV vẫn tiếp tục hoàn tất các hạng mục đã được duyệt
   const canContinue = effectivelyApproved || (isRejected && hasApprovedQuote);
 
   const COPY = supplementary

@@ -35,17 +35,17 @@ export const UserTable: React.FC<UserTableProps> = ({
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1060px] text-left text-base">
+        <table className="w-full min-w-265 text-left text-base">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-sm font-bold uppercase tracking-wider text-slate-500">
-              <th className="w-[80px] px-6 py-4">STT</th>
-              <th className="w-[240px] px-4 py-4">User</th>
-              <th className="w-[260px] px-4 py-4">Email</th>
-              <th className="w-[170px] px-4 py-4">SĐT</th>
-              <th className="w-[150px] px-4 py-4">Vai trò</th>
-              <th className="w-[150px] px-4 py-4">Trạng thái</th>
-              <th className="w-[120px] px-4 py-4">Online</th>
-              <th className="w-[140px] px-6 py-4 text-right">Thao tác</th>
+              <th className="w-20 px-6 py-4">STT</th>
+              <th className="w-60 px-4 py-4">User</th>
+              <th className="w-65 px-4 py-4">Email</th>
+              <th className="w-42.5 px-4 py-4">SĐT</th>
+              <th className="w-37.5 px-4 py-4">Vai trò</th>
+              <th className="w-37.5 px-4 py-4">Trạng thái</th>
+              <th className="w-30 px-4 py-4">Online</th>
+              <th className="w-35 px-6 py-4 text-right">Thao tác</th>
             </tr>
           </thead>
 

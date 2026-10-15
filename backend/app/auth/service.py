@@ -5,7 +5,14 @@ import secrets
 from app.auth import repository
 from app.auth.google import verify_google_id_token
 from app.auth.sms import send_password_reset_code
-from app.auth.utils import create_access_token, hash_password, verify_password
+from app.auth.utils import (
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    create_access_token,
+    generate_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
 from app.core.exceptions import AppException, ErrorCode
 
 CUSTOMER_ROLE_CODE = "CUSTOMER"
@@ -16,6 +23,67 @@ OTP_RESEND_COOLDOWN_SECONDS = 60
 
 def _generate_user_id() -> str:
     return secrets.token_hex(5).upper()
+
+
+def _issue_refresh_token(user_id: str) -> str:
+    raw_token = generate_refresh_token()
+    created = repository.create_refresh_token(
+        {
+            "id": _generate_user_id(),
+            "user_id": user_id,
+            "token_hash": hash_refresh_token(raw_token),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
+        }
+    )
+    if not created:
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+    return raw_token
+
+
+def refresh_access_token(raw_refresh_token: str):
+    now = datetime.now(timezone.utc)
+    stored = repository.get_refresh_token_by_hash(hash_refresh_token(raw_refresh_token))
+    if not stored:
+        raise AppException(ErrorCode.TOKEN_INVALID, headers={"WWW-Authenticate": "Bearer"})
+
+    if stored.get("revoked_at"):
+        # Token cũ bị dùng lại: thu hồi toàn bộ phiên của user
+        repository.revoke_all_user_refresh_tokens(stored["user_id"], now.isoformat())
+        raise AppException(ErrorCode.TOKEN_INVALID, headers={"WWW-Authenticate": "Bearer"})
+
+    expires_at = datetime.fromisoformat(str(stored["expires_at"]).replace("Z", "+00:00"))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now:
+        raise AppException(ErrorCode.TOKEN_EXPIRED, headers={"WWW-Authenticate": "Bearer"})
+
+    user = repository.get_user_by_id(stored["user_id"])
+    if isinstance(user, list):
+        user = user[0] if user else None
+    if not user or not user.get("is_active", True):
+        raise AppException(ErrorCode.USER_LOCKED)
+
+    role = user.get("role") or {}
+    if not role.get("id") or not role.get("code"):
+        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
+
+    # Xoay vòng: thu hồi token cũ, cấp token mới
+    repository.revoke_refresh_token(stored["id"], now.isoformat())
+    access_token = create_access_token(
+        data={"sub": user["id"], "email": user["email"], "role_id": role["id"], "role": role["code"]}
+    )
+    return {
+        "access_token": access_token,
+        "refresh_token": _issue_refresh_token(user["id"]),
+        "token_type": "bearer",
+    }
+
+
+def logout_refresh_token(raw_refresh_token: str):
+    stored = repository.get_refresh_token_by_hash(hash_refresh_token(raw_refresh_token))
+    if stored and not stored.get("revoked_at"):
+        repository.revoke_refresh_token(stored["id"], datetime.now(timezone.utc).isoformat())
+    return {"message": "Đăng xuất thành công"}
 
 
 def authenticate_user(email_or_phone: str, password: str):
@@ -54,6 +122,7 @@ def authenticate_user(email_or_phone: str, password: str):
 
     return {
         "access_token": access_token,
+        "refresh_token": _issue_refresh_token(user["id"]),
         "token_type": "bearer",
         "role_id": role_id,
         "role": role_code,
@@ -162,6 +231,7 @@ def authenticate_or_register_google_user(payload):
     )
     return {
         "access_token": access_token,
+        "refresh_token": _issue_refresh_token(user["id"]),
         "token_type": "bearer",
         "role_id": user_role_id,
         "role": user_role_code,

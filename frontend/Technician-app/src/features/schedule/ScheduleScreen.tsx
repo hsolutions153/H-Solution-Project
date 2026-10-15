@@ -6,7 +6,6 @@ import { Card,EmptyState,StatusBadge } from "@h-mobility/ui";
 import { CalendarDays,ChevronRight,MapPin,Phone,RefreshCw,Siren } from "lucide-react";
 import { useCallback,useEffect,useMemo,useState } from "react";
 
-/** Requests that no longer need the technician to show up. */
 const CLOSED_STATUSES = new Set(["COMPLETED", "CANCELLED", "REJECTED", "ESTIMATE_REJECTED"]);
 const REFRESH_MS = 30_000;
 
@@ -24,7 +23,6 @@ interface ScheduleGroup {
 }
 
 interface ScheduleScreenProps {
-  /** Opens the job in the task flow (detail screen on the Home tab). */
   onOpenTask: (task: Task) => void;
 }
 
@@ -116,7 +114,7 @@ export function ScheduleScreen({ onOpenTask }: ScheduleScreenProps) {
   }, []);
 
   useEffect(() => {
-    // Initial fetch plus a slow background refresh; state updates happen after the request resolves.
+    // Tải dữ liệu ban đầu và định kỳ làm mới ngầm
     const first = setTimeout(load, 0);
     const interval = setInterval(load, REFRESH_MS);
     return () => {

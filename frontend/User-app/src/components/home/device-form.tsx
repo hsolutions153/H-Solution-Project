@@ -225,7 +225,6 @@ export function DeviceForm({ device }: Props) {
       </div>
 
       <form onSubmit={submit} className="device-form">
-        {/* 1. Ảnh thiết bị / Xe */}
         <div className="device-upload-container">
           <label className="device-upload-label">
             <span>Ảnh chụp phương tiện / xe</span>
@@ -282,7 +281,6 @@ export function DeviceForm({ device }: Props) {
           </button>
         </div>
 
-        {/* 2. Banner chọn nhanh Thương hiệu & Dòng xe */}
         <div className="vp-models-header-card" style={{ marginBottom: 20 }}>
           <div className="vp-brand-pill">
             <Sparkles size={16} />
@@ -299,7 +297,6 @@ export function DeviceForm({ device }: Props) {
           </button>
         </div>
 
-        {/* 3. Thương hiệu & Dòng xe (Các trường tối thiểu bắt buộc) */}
         <div className="device-form-grid-2">
           <label>
             <span>
@@ -338,7 +335,6 @@ export function DeviceForm({ device }: Props) {
           </label>
         </div>
 
-        {/* 4. ID xe / Số sê-ri / Biển số & Loại phương tiện */}
         <div className="device-form-grid-2">
           <label>
             <span>
@@ -365,7 +361,6 @@ export function DeviceForm({ device }: Props) {
           </label>
         </div>
 
-        {/* 5. Cấu trúc dữ liệu xe máy điện: Loại pin & Năm sản xuất */}
         <div className="device-form-grid-2">
           <label>
             <span>
@@ -401,7 +396,6 @@ export function DeviceForm({ device }: Props) {
           </label>
         </div>
 
-        {/* 6. Tên gợi nhớ & Ngày mua */}
         <div className="device-form-grid-2">
           <label>
             <span>Tên gợi nhớ</span>
@@ -422,7 +416,6 @@ export function DeviceForm({ device }: Props) {
           </label>
         </div>
 
-        {/* 7. Thiết bị mặc định */}
         <div className="device-settings-panel">
           <label className="device-switch-row">
             <span className="device-setting-icon">
@@ -461,7 +454,6 @@ export function DeviceForm({ device }: Props) {
         </button>
       </form>
 
-      {/* Modal chọn dòng xe 2 bước: Thương hiệu -> Dòng xe & Xác nhận xe "Khác" */}
       <VehiclePickerModal
         isOpen={isPickerOpen}
         onClose={() => setIsPickerOpen(false)}
@@ -470,7 +462,6 @@ export function DeviceForm({ device }: Props) {
         currentModel={form.model}
       />
 
-      {/* Modal xác nhận xóa xe */}
       {isEditing && (
         <DeleteConfirmModal
           isOpen={isDeleteModalOpen}

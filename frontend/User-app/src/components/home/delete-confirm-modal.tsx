@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Trash2, AlertTriangle, LoaderCircle, X } from "lucide-react";
 
 interface DeleteConfirmModalProps {

@@ -40,7 +40,7 @@ export const HistoryList = () => {
         ? ordersRes
         : [];
 
-      // Filter only finished or cancelled orders
+      // Chỉ lọc đơn đã hoàn tất hoặc đã hủy
       const finished = list.filter(
         (o) => o.status === "COMPLETED" || o.status === "CANCELLED"
       );
@@ -48,7 +48,7 @@ export const HistoryList = () => {
 
       setTechnicians(Array.isArray(techRes) ? techRes : []);
     } catch (err: unknown) {
-      console.warn("Error fetching history:", err);
+      console.warn("Lỗi tải lịch sử đơn hàng:", err);
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,6 @@ export const HistoryList = () => {
         </button>
       </div>
 
-      {/* Search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
@@ -109,7 +108,6 @@ export const HistoryList = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -191,7 +189,6 @@ export const HistoryList = () => {
           </table>
         </div>
 
-        {/* Gắn Component Pagination ngay sau bảng */}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

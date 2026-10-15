@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import {
   ChevronLeft,
@@ -66,7 +64,6 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-white border-t border-slate-200/80 text-sm">
-      {/* Thông tin số lượng bản ghi */}
       <div className="flex items-center gap-3 text-slate-500">
         <span>
           Hiển thị <b className="text-slate-800">{startItem}</b> -{" "}
@@ -92,9 +89,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         )}
       </div>
 
-      {/* Điều khiển trang */}
       <div className="flex items-center gap-1.5">
-        {/* Về trang đầu */}
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage <= 1}
@@ -105,7 +100,6 @@ export const Pagination: React.FC<PaginationProps> = ({
           <ChevronsLeft className="w-4 h-4 stroke-[2.5]" />
         </button>
 
-        {/* Trang trước */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
@@ -116,7 +110,6 @@ export const Pagination: React.FC<PaginationProps> = ({
           <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
         </button>
 
-        {/* Các số trang */}
         <div className="flex items-center gap-1.5 mx-1">
           {getPageNumbers().map((p, idx) => {
             if (p === "...") {
@@ -137,7 +130,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               <button
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
-                className={`min-w-[36px] h-9 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none flex items-center justify-center ${
+                className={`min-w-9 h-9 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none flex items-center justify-center ${
                   isActive
                     ? "bg-brand-900 text-white shadow-sm border border-brand-950 ring-2 ring-brand-900/20 font-black"
                     : "bg-white border border-slate-300 text-slate-700 hover:bg-brand-50 hover:border-brand-400 hover:text-brand-900 shadow-2xs"
@@ -152,7 +145,6 @@ export const Pagination: React.FC<PaginationProps> = ({
           })}
         </div>
 
-        {/* Trang sau */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= safeTotalPages}
@@ -163,7 +155,6 @@ export const Pagination: React.FC<PaginationProps> = ({
           <ChevronRight className="w-4 h-4 stroke-[2.5]" />
         </button>
 
-        {/* Đến trang cuối */}
         <button
           onClick={() => onPageChange(safeTotalPages)}
           disabled={currentPage >= safeTotalPages}

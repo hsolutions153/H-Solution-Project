@@ -5,7 +5,6 @@ export interface BottomNavItem {
   id: string;
   label: string;
   icon: ReactNode;
-  /** When set, the item renders as a link; otherwise as a button calling onSelect. */
   href?: string;
 }
 
@@ -15,12 +14,10 @@ interface BottomNavProps {
   items: BottomNavItem[];
   activeId: string;
   onSelect?: (id: string) => void;
-  /** Pass next/link's Link to get client-side navigation for href items. */
   linkComponent?: LinkLike;
   className?: string;
 }
 
-/** Mobile tab bar shared by User-app and Technician-app. */
 export function BottomNav({ items, activeId, onSelect, linkComponent, className }: BottomNavProps) {
   const LinkTag: LinkLike = linkComponent ?? ((props) => <a {...props} />);
   return (

@@ -91,7 +91,7 @@ export const CreateCustomerModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Phone className="w-4 h-4 text-brand-700" />
               Số điện thoại
             </label>
@@ -106,7 +106,7 @@ export const CreateCustomerModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Mail className="w-4 h-4 text-slate-500" />
               Email
             </label>
@@ -120,7 +120,7 @@ export const CreateCustomerModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Lock className="w-4 h-4 text-slate-500" />
               Mật khẩu khởi tạo
             </label>
@@ -134,7 +134,7 @@ export const CreateCustomerModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <MapPin className="w-4 h-4 text-rose-500" />
               Địa chỉ
             </label>

@@ -1,7 +1,3 @@
-/**
- * Danh mục chuẩn Thương hiệu, Dòng xe và Loại pin cho dịch vụ sửa chữa xe máy điện
- */
-
 export interface VehicleModelItem {
   model: string;
   defaultBattery: string;

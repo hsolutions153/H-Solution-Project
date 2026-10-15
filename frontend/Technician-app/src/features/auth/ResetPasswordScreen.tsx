@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { fetchApi } from '@/lib/api-client';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { LoginHeader } from '@/components/LoginHeader';

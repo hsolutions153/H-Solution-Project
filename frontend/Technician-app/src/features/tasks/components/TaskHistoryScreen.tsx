@@ -1,10 +1,10 @@
 "use client";
 
-import { SkeletonList } from "@/components/ui";
+import { Modal, SkeletonList } from "@/components/ui";
 import { HistoryTask } from "@/types/task";
-import { Badge,Button,Card,EmptyState,cn,inputClasses } from "@h-mobility/ui";
-import { ChevronDown,FileText,MapPin,RotateCw,Search } from "lucide-react";
-import React,{ useEffect,useState } from "react";
+import { Badge, Button, Card, EmptyState, cn, inputClasses } from "@h-mobility/ui";
+import { Banknote, CheckCircle2, ChevronDown, FileText, MapPin, QrCode, RotateCw, Search } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface TaskHistoryScreenProps {
   newCompletedTask?: HistoryTask | null;
@@ -17,6 +17,44 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     return newCompletedTask ? [newCompletedTask] : [];
   });
   const [loading, setLoading] = useState(true);
+
+  // Quản lý xác nhận thanh toán trực tiếp từ Lịch sử
+  const [selectedConfirmTask, setSelectedConfirmTask] = useState<HistoryTask | null>(null);
+  const [confirmMethod, setConfirmMethod] = useState<"BANK_TRANSFER" | "CASH">("BANK_TRANSFER");
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
+
+  const handleConfirmHistoryPayment = async () => {
+    if (!selectedConfirmTask) return;
+    setIsConfirming(true);
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi<any>(`/payments/repair/${selectedConfirmTask.id}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ payment_method: confirmMethod }),
+      });
+      setConfirmSuccess(
+        confirmMethod === "CASH"
+          ? "Đã xác nhận thu đủ tiền mặt thành công!"
+          : "Đã xác nhận nhận tiền chuyển khoản thành công!"
+      );
+      setHistoryList((prev) =>
+        prev.map((t) =>
+          t.id === selectedConfirmTask.id
+            ? { ...t, paymentStatus: "PAID", paymentMethod: confirmMethod }
+            : t
+        )
+      );
+      setTimeout(() => {
+        setSelectedConfirmTask(null);
+        setConfirmSuccess(null);
+      }, 1200);
+    } catch (err: any) {
+      alert(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +100,8 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                   })(),
                 },
                 totalAmount: effectiveTotal,
+                paymentStatus: item.payment_status || (item.payments && item.payments[0]?.payment_status) || "UNPAID",
+                paymentMethod: item.payment_method || (item.payments && item.payments[0]?.payment_method) || undefined,
               };
             });
 
@@ -127,7 +167,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
       </div>
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
           aria-label="Tìm công việc"
@@ -198,11 +238,22 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                     <h3 className="mt-1 truncate text-base font-bold text-ink">{item.customerName}</h3>
                     <p className="mt-0.5 truncate text-[13px] text-slate-600">{item.deviceInfo}</p>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <Badge tone={item.type === "repair" ? "brand" : "neutral"} className="min-w-0 max-w-[60%]">
-                        <span className="min-w-0 truncate">{item.serviceType}</span>
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge tone={item.type === "repair" ? "brand" : "neutral"} className="min-w-0">
+                          <span className="min-w-0 truncate">{item.serviceType}</span>
+                        </Badge>
+                        {item.paymentStatus === "PAID" ? (
+                          <Badge tone="success">
+                            ✓ {item.paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                          </Badge>
+                        ) : item.paymentStatus === "PENDING" ? (
+                          <Badge tone="warning">Khách đã nộp - Chờ duyệt</Badge>
+                        ) : (
+                          <Badge tone="neutral">Chưa thanh toán</Badge>
+                        )}
+                      </div>
                       <span className="text-sm font-bold tabular-nums text-ink">
-                        {item.totalAmount.toLocaleString("vi-VN")} đ
+                        {Number(item.totalAmount).toLocaleString("vi-VN")} đ
                       </span>
                     </div>
                   </div>
@@ -235,7 +286,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                       <div className="grid grid-cols-2 gap-2">
                         {item.images.before && (
                           <figure>
-                            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line bg-slate-100">
+                            <div className="aspect-4/3 overflow-hidden rounded-control border border-line bg-slate-100">
                               <img
                                 src={item.images.before}
                                 alt="Trước khi sửa"
@@ -250,7 +301,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                         )}
                         {item.images.after && (
                           <figure>
-                            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line bg-slate-100">
+                            <div className="aspect-4/3 overflow-hidden rounded-control border border-line bg-slate-100">
                               <img
                                 src={item.images.after}
                                 alt="Sau khi sửa"
@@ -266,16 +317,40 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between border-t border-line pt-3">
-                      <div>
-                        <p className="text-xs text-slate-500">Tổng cộng</p>
-                        <p className="text-base font-bold tabular-nums text-ink">
-                          {item.totalAmount.toLocaleString("vi-VN")} đ
-                        </p>
+                    <div className="border-t border-line pt-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-500">Tổng cộng</p>
+                          <p className="text-base font-bold tabular-nums text-ink">
+                            {Number(item.totalAmount).toLocaleString("vi-VN")} đ
+                          </p>
+                        </div>
+                        {item.paymentStatus === "PAID" && (
+                          <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
+                            Xem hóa đơn
+                          </Button>
+                        )}
                       </div>
-                      <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
-                        Xem hóa đơn
-                      </Button>
+
+                      {item.paymentStatus !== "PAID" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<CheckCircle2 className="size-4" />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedConfirmTask(item);
+                              setConfirmMethod(item.paymentMethod === "CASH" ? "CASH" : "BANK_TRANSFER");
+                            }}
+                          >
+                            Xác nhận nhận tiền
+                          </Button>
+                          <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
+                            Xem hóa đơn
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -291,6 +366,84 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             Tải thêm
           </Button>
         </div>
+      )}
+
+      {selectedConfirmTask && (
+        <Modal
+          open={!!selectedConfirmTask}
+          onClose={() => {
+            if (!isConfirming) {
+              setSelectedConfirmTask(null);
+              setConfirmSuccess(null);
+            }
+          }}
+          variant="sheet"
+          title="Xác nhận nhận tiền"
+        >
+          <div className="space-y-4">
+            <div className="rounded-card border border-brand-100 bg-brand-50/70 p-4 text-center">
+              <p className="text-xs font-medium text-slate-500">Số tiền cần xác nhận</p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-brand-700">
+                {Number(selectedConfirmTask.totalAmount).toLocaleString("vi-VN")} đ
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Mã đơn: <span className="font-semibold text-ink">#{selectedConfirmTask.code}</span> · Khách: {selectedConfirmTask.customerName}
+              </p>
+            </div>
+
+            {confirmSuccess ? (
+              <div className="flex items-center gap-3 rounded-control border border-emerald-200 bg-emerald-50 p-3.5 text-emerald-800">
+                <CheckCircle2 className="size-5 shrink-0 text-emerald-600" />
+                <div className="text-sm font-semibold">{confirmSuccess}</div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 rounded-control bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmMethod("BANK_TRANSFER")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-control py-2 text-xs font-semibold transition-all cursor-pointer",
+                      confirmMethod === "BANK_TRANSFER"
+                        ? "bg-white text-brand-700 shadow-sm"
+                        : "text-slate-600 hover:text-ink"
+                    )}
+                  >
+                    <QrCode className="size-4" />
+                    Chuyển khoản
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmMethod("CASH")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-control py-2 text-xs font-semibold transition-all cursor-pointer",
+                      confirmMethod === "CASH"
+                        ? "bg-white text-brand-700 shadow-sm"
+                        : "text-slate-600 hover:text-ink"
+                    )}
+                  >
+                    <Banknote className="size-4" />
+                    Tiền mặt
+                  </button>
+                </div>
+
+                <Button
+                  size="lg"
+                  fullWidth
+                  disabled={isConfirming}
+                  icon={<CheckCircle2 className="size-5" />}
+                  onClick={handleConfirmHistoryPayment}
+                >
+                  {isConfirming
+                    ? "Đang xác nhận..."
+                    : confirmMethod === "CASH"
+                    ? "Xác nhận đã thu đủ tiền mặt"
+                    : "Xác nhận đã nhận chuyển khoản"}
+                </Button>
+              </>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

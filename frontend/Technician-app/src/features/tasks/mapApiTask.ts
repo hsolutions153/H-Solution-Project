@@ -1,6 +1,5 @@
 import { Task, TaskStatus } from "@/types/task";
 
-/** Converts a /repair-requests/technician/me item into the app's Task shape. */
 export function mapApiTask(item: any): Task {
   let status: TaskStatus = "PENDING";
   let statusText = "Chưa bắt đầu";
@@ -81,13 +80,12 @@ export function mapApiTask(item: any): Task {
     quote: item.quote,
     quotes: item.quotes || (item.quote ? [item.quote] : []),
     approvedEstimate: Number(item.approved_estimate || 0),
+    paymentStatus: item.payment_status || (item.payments && item.payments[0]?.payment_status) || undefined,
+    paymentMethod: item.payment_method || (item.payments && item.payments[0]?.payment_method) || undefined,
   };
 }
 
-/**
- * True when the quote under review is a supplementary (extra cost) quote sent
- * during the repair, as opposed to the first quote sent before repair starts.
- */
+// Kiểm tra xem báo giá có phải là báo giá bổ sung phát sinh trong lúc sửa hay không
 export function isSupplementaryQuote(task: Pick<Task, "quote" | "quotes" | "repairStartedAt">): boolean {
   if (task.repairStartedAt) return true;
   const latestId = task.quote?.id;
@@ -95,18 +93,13 @@ export function isSupplementaryQuote(task: Pick<Task, "quote" | "quotes" | "repa
 }
 
 export interface Appointment {
-  /** Local calendar day of the appointment; null when the request carries no date. */
   day: Date | null;
-  /** "HH:MM" slot when the customer picked one. */
   slot: string | null;
 }
 
 const APPOINTMENT_PATTERN = /\[Hẹn:\s*([^\]]*)\]/;
 
-/**
- * Reads the appointment the backend stores as "[Hẹn: <Hôm nay|Ngày mai|YYYY-MM-DD> <HH:MM>]"
- * inside the description. "Hôm nay"/"Ngày mai" are relative to when the request was created.
- */
+// Đọc lịch hẹn dạng "[Hẹn: <Hôm nay|Ngày mai|YYYY-MM-DD> <HH:MM>]" từ mô tả
 export function parseAppointment(task: Pick<Task, "description" | "createdAt">): Appointment {
   const match = task.description?.match(APPOINTMENT_PATTERN);
   if (!match) return { day: null, slot: null };

@@ -67,7 +67,6 @@ export const CreateTechnicianModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-brand-900/60 border border-brand-400/30 flex items-center justify-center text-brand-400">
@@ -89,7 +88,6 @@ export const CreateTechnicianModal = ({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
@@ -97,7 +95,6 @@ export const CreateTechnicianModal = ({
             </div>
           )}
 
-          {/* Họ và tên */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
               Họ và tên KTV <span className="text-rose-500">*</span>
@@ -112,10 +109,9 @@ export const CreateTechnicianModal = ({
             />
           </div>
 
-          {/* Số điện thoại & Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
                 <Phone className="w-3.5 h-3.5 text-brand-700" />
                 Số điện thoại <span className="text-rose-500">*</span>
               </label>
@@ -130,7 +126,7 @@ export const CreateTechnicianModal = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
                 <Mail className="w-3.5 h-3.5 text-brand-700" />
                 Email
               </label>
@@ -144,10 +140,9 @@ export const CreateTechnicianModal = ({
             </div>
           </div>
 
-          {/* Mật khẩu & Số CCCD */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
                 <Lock className="w-3.5 h-3.5 text-brand-700" />
                 Mật khẩu đăng nhập
               </label>
@@ -174,9 +169,8 @@ export const CreateTechnicianModal = ({
             </div>
           </div>
 
-          {/* Chuyên môn */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Award className="w-3.5 h-3.5 text-brand-700" />
               Chuyên môn kỹ thuật
             </label>
@@ -189,7 +183,6 @@ export const CreateTechnicianModal = ({
             />
           </div>
 
-          {/* Kinh nghiệm & Kỹ năng */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
@@ -220,7 +213,6 @@ export const CreateTechnicianModal = ({
             </div>
           </div>
 
-          {/* Footer buttons */}
           <div className="pt-3 flex justify-end gap-3 border-t border-slate-100">
             <button
               type="button"

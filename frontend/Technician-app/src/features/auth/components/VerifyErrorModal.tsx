@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { X } from 'lucide-react'; // Chỉ cần import icon X
+import { X } from 'lucide-react';
 
 interface VerifyErrorModalProps {
   isOpen: boolean;

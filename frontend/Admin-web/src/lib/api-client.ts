@@ -1,8 +1,11 @@
 import { fetchAllPages } from "@h-mobility/ui";
 
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  return process.env.NEXT_PUBLIC_API_URL || "";
 }
+
+// Tên vai trò dùng để backend chọn cookie refresh tương ứng với app này
+const REFRESH_ROLE = "admin";
 
 export interface UserSession {
   id: string;
@@ -28,9 +31,43 @@ export function setAuthToken(token: string, user?: UserSession): void {
 
 export function removeAuthToken(): void {
   if (typeof window === "undefined") return;
+  if (getAuthToken()) {
+    // Thu hồi refresh token (cookie httpOnly) trên server, không chờ kết quả
+    fetch(`${getBaseUrl()}/auth/logout?role=${REFRESH_ROLE}`, {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+    }).catch(() => {});
+  }
   localStorage.removeItem("access_token");
   localStorage.removeItem("user_info");
   window.dispatchEvent(new Event("session-changed"));
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+// Làm mới access token bằng cookie refresh, dùng chung một promise để tránh gọi trùng
+async function refreshAccessToken(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/auth/refresh?role=${REFRESH_ROLE}`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        localStorage.setItem("access_token", data.access_token);
+        return true;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 export function getUserInfo(): UserSession | null {
@@ -56,14 +93,18 @@ export class ApiError extends Error {
   }
 }
 
-export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function fetchApi<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  retried = false
+): Promise<T> {
   const token = getAuthToken();
 
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
 
-  // Only add Content-Type if body is not FormData
+  // Không gắn Content-Type nếu body là FormData
   if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
@@ -76,11 +117,12 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${endpoint}`, {
+      credentials: "include",
       ...options,
       headers,
     });
   } catch (err: unknown) {
-    console.warn(`[Network/Fetch Error] ${endpoint}:`, err instanceof Error ? err.message : err);
+    console.warn(`[Lỗi kết nối API] ${endpoint}:`, err instanceof Error ? err.message : err);
     throw new ApiError(
       "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.",
       0,
@@ -111,6 +153,22 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       data?.message ||
       `Yêu cầu thất bại (${response.status})`;
     const errorCode = (typeof data?.detail === "object" ? data.detail?.code : undefined) || data?.code;
+
+    const canRefresh =
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      !retried &&
+      !endpoint.startsWith("/auth/") &&
+      !(options.headers as Record<string, string> | undefined)?.["Authorization"] &&
+      Boolean(token);
+
+    if (canRefresh) {
+      // Tab khác có thể đã làm mới token rồi, khi đó chỉ cần thử lại
+      const alreadyRefreshed = getAuthToken() !== token;
+      if (alreadyRefreshed || (await refreshAccessToken())) {
+        return fetchApi<T>(endpoint, options, true);
+      }
+    }
 
     if (response.status === 401 && typeof window !== "undefined") {
       removeAuthToken();

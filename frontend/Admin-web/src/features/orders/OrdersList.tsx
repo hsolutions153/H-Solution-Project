@@ -3,25 +3,28 @@
 import { Pagination } from "@/components/common/Pagination";
 import { getStatusBadge,ISSUE_TYPE_LABELS,STATUS_CONFIG } from "@/constants/orderStatus";
 import {
-AlertTriangle,
-Calendar,
-CheckCircle2,
-Eye,
-LayoutGrid,
-MapPin,
-Phone,
-Plus,
-RefreshCw,
-Search,
-Table,
-User,
-UserCheck,
-Wrench,
-XCircle,
+  AlertTriangle,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Eye,
+  LayoutGrid,
+  MapPin,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  Table,
+  User,
+  UserCheck,
+  Wrench,
+  X,
+  XCircle,
 } from "lucide-react";
 import { useEffect,useState } from "react";
 import { CreateOrderModal } from "./CreateOrderModal";
 import { OrderDetailModal,type OrderRecord,type TechnicianItem } from "./OrderDetailModal";
+
 
 function toLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -47,11 +50,11 @@ export const OrdersList = () => {
   const [dateTo, setDateTo] = useState("");
   const [techFilter, setTechFilter] = useState("ALL");
 
-  // Pagination state (10 bản ghi 1 trang)
+  // Phân trang danh sách đơn
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // View Mode: 'table' (dạng bảng) hoặc 'grid' (dạng lưới)
+  // Chế độ xem: bảng hoặc lưới
   const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
     if (typeof window !== "undefined") {
       try {
@@ -69,14 +72,13 @@ export const OrdersList = () => {
     } catch {}
   };
 
-  // Selected Order for Detail Modal
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Quick Action States
   const [assigningOrder, setAssigningOrder] = useState<OrderRecord | null>(null);
   const [selectedTechId, setSelectedTechId] = useState<string>("");
+  const [assignSearch, setAssignSearch] = useState<string>("");
   const [cancellingOrder, setCancellingOrder] = useState<OrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customCancelReason, setCustomCancelReason] = useState<string>("");
@@ -100,7 +102,7 @@ export const OrdersList = () => {
       const techList = Array.isArray(techRes) ? techRes : [];
       setTechnicians(techList);
     } catch (err: unknown) {
-      console.warn("Error fetching orders:", err);
+      console.warn("Lỗi tải danh sách đơn hàng:", err);
     } finally {
       setLoading(false);
     }
@@ -125,7 +127,7 @@ export const OrdersList = () => {
         const techList = Array.isArray(techRes) ? techRes : [];
         setTechnicians(techList);
       } catch (err: unknown) {
-        console.warn("Error fetching orders:", err);
+        console.warn("Lỗi tải danh sách đơn hàng:", err);
       } finally {
         if (active) setLoading(false);
       }
@@ -141,7 +143,7 @@ export const OrdersList = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Filtered orders
+  // Lọc danh sách đơn hàng
   const filteredOrders = orders.filter((order) => {
     const code = (order.request_code || order.id || "").toLowerCase();
     const customer = (
@@ -198,7 +200,7 @@ export const OrdersList = () => {
     );
   });
 
-  // Phân trang 10 bản ghi 1 trang
+  // Phân trang danh sách đơn
   const totalItems = filteredOrders.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -210,6 +212,18 @@ export const OrdersList = () => {
   // Xử lý phân công nhanh
   const handleQuickAssign = async () => {
     if (!assigningOrder?.id || !selectedTechId) return;
+    const st = (assigningOrder.status || "").toUpperCase();
+    const isAssignable =
+      st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
+    if (!isAssignable) {
+      handleShowToast("Đơn ở trạng thái này không thể phân công thợ!");
+      return;
+    }
+    const targetTech = technicians.find((t) => (t.user_id || t.id) === selectedTechId);
+    if (!targetTech?.is_online) {
+      handleShowToast("Kỹ thuật viên này đang Ngoại tuyến (Offline), không thể phân công!");
+      return;
+    }
     const orderId = assigningOrder.id;
     setActionLoading(true);
     try {
@@ -219,15 +233,15 @@ export const OrdersList = () => {
         body: JSON.stringify({ technician_id: selectedTechId }),
       });
       handleShowToast(
-        `Phân công kỹ thuật viên cho đơn #${
+        `Đã gửi yêu cầu cho kỹ thuật viên (Đơn #${
           assigningOrder.request_code || orderId.substring(0, 8)
-        } thành công!`
+        }), đang chờ thợ xác nhận nhận việc.`
       );
       setAssigningOrder(null);
       fetchOrdersAndTechs();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Lỗi khi phân công kỹ thuật viên";
-      alert(msg);
+      handleShowToast(msg);
     } finally {
       setActionLoading(false);
     }
@@ -264,7 +278,7 @@ export const OrdersList = () => {
       fetchOrdersAndTechs();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Lỗi khi hủy đơn hàng";
-      alert(msg);
+      handleShowToast(msg);
     } finally {
       setActionLoading(false);
     }
@@ -272,15 +286,13 @@ export const OrdersList = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-70 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900">
@@ -292,9 +304,7 @@ export const OrdersList = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Thanh trượt hiển thị Dạng Bảng / Dạng Lưới */}
           <div className="relative flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 select-none">
-            {/* Thanh trượt di chuyển (Slider Indicator) */}
             <div
               className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-xs transition-all duration-200 ease-out pointer-events-none ${
                 viewMode === "grid" ? "left-[calc(50%+2px)]" : "left-1"
@@ -342,9 +352,7 @@ export const OrdersList = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        {/* Search (Kéo dài thanh tìm kiếm vừa vặn, cân đối) */}
         <div className="relative w-full sm:w-80 md:w-96 lg:w-105 xl:w-115 shrink-0">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
           <input
@@ -366,9 +374,7 @@ export const OrdersList = () => {
           )}
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
-          {/* SOS Filter */}
           <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               onClick={() => setTypeFilter("ALL")}
@@ -402,7 +408,6 @@ export const OrdersList = () => {
             </button>
           </div>
 
-          {/* Status Dropdown */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -416,7 +421,6 @@ export const OrdersList = () => {
             ))}
           </select>
 
-          {/* Date range filter */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
               <input
@@ -437,7 +441,6 @@ export const OrdersList = () => {
                 title="Đến ngày"
               />
             </div>
-            {/* Nút Hủy lọc theo ngày mở rộng rõ ràng */}
             {(dateFrom || dateTo) && (
               <button
                 type="button"
@@ -454,7 +457,6 @@ export const OrdersList = () => {
             )}
           </div>
 
-          {/* Technician Filter */}
           <div className="flex items-center gap-1.5">
             <select
               value={techFilter}
@@ -490,10 +492,8 @@ export const OrdersList = () => {
         </div>
       </div>
 
-      {/* Orders Container (Dạng Bảng hoặc Dạng Lưới) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {viewMode === "grid" ? (
-          /* Dạng Lưới (Grid View) */
           <div className="p-5">
             {loading ? (
               <div className="py-16 text-center text-slate-400">
@@ -520,7 +520,6 @@ export const OrdersList = () => {
                       key={order.id}
                       className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-4.5 flex flex-col justify-between gap-4 group hover:border-brand-300"
                     >
-                      {/* Card Header: Mã đơn + SOS + Trạng thái */}
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -564,7 +563,6 @@ export const OrdersList = () => {
                           </div>
                         </div>
 
-                        {/* Customer Info */}
                         <div className="bg-slate-50/80 rounded-xl p-3 mb-3 border border-slate-100 space-y-1">
                           <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
                             <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -585,7 +583,6 @@ export const OrdersList = () => {
                           </div>
                         </div>
 
-                        {/* Device & Issue */}
                         <div className="space-y-1.5 text-xs text-slate-600 mb-3">
                           <div className="flex items-start gap-2">
                             <Wrench className="w-3.5 h-3.5 text-brand-800 shrink-0 mt-0.5" />
@@ -599,7 +596,6 @@ export const OrdersList = () => {
                             </div>
                           </div>
 
-                          {/* Location Address */}
                           <div className="flex items-start gap-2 pt-1">
                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                             <span
@@ -614,9 +610,7 @@ export const OrdersList = () => {
                         </div>
                       </div>
 
-                      {/* Card Footer: Technician + Actions */}
                       <div className="pt-3 border-t border-slate-100 space-y-3">
-                        {/* Technician & Date */}
                         <div className="flex items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {order.technician ? (
@@ -639,7 +633,6 @@ export const OrdersList = () => {
                           </div>
                         </div>
 
-                        {/* Function Buttons Row */}
                         <div className="flex items-center justify-end gap-1.5 pt-1">
                           <button
                             onClick={() => setSelectedOrder(order)}
@@ -650,34 +643,51 @@ export const OrdersList = () => {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          <button
-                            disabled={isFinished}
-                            onClick={() => {
-                              if (isFinished) return;
-                              setSelectedTechId(
-                                order.technician_id ||
-                                  (technicians[0]?.user_id || technicians[0]?.id || "")
-                              );
-                              setAssigningOrder(order);
-                            }}
-                            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
-                              isFinished
-                                ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
-                                : order.technician
-                                ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
-                                : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
-                            }`}
-                            title={
-                              isFinished
-                                ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
-                                : order.technician
-                                ? "Đổi kỹ thuật viên"
-                                : "Phân công kỹ thuật viên"
-                            }
-                            aria-label={order.technician ? "Đổi kỹ thuật viên" : "Phân công kỹ thuật viên"}
-                          >
-                            <UserCheck className="w-4 h-4" />
-                          </button>
+                          {(() => {
+                            const st = (order.status || "").toUpperCase();
+                            const isAssignable =
+                              st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
+                            const isDisabled = isFinished || !isAssignable;
+                            return (
+                              <button
+                                disabled={isDisabled}
+                                onClick={() => {
+                                  if (isDisabled) return;
+                                  const currentTech = technicians.find(
+                                    (t) => (t.user_id || t.id) === order.technician_id
+                                  );
+                                  const firstOnlineTech = technicians.find((t) => t.is_online);
+                                  if (currentTech && currentTech.is_online) {
+                                    setSelectedTechId(currentTech.user_id || currentTech.id || "");
+                                  } else if (firstOnlineTech) {
+                                    setSelectedTechId(firstOnlineTech.user_id || firstOnlineTech.id || "");
+                                  } else {
+                                    setSelectedTechId("");
+                                  }
+                                  setAssigningOrder(order);
+                                }}
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
+                                  isDisabled
+                                    ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
+                                    : order.technician
+                                    ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
+                                    : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                                }`}
+                                title={
+                                  isFinished
+                                    ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
+                                    : !isAssignable
+                                    ? "Đơn ở trạng thái này không thể gán thợ"
+                                    : order.technician
+                                    ? "Đổi kỹ thuật viên"
+                                    : "Phân công kỹ thuật viên"
+                                }
+                                aria-label={order.technician ? "Đổi kỹ thuật viên" : "Phân công kỹ thuật viên"}
+                              >
+                                <UserCheck className="w-4 h-4" />
+                              </button>
+                            );
+                          })()}
 
                           <button
                             disabled={isFinished}
@@ -710,7 +720,6 @@ export const OrdersList = () => {
             )}
           </div>
         ) : (
-          /* Dạng Bảng (Table View) */
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -753,7 +762,6 @@ export const OrdersList = () => {
                         key={order.id}
                         className="hover:bg-slate-50/80 transition group"
                       >
-                        {/* Mã đơn */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900">
@@ -772,7 +780,6 @@ export const OrdersList = () => {
                           </div>
                         </td>
 
-                        {/* Khách hàng */}
                         <td className="py-3.5 px-4">
                           <div className="font-bold text-slate-800">
                             {order.customer?.full_name ||
@@ -787,7 +794,6 @@ export const OrdersList = () => {
                           </div>
                         </td>
 
-                        {/* Thiết bị & Lỗi */}
                         <td className="py-3.5 px-4 max-w-50">
                           <div className="font-bold text-slate-800 truncate">
                             {getDeviceLabel(order.device)}
@@ -797,14 +803,12 @@ export const OrdersList = () => {
                           </div>
                         </td>
 
-                        {/* Địa chỉ */}
                         <td className="py-3.5 px-4 max-w-55">
                           <div className="text-xs text-slate-600 truncate" title={order.location_address || order.address_detail}>
                             {order.location_address || order.address_detail || "Chưa có địa chỉ"}
                           </div>
                         </td>
 
-                        {/* Trạng thái */}
                         <td className="py-3.5 px-4">
                           <div className="space-y-1">
                             <span
@@ -836,7 +840,6 @@ export const OrdersList = () => {
                           </div>
                         </td>
 
-                        {/* Thợ */}
                         <td className="py-3.5 px-4">
                           {order.technician ? (
                             <div className="text-xs font-bold text-slate-800">
@@ -849,10 +852,8 @@ export const OrdersList = () => {
                           )}
                         </td>
 
-                        {/* Cột Chức năng */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center justify-center gap-1.5">
-                            {/* Nút Xem chi tiết */}
                             <button
                               onClick={() => setSelectedOrder(order)}
                               className="w-8 h-8 rounded-xl flex items-center justify-center border border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 hover:text-brand-950 transition cursor-pointer shadow-2xs"
@@ -862,37 +863,52 @@ export const OrdersList = () => {
                               <Eye className="w-4 h-4" />
                             </button>
 
-                            {/* Nút Phân công / Đổi KTV (Disable nếu đơn đã kết thúc) */}
-                            <button
-                              disabled={isFinished}
-                              onClick={() => {
-                                if (isFinished) return;
-                                setSelectedTechId(
-                                  order.technician_id ||
-                                    (technicians[0]?.user_id || technicians[0]?.id || "")
-                                );
-                                setAssigningOrder(order);
-                              }}
-                              className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
-                                isFinished
-                                  ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
-                                  : order.technician
-                                  ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
-                                  : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
-                              }`}
-                              title={
-                                isFinished
-                                  ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
-                                  : order.technician
-                                  ? "Đổi kỹ thuật viên"
-                                  : "Phân công kỹ thuật viên"
-                              }
-                              aria-label={order.technician ? "Đổi kỹ thuật viên" : "Phân công kỹ thuật viên"}
-                            >
-                              <UserCheck className="w-4 h-4" />
-                            </button>
+                            {(() => {
+                              const st = (order.status || "").toUpperCase();
+                              const isAssignable =
+                                st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
+                              const isDisabled = isFinished || !isAssignable;
+                              return (
+                                <button
+                                  disabled={isDisabled}
+                                  onClick={() => {
+                                    if (isDisabled) return;
+                                    const currentTech = technicians.find(
+                                      (t) => (t.user_id || t.id) === order.technician_id
+                                    );
+                                    const firstOnlineTech = technicians.find((t) => t.is_online);
+                                    if (currentTech && currentTech.is_online) {
+                                      setSelectedTechId(currentTech.user_id || currentTech.id || "");
+                                    } else if (firstOnlineTech) {
+                                      setSelectedTechId(firstOnlineTech.user_id || firstOnlineTech.id || "");
+                                    } else {
+                                      setSelectedTechId("");
+                                    }
+                                    setAssigningOrder(order);
+                                  }}
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
+                                    isDisabled
+                                      ? "border-slate-200 bg-slate-50/50 text-slate-300 opacity-40 cursor-not-allowed"
+                                      : order.technician
+                                      ? "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-brand-900 cursor-pointer shadow-2xs"
+                                      : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                                  }`}
+                                  title={
+                                    isFinished
+                                      ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
+                                      : !isAssignable
+                                      ? "Chỉ được phép gán thợ khi đơn ở trạng thái Mới gửi yêu cầu"
+                                      : order.technician
+                                      ? "Đổi kỹ thuật viên"
+                                      : "Phân công kỹ thuật viên"
+                                  }
+                                  aria-label={order.technician ? "Đổi kỹ thuật viên" : "Phân công kỹ thuật viên"}
+                                >
+                                  <UserCheck className="w-4 h-4" />
+                                </button>
+                              );
+                            })()}
 
-                            {/* Nút Hủy đơn (Disable nếu đơn đã kết thúc) */}
                             <button
                               disabled={isFinished}
                               onClick={() => {
@@ -926,7 +942,6 @@ export const OrdersList = () => {
           </div>
         )}
 
-        {/* Phân trang (10 bản ghi 1 trang) */}
         <Pagination
           currentPage={safeCurrentPage}
           totalPages={totalPages}
@@ -942,7 +957,6 @@ export const OrdersList = () => {
         />
       </div>
 
-      {/* Modals */}
       {selectedOrder && (
         <OrderDetailModal
           order={selectedOrder}
@@ -963,86 +977,279 @@ export const OrdersList = () => {
         />
       )}
 
-      {/* Modal Phân công nhanh */}
       {assigningOrder && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 my-auto flex flex-col overflow-hidden">
+            <div className="px-6 py-4.5 bg-linear-to-r from-slate-900 via-brand-950 to-slate-900 text-white flex justify-between items-center shrink-0">
               <div>
-                <span className="text-xs font-bold tracking-wider text-brand-400 uppercase">
-                  Chức năng phân công
+                <span className="text-[11px] font-black tracking-wider text-brand-300 uppercase bg-brand-900/80 px-2.5 py-0.5 rounded-full border border-brand-400/30">
+                  Điều phối & Phân công kỹ thuật viên
                 </span>
-                <h3 className="text-lg font-black mt-0.5">
-                  Đơn #{assigningOrder.request_code || assigningOrder.id?.substring(0, 8)}
+                <h3 className="text-xl font-black mt-1 text-white">
+                  Đơn hàng #{assigningOrder.request_code || assigningOrder.id?.substring(0, 8)}
                 </h3>
               </div>
               <button
                 onClick={() => setAssigningOrder(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition cursor-pointer"
+                title="Đóng modal"
+                aria-label="Đóng"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold uppercase text-slate-400 mb-1.5 block">
-                  Khách hàng & Thiết bị
-                </label>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-sm">
-                  <div className="font-bold text-slate-800">
-                    {assigningOrder.customer?.full_name ||
-                      assigningOrder.customer_name ||
-                      "Khách hàng"}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {getDeviceLabel(assigningOrder.device)} - Lỗi:{" "}
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(85vh-140px)] flex-1 bg-slate-50/40">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5 flex items-center justify-between">
+                  <span>Thông tin Khách hàng & Thiết bị</span>
+                  <span className="text-xs font-bold text-brand-900 bg-brand-50 px-2.5 py-0.5 rounded-full border border-brand-100">
                     {(assigningOrder.issue_type ? ISSUE_TYPE_LABELS[assigningOrder.issue_type] : undefined) ||
                       assigningOrder.issue_type ||
-                      "Kỹ thuật"}
+                      "Sự cố kỹ thuật"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-400 block font-medium">Khách hàng:</span>
+                    <span className="font-bold text-slate-900 text-sm">
+                      {assigningOrder.customer?.full_name ||
+                        assigningOrder.customer_name ||
+                        "Khách hàng"}
+                    </span>
+                    {(assigningOrder.customer?.phone || assigningOrder.phone) && (
+                      <span className="text-slate-500 block mt-0.5 font-mono">
+                        {assigningOrder.customer?.phone || assigningOrder.phone}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 block font-medium">Phương tiện & Thiết bị:</span>
+                    <span className="font-bold text-slate-900 text-sm truncate block">
+                      {getDeviceLabel(assigningOrder.device)}
+                    </span>
+                    {assigningOrder.location_address && (
+                      <span className="text-slate-500 block truncate mt-0.5">
+                        📍 {assigningOrder.location_address}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold uppercase text-slate-500 mb-1.5 block">
-                  Chọn Kỹ thuật viên phụ trách
-                </label>
-                <select
-                  value={selectedTechId}
-                  onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
-                >
-                  <option value="">-- Chọn kỹ thuật viên --</option>
-                  {technicians.map((t) => {
-                    const name =
-                      t.user?.full_name || t.full_name || t.name || t.user_id || "Kỹ thuật viên";
-                    const phone = t.user?.phone || t.phone;
-                    const spec = t.specialization ? ` - ${t.specialization}` : "";
-                    const status = t.is_online ? "🟢 Online" : "⚪ Offline";
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase text-slate-700 block">
+                    Chọn Kỹ thuật viên phụ trách (Trực tuyến)
+                  </label>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>
+                      {technicians.filter((t) => t.is_online).length} thợ đang Online
+                    </span>
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={assignSearch}
+                    onChange={(e) => setAssignSearch(e.target.value)}
+                    placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
+                    className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-8 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-700 font-medium shadow-2xs"
+                  />
+                  {assignSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAssignSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded transition cursor-pointer"
+                      title="Xóa tìm kiếm"
+                      aria-label="Xóa tìm kiếm"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-56 overflow-y-auto space-y-2 p-1.5 rounded-2xl border border-slate-200/90 bg-slate-50/50">
+                  {(() => {
+                    const q = assignSearch.trim().toLowerCase();
+                    const filtered = technicians.filter((t) => {
+                      if (!q) return true;
+                      const name = (t.user?.full_name || t.full_name || t.name || "").toLowerCase();
+                      const phone = (t.user?.phone || t.phone || "").toLowerCase();
+                      const spec = (t.specialization || "").toLowerCase();
+                      return name.includes(q) || phone.includes(q) || spec.includes(q);
+                    });
+
+                    const onlineList = filtered.filter((t) => t.is_online);
+                    const offlineList = filtered.filter((t) => !t.is_online);
+
+                    if (onlineList.length === 0 && offlineList.length === 0) {
+                      return (
+                        <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200 font-medium">
+                          Không tìm thấy kỹ thuật viên nào phù hợp
+                        </div>
+                      );
+                    }
+
                     return (
-                      <option key={t.user_id || t.id} value={t.user_id || t.id}>
-                        {name} ({phone || "KTV"}){spec} ({status})
-                      </option>
+                      <>
+                        {onlineList.length === 0 && (
+                          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                            <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                              Không có thợ trực tuyến phù hợp
+                            </p>
+                            <p className="mt-1 text-[11px] text-amber-800 leading-relaxed">
+                              Tất cả thợ đang ngoại tuyến hoặc không khớp từ khóa tìm kiếm. Vui lòng liên hệ KTV mở app trực tuyến để nhận việc.
+                            </p>
+                          </div>
+                        )}
+
+                        {onlineList.map((t) => {
+                          const id = t.user_id || t.id || "";
+                          const name = t.user?.full_name || t.full_name || t.name || "KTV";
+                          const phone = t.user?.phone || t.phone || "";
+                          const spec = t.specialization || "Kỹ thuật viên";
+                          const isSelected = id === selectedTechId;
+
+                          return (
+                            <div
+                              key={id}
+                              onClick={() => setSelectedTechId(id)}
+                              className={`w-full p-2.5 rounded-xl transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                                isSelected
+                                  ? "bg-brand-50/90 border-2 border-brand-800 shadow-xs"
+                                  : "bg-white border-2 border-slate-200/90 hover:border-brand-400 hover:bg-slate-50 shadow-2xs"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative shrink-0">
+                                  <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-900 flex items-center justify-center font-black text-xs border border-brand-200">
+                                    {name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white"></span>
+                                </div>
+                                <div className="min-w-0 flex flex-col text-left">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-900 truncate">{name}</span>
+                                    {isSelected && (
+                                      <span className="bg-brand-900 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                                        Đang chọn
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-slate-500 truncate mt-0.5">
+                                    {spec} {phone ? `· ${phone}` : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  <span>Online</span>
+                                </span>
+                                <div
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center transition ${
+                                    isSelected ? "bg-brand-900 text-white" : "border-2 border-slate-300 bg-white"
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-3.5 h-3.5 stroke-3" />}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {offlineList.length > 0 && (
+                          <div className="pt-2">
+                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              <span>Ngoại tuyến ({offlineList.length}) - Không thể giao việc</span>
+                            </div>
+                            {offlineList.map((t) => {
+                              const id = t.user_id || t.id || "";
+                              const name = t.user?.full_name || t.full_name || t.name || "KTV";
+                              const phone = t.user?.phone || t.phone || "";
+                              const spec = t.specialization || "Kỹ thuật viên";
+
+                              return (
+                                <div
+                                  key={id}
+                                  className="w-full p-2.5 rounded-xl border border-slate-200/80 bg-slate-100/60 flex items-center justify-between gap-3 opacity-50 cursor-not-allowed select-none mb-1.5"
+                                  title="Kỹ thuật viên này đang Ngoại tuyến, không thể nhận đơn mới"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                      {name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex flex-col text-left">
+                                      <span className="text-xs font-bold text-slate-600 truncate">{name}</span>
+                                      <span className="text-[11px] text-slate-400 truncate">
+                                        {spec} {phone ? `· ${phone}` : ""}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-600 border border-slate-300 shrink-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                    <span>Offline</span>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     );
-                  })}
-                </select>
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="text-xs text-slate-600 text-center sm:text-left">
+                {selectedTechId && technicians.find((t) => (t.user_id || t.id) === selectedTechId)?.is_online ? (
+                  <span className="text-slate-800 font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>
+                      Đang chọn:{" "}
+                      <strong className="text-brand-950 font-bold">
+                        {technicians.find((t) => (t.user_id || t.id) === selectedTechId)?.user?.full_name ||
+                          technicians.find((t) => (t.user_id || t.id) === selectedTechId)?.full_name ||
+                          technicians.find((t) => (t.user_id || t.id) === selectedTechId)?.name}
+                      </strong>
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-amber-700 font-medium">
+                    Vui lòng nhấp chọn một kỹ thuật viên đang trực tuyến ở trên
+                  </span>
+                )}
               </div>
 
-              <div className="pt-2 flex justify-end gap-3">
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => setAssigningOrder(null)}
                   disabled={actionLoading}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="button"
                   onClick={handleQuickAssign}
-                  disabled={actionLoading || !selectedTechId}
-                  className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+                  disabled={
+                    actionLoading ||
+                    !selectedTechId ||
+                    !technicians.find((t) => (t.user_id || t.id) === selectedTechId)?.is_online
+                  }
+                  className="px-5 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
                 >
                   {actionLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1057,7 +1264,6 @@ export const OrdersList = () => {
         </div>
       )}
 
-      {/* Modal Hủy đơn nhanh */}
       {cancellingOrder && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -1072,9 +1278,11 @@ export const OrdersList = () => {
               </div>
               <button
                 onClick={() => setCancellingOrder(null)}
-                className="text-rose-200 hover:text-white p-1 rounded-lg transition cursor-pointer"
+                className="text-rose-200 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                title="Đóng modal"
+                aria-label="Đóng"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 

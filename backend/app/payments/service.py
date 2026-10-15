@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import hmac
 import json
 import os
@@ -9,12 +9,15 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
+import logging
 import requests
 from app.auth import repository as auth_repository
 from app.core.exceptions import AppException, ErrorCode
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.payments import repository
 from app.repair_requests.models import TECHNICIAN_ROLE_CODE
+
+logger = logging.getLogger(__name__)
 
 PAYMENT_CODE_PREFIX = os.getenv('PAYMENT_CODE_PREFIX') or 'HS'
 SEPAY_BANK_ACCOUNT = os.getenv('SEPAY_BANK_ACCOUNT')
@@ -64,9 +67,19 @@ def _amount(value) -> Decimal:
 
 
 def _final_amount(repair: dict) -> Decimal:
-    if repair.get('status') != 'COMPLETED' or repair.get('total_amount') is None:
+    if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
         raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
-    return _amount(repair['total_amount'])
+    amt = repair.get('total_amount')
+    if amt is None or (isinstance(amt, (int, float, str)) and float(amt) == 0):
+        try:
+            accepted_quote = repository.get_accepted_quote(repair['id'])
+            if accepted_quote and accepted_quote.get('estimated_price') is not None:
+                amt = accepted_quote['estimated_price']
+        except Exception:
+            pass
+    if amt is None:
+        raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
+    return _amount(amt)
 
 
 def _metadata(payment: dict) -> dict:
@@ -154,6 +167,141 @@ def fetch_qr(repair_id: str, current_user: dict, payment_method: str = 'BANK_TRA
         'payment': payment,
         'qr_url': build_qr_url(payment['payment_code'], int(amount)) if amount > 0 and method == 'BANK_TRANSFER' else None,
         'bank_account': SEPAY_BANK_ACCOUNT, 'bank_name': SEPAY_BANK_NAME, 'bank_account_name': SEPAY_BANK_ACCOUNT_NAME,
+    }
+
+
+def customer_submit_payment(repair_id: str, current_user: dict, payment_method: str = 'BANK_TRANSFER', note: str | None = None) -> dict:
+    repair = repository.get_repair_request(repair_id)
+    if not repair:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if not (_is_role(current_user, CUSTOMER_ROLE_CODE) and repair['customer_id'] == current_user['sub']):
+        raise AppException(ErrorCode.FORBIDDEN, message="Chỉ khách hàng sở hữu đơn mới có thể xác nhận thanh toán.")
+    if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ có thể thanh toán khi đơn đang sửa chữa hoặc đã hoàn thành.")
+
+    method = 'CASH' if payment_method in {'COD', 'CASH'} else payment_method
+    if method not in {'CASH', 'BANK_TRANSFER'}:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Phương thức thanh toán không hợp lệ.")
+
+    amount = _final_amount(repair)
+    payment = _ensure_payment(repair, current_user, method)
+    if amount == 0:
+        payment = _settle(payment, f'FREE:{payment["id"]}', current_user['sub'])
+        return {"success": True, "message": "Đơn hàng miễn phí (0 đ) đã được xử lý hoàn tất.", "payment": payment}
+
+    if payment.get('payment_status') == 'PAID':
+        return {"success": True, "message": "Khoản thanh toán đã hoàn tất trước đó.", "payment": payment}
+
+    submit_note = note or f"Khách hàng đã báo hoàn tất thanh toán qua {('Tiền mặt' if method == 'CASH' else 'Chuyển khoản')}."
+    updated = repository.update_unpaid_payment(payment['id'], {
+        'payment_status': 'PENDING',
+        'payment_method': method,
+        'note': submit_note,
+        'updated_by': current_user['sub'],
+    })
+    if not updated:
+        payment = repository.get_payment_by_repair_id(repair_id)
+        if payment and payment.get('payment_status') == 'PAID':
+            return {"success": True, "message": "Khoản thanh toán đã hoàn tất trước đó.", "payment": payment}
+        raise AppException(ErrorCode.DATABASE_ERROR)
+
+    try:
+        repository.update_repair_payment_info(repair_id, {
+            'payment_status': 'PENDING',
+            'payment_method': method,
+        })
+    except Exception as r_err:
+        logger.warning(f"Could not update repair_request payment_status to PENDING: {r_err}")
+
+    repository.add_payment_history({
+        'id': _payment_id(),
+        'payment_id': payment['id'],
+        'action': 'PAYMENT_PENDING',
+        'old_status': payment.get('payment_status'),
+        'new_status': 'PENDING',
+        'amount': str(amount),
+        'note': submit_note,
+        'changed_by': current_user['sub'],
+    })
+    return {
+        "success": True,
+        "message": "Đã gửi thông báo thanh toán. Vui lòng chờ kỹ thuật viên kiểm tra và xác nhận.",
+        "payment": updated,
+    }
+
+
+def technician_confirm_payment(repair_id: str, current_user: dict, payment_method: str | None = None, note: str | None = None) -> dict:
+    repair = repository.get_repair_request(repair_id)
+    if not repair:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+
+    # DUY NHẤT Kỹ thuật viên phụ trách ca sửa này mới được quyền xác nhận nhận tiền!
+    is_tech = _is_role(current_user, TECHNICIAN_ROLE_CODE) and repair.get('technician_id') == current_user['sub']
+    if not is_tech:
+        raise AppException(ErrorCode.FORBIDDEN, message="Chỉ kỹ thuật viên phụ trách ca sửa này mới có quyền xác nhận nhận tiền.")
+
+    if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ có thể xác nhận thanh toán khi đơn đang sửa chữa hoặc đã hoàn thành.")
+
+    payment = repository.get_payment_by_repair_id(repair_id)
+    method = payment_method or (payment.get('payment_method') if payment else 'CASH')
+    if method in {'COD', 'CASH'}:
+        method = 'CASH'
+    elif method not in {'CASH', 'BANK_TRANSFER'}:
+        method = 'BANK_TRANSFER'
+
+    amount = _final_amount(repair)
+    if not payment:
+        payment = _ensure_payment(repair, current_user, method)
+
+    if payment.get('payment_status') == 'PAID':
+        return {"success": True, "message": "Thanh toán đã được xác nhận trước đó.", "payment": payment}
+
+    if payment.get('payment_method') != method:
+        payment = repository.update_unpaid_payment(payment['id'], {'payment_method': method, 'updated_by': current_user['sub']}) or payment
+
+    tx_code = f"TECH:{current_user['sub']}:{secrets.token_hex(3).upper()}"
+    settled = _settle(payment, tx_code, changed_by=current_user['sub'])
+
+    confirm_note = note or f"Kỹ thuật viên ({current_user['sub']}) đã xác nhận nhận đủ tiền qua {'Tiền mặt' if method == 'CASH' else 'Chuyển khoản'}."
+    repository.update_payment(settled['id'], {'note': confirm_note})
+    settled['note'] = confirm_note
+
+    # Tự động cập nhật đơn hàng sang COMPLETED trong database khi KTV gạt xác nhận thanh toán
+    if repair.get('status') != 'COMPLETED':
+        try:
+            from app.repair_requests.repository import update_repair_request, add_status_history
+            from app.repair_requests.service import _request_id
+            now = datetime.now(timezone.utc).isoformat()
+            update_repair_request(repair['id'], {
+                'status': 'COMPLETED',
+                'total_amount': float(amount),
+                'updated_by': current_user['sub'],
+            })
+            add_status_history({
+                'id': _request_id(),
+                'repair_id': repair['id'],
+                'status': 'COMPLETED',
+                'changed_by': current_user['sub'],
+                'note': f"Kỹ thuật viên xác nhận thanh toán ({'Tiền mặt' if method == 'CASH' else 'Chuyển khoản'}) và hoàn tất đơn sửa chữa.",
+            })
+            from app.db.database import supabase
+            c_resp = (
+                supabase.table("repair_requests")
+                .select("id", count="exact")
+                .eq("technician_id", current_user['sub'])
+                .eq("status", "COMPLETED")
+                .execute()
+            )
+            if c_resp and c_resp.count is not None:
+                supabase.table("technician_profiles").update({"total_jobs_done": c_resp.count}).eq("user_id", current_user['sub']).execute()
+        except Exception as auto_comp_err:
+            logger.warning(f"Failed to auto-update repair status to COMPLETED: {auto_comp_err}")
+
+    return {
+        "success": True,
+        "message": f"Kỹ thuật viên đã xác nhận thanh toán thành công ({'Tiền mặt' if method == 'CASH' else 'Chuyển khoản'}).",
+        "payment": settled,
     }
 
 

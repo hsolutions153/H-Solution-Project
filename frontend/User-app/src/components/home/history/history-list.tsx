@@ -60,7 +60,6 @@ export function getServiceTitle(isSos: boolean, issueType?: string, description?
   }
 }
 
-/** Icon per service, on the same tinted tile the Technician-app task cards use. */
 function getStyleForService(title: string, isSos?: boolean) {
   const tile = (icon: string) => ({ icon, gradient: "var(--color-brand-50)", shadow: "none", color: "var(--color-brand-700)" });
   if (isSos) return { icon: "e911_emergency", gradient: "#fff1f2", shadow: "none", color: "#e11d48" };
@@ -118,14 +117,14 @@ function formatCurrency(amount: number): string {
   return amount.toLocaleString("vi-VN") + " ₫";
 }
 
-// In-memory module cache for instant Stale-While-Revalidate load
+// Bộ nhớ đệm module phục vụ tải tức thì Stale-While-Revalidate
 let memoryHistoryCache: RepairHistoryItem[] | null = null;
 
 export function HistoryList() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Initialize immediately from memory or sessionStorage cache (0ms instant display)
+  // Khởi tạo ngay từ bộ nhớ đệm (hiển thị tức thì 0ms)
   const [allRequests, setAllRequests] = useState<RepairHistoryItem[]>(() => {
     if (memoryHistoryCache && memoryHistoryCache.length > 0) return memoryHistoryCache;
     if (typeof window !== "undefined") {
@@ -150,7 +149,7 @@ export function HistoryList() {
 
   const isFetchingRef = useRef(false);
 
-  // Fast background fetch without tearing down on every filter/search change
+  // Tải dữ liệu ngầm khi chuyển bộ lọc hoặc tìm kiếm
   const fetchHistory = useCallback(async () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
@@ -203,14 +202,14 @@ export function HistoryList() {
         sessionStorage.setItem("emobi_history_cache", JSON.stringify(mapped));
       } catch { }
     } catch (err) {
-      console.warn("Failed to fetch history:", err);
+      console.warn("Lỗi tải lịch sử sửa chữa:", err);
     } finally {
       isFetchingRef.current = false;
       setLoading(false);
     }
   }, []);
 
-  // Poll in the background every 10s (stops when tab is in background)
+  // Thăm dò dữ liệu ngầm mỗi 10s (tự dừng khi chuyển tab)
   useEffect(() => {
     fetchHistory();
 
@@ -222,7 +221,7 @@ export function HistoryList() {
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
-  // Counts for each tab
+  // Số lượng đơn theo từng tab
   const tabCounts = useMemo(() => {
     const all = allRequests.length;
     const completed = allRequests.filter((i) => i.status === "completed").length;
@@ -237,7 +236,7 @@ export function HistoryList() {
     return { all, completed, this_month: thisMonth };
   }, [allRequests]);
 
-  // Instant in-memory filtering: 0ms latency when typing or clicking tabs!
+  // Lọc dữ liệu trong bộ nhớ theo từ khóa và bộ lọc
   const filteredData = useMemo(() => {
     let result = allRequests;
     if (searchQuery.trim()) {
@@ -266,13 +265,11 @@ export function HistoryList() {
 
   return (
     <div className="rh-container">
-      {/* Premium Header */}
       <div className="rh-page-header">
         <h1 className="rh-page-title">Lịch sử sửa chữa & cứu hộ</h1>
         <p className="rh-page-subtitle">Theo dõi & quản lý các yêu cầu bảo dưỡng xe máy điện</p>
       </div>
 
-      {/* Modern Search */}
       <div className="rh-search-bar">
         <span className="material-symbols-outlined rh-search-icon">search</span>
         <input
@@ -297,7 +294,6 @@ export function HistoryList() {
         )}
       </div>
 
-      {/* Filter Tabs with Dynamic Counters */}
       <div className="rh-filter-tabs">
         <button
           className={`rh-filter-tab ${activeFilter === "all" ? "rh-filter-tab--active" : ""}`}
@@ -325,7 +321,6 @@ export function HistoryList() {
         </button>
       </div>
 
-      {/* History Cards List */}
       <div className="rh-cards-list">
         {loading && allRequests.length === 0 ? (
           <div className="rh-skeleton-list">
@@ -367,7 +362,6 @@ export function HistoryList() {
                 className="rh-card"
                 style={{ animationDelay: `${index * 0.04}s` }}
               >
-                {/* Top Meta Bar */}
                 <div className="rh-card-meta-bar">
                   <div className="rh-card-meta-left">
                     <span className="rh-order-code">
@@ -388,7 +382,6 @@ export function HistoryList() {
                   </div>
                 </div>
 
-                {/* Main Service Content */}
                 <div className="rh-card-body">
                   <div
                     className="rh-service-icon"
@@ -422,10 +415,8 @@ export function HistoryList() {
                   </div>
                 </div>
 
-                {/* Card Divider */}
                 <div className="rh-card-divider" />
 
-                {/* Card Footer: Price & Action */}
                 <div className="rh-card-footer">
                   <div className="rh-price-group">
                     <span className="rh-price-label">Tổng chi phí</span>

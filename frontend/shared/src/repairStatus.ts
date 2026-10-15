@@ -1,13 +1,11 @@
 /**
- * One source of truth for repair-request statuses across the three apps.
- *
- * Statuses are grouped into a handful of tones instead of one hue per status,
- * so the same state reads the same way for customers, technicians and admins:
- *   neutral  - created, not yet picked up
- *   brand    - work is moving (assigned, travelling, diagnosing, repairing)
- *   warning  - blocked on someone's decision
- *   success  - approved or finished
- *   danger   - cancelled or refused
+ * Trạng thái yêu cầu sửa chữa dùng chung cho Admin, KTV và Khách hàng.
+ * Phân nhóm theo sắc thái (tone) để giao diện hiển thị đồng nhất:
+ * - neutral: Mới tạo, chờ tiếp nhận
+ * - brand: Đang xử lý (đã gán, di chuyển, chẩn đoán, sửa chữa)
+ * - warning: Chờ duyệt / chờ phản hồi
+ * - success: Hoàn tất hoặc khách đã duyệt
+ * - danger: Đã hủy hoặc từ chối
  */
 export type StatusTone = "neutral" | "brand" | "warning" | "success" | "danger";
 
@@ -45,7 +43,7 @@ export function getRepairStatus(status: string): RepairStatusMeta {
   return REPAIR_STATUS[status?.toUpperCase?.() ?? status] ?? { label: status, tone: "neutral" };
 }
 
-/** Tailwind classes per tone. Used by Badge, and by screens that need the raw classes. */
+// Bảng màu Tailwind đồng bộ theo từng sắc thái trạng thái.
 export const TONE_CLASSES: Record<StatusTone, { bg: string; text: string; border: string; dot: string }> = {
   neutral: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200", dot: "bg-slate-400" },
   brand: { bg: "bg-brand-50", text: "text-brand-700", border: "border-brand-200", dot: "bg-brand-500" },

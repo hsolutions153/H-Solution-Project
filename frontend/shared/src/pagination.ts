@@ -1,6 +1,5 @@
 type Page<T> = { items: T[]; total?: number };
 
-/** Load each server page before applying client-side search and filters. */
 export async function fetchAllPages<T>(
   fetchPage: (endpoint: string) => Promise<Page<T> | T[]>,
   endpoint: string,

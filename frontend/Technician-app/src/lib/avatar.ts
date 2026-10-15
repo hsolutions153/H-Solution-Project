@@ -1,13 +1,11 @@
 import { fetchApi } from "@/lib/api-client";
 
-/** Fired on window after a new avatar is saved, so the header can refresh. */
 export const AVATAR_UPDATED_EVENT = "technician-avatar-updated";
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SOURCE_BYTES = 8_000_000;
 const OUTPUT_SIZE = 360;
 
-/** Center-crops the photo to a square JPEG so uploads stay small. */
 async function resizeAvatar(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
@@ -46,7 +44,6 @@ async function resizeAvatar(file: File): Promise<Blob> {
   }
 }
 
-/** Validates, resizes and uploads a profile photo. Returns the updated technician profile. */
 export async function uploadTechnicianAvatar<T extends { user?: { avatar_url?: string | null } | null }>(
   file: File,
 ): Promise<T> {

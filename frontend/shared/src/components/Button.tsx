@@ -18,7 +18,6 @@ const SIZE: Record<ButtonSize, string> = {
   lg: "h-12 px-5 text-base gap-2",
 };
 
-/** Class string for anything that should look like a button (links, labels). */
 export function buttonClasses(
   variant: ButtonVariant = "primary",
   size: ButtonSize = "md",
@@ -41,7 +40,6 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   fullWidth?: boolean;
   loading?: boolean;
-  /** Icon rendered before the label (hidden while loading). */
   icon?: ReactNode;
 }
 

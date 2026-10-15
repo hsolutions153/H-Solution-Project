@@ -133,7 +133,6 @@ export const TaskDetailScreen = ({
             }
           }}
           onSubmitQuote={(data) => {
-            console.log("Dữ liệu báo giá:", data);
             setQuoteData(data);
 
             if (data.status === "SENT") {
@@ -193,7 +192,6 @@ export const TaskDetailScreen = ({
         task={activeTask}
         onBack={onBack}
         onSubmitDiagnostic={(data, updatedTask) => {
-          console.log("Dữ liệu chẩn đoán đã lưu:", data);
           setDiagnosticData(data);
           if (updatedTask) {
             setCurrentTask(updatedTask);
@@ -210,7 +208,6 @@ export const TaskDetailScreen = ({
       : "Khách hàng";
   const [addressLine, ...addressRest] = (task.address || "").split(",");
   const slot = task.bookingSlot || task.requestedTime || task.time || "";
-  // The slot parsed from "[Hẹn: Hôm nay 14:30]" may already include the day label.
   const slotText = task.bookingDate && slot.startsWith(task.bookingDate) ? slot.slice(task.bookingDate.length).trim() : slot;
   const description = task.description?.replace(/\[Hẹn:[^\]]*\]/, "").trim();
   const hasAction = ["WAITING_ACCEPT", "PENDING", "WAITING_MOVE", "MOVING", "ARRIVED"].includes(task.status);
@@ -284,7 +281,7 @@ export const TaskDetailScreen = ({
             <p className="mb-2 text-xs text-slate-500">Ảnh đính kèm ({task.images.length})</p>
             <div className="grid grid-cols-2 gap-2">
               {task.images.slice(0, 4).map((imgUrl, idx) => (
-                <div key={idx} className="relative aspect-[4/3] overflow-hidden rounded-control border border-line bg-slate-100">
+                <div key={idx} className="relative aspect-4/3 overflow-hidden rounded-control border border-line bg-slate-100">
                   <img
                     src={imgUrl}
                     className="size-full object-cover"
@@ -309,7 +306,7 @@ export const TaskDetailScreen = ({
           <iframe
             title="Bản đồ vị trí khách hàng"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1862.2937046228108!2d105.82894155000001!3d21.00916975!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ac8008dbd905%3A0x100650bea845689e!2zMTIgUC4gQ2jDuWEgQuG7mWMsIEtpbSBMacOqbiwgSMOgIE7hu5lpLCBWaeG7h3QgTmFt!5e0!3m2!1svi!2s!4v1784825224350!5m2!1svi!2s"
-            className="pointer-events-none relative -top-[25%] h-[150%] w-full border-0"
+            className="pointer-events-none relative top-[-25%] h-[150%] w-full border-0"
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"
           />

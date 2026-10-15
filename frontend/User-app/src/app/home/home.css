@@ -1,9 +1,3 @@
-/* ═══════════════════════════════════════════════
-   GLACIER — Home Page Styles
-   Mobile-first design matching Figma spec
-   ═══════════════════════════════════════════════ */
-
-/* ── Page Shell ── */
 .home-page {
   display: flex;
   flex-direction: column;
@@ -21,7 +15,6 @@
   max-width: 480px;
 }
 
-/* ── Header ── */
 .home-header {
   display: flex;
   align-items: center;
@@ -159,7 +152,6 @@
   pointer-events: none;
 }
 
-/* ── Placeholder sub-pages ── */
 .placeholder-page {
   display: flex;
   flex-direction: column;
@@ -274,7 +266,6 @@
   font-size: 20px;
 }
 
-/* ── Main Content ── */
 .home-content {
   flex: 1;
   overflow-y: auto;
@@ -286,7 +277,6 @@
   display: none;
 }
 
-/* ── SOS Section ── */
 .sos-section {
   display: flex;
   flex-direction: column;
@@ -331,7 +321,6 @@
   gap: 4px;
   z-index: 3;
 
-  /* Radial gradient: deep red center → bright red edge */
   background: radial-gradient(circle at 50% 40%, #e53935 0%, #c62828 50%, #b71c1c 100%);
   box-shadow:
     0 8px 32px rgba(183, 28, 28, 0.45),
@@ -391,7 +380,6 @@
   text-align: center;
 }
 
-/* Pulse animation for SOS */
 @keyframes sos-pulse {
 
   0%,
@@ -408,7 +396,6 @@
   animation: sos-pulse 2.5s ease-in-out infinite;
 }
 
-/* ── Status Card ── */
 .status-card {
   display: flex;
   align-items: center;
@@ -454,7 +441,6 @@
   color: #7a8594;
 }
 
-/* ── Book Repair Button ── */
 .book-repair-btn {
   display: flex;
   align-items: center;
@@ -496,7 +482,6 @@
   letter-spacing: 0.01em;
 }
 
-/* ── My Chair Card ── */
 .chair-card {
   display: flex;
   align-items: stretch;
@@ -585,7 +570,6 @@
   color: #7a8594;
 }
 
-/* ── Repair History Button ── */
 .repair-history-btn {
   display: flex;
   align-items: center;
@@ -629,7 +613,6 @@
   color: #0a2540;
 }
 
-/* ── Responsive adjustments ── */
 @media (max-width: 360px) {
   .sos-outer {
     width: 150px;
@@ -646,8 +629,6 @@
   }
 }
 
-/* ── Wheelchair Page & Diagnostic Flow ── */
-
 .wheelchair-container {
   display: flex;
   flex-direction: column;
@@ -658,7 +639,6 @@
   position: relative;
 }
 
-/* Custom Headers */
 .wc-header-row {
   display: flex;
   align-items: center;
@@ -730,7 +710,6 @@
   color: #64748b;
 }
 
-/* Page Titles and Prompts */
 .wc-title-area {
   padding: 32px 24px 20px;
   text-align: center;
@@ -752,7 +731,6 @@
   max-width: 320px;
 }
 
-/* Issue Selection Grid */
 .wc-grid-container {
   padding: 12px 20px;
   display: grid;
@@ -844,7 +822,6 @@
   margin-top: auto;
 }
 
-/* Camera Viewfinder Screen */
 .camera-viewfinder-container {
   position: relative;
   width: 100%;
@@ -870,7 +847,6 @@
   filter: brightness(0.9);
 }
 
-/* Viewfinder Overlays */
 .camera-grid-overlay {
   position: absolute;
   inset: 0;
@@ -890,7 +866,6 @@
   border-right: 0.5px solid rgba(255, 255, 255, 0.25);
 }
 
-/* Center focus bracket box */
 .camera-focus-bracket {
   position: absolute;
   top: 50%;
@@ -913,7 +888,6 @@
   border-style: solid;
 }
 
-/* Top-Left Corner */
 .camera-focus-bracket::before {
   top: 0;
   left: 0;
@@ -921,7 +895,6 @@
   border-top-left-radius: 12px;
 }
 
-/* Top-Right Corner */
 .camera-focus-bracket::after {
   top: 0;
   right: 0;
@@ -929,7 +902,6 @@
   border-top-right-radius: 12px;
 }
 
-/* Bottom-Left Corner */
 .camera-focus-bracket-inner::before {
   bottom: 0;
   left: 0;
@@ -937,7 +909,6 @@
   border-bottom-left-radius: 12px;
 }
 
-/* Bottom-Right Corner */
 .camera-focus-bracket-inner::after {
   bottom: 0;
   right: 0;
@@ -945,7 +916,6 @@
   border-bottom-right-radius: 12px;
 }
 
-/* Flash Button Overlay */
 .camera-flash-overlay {
   position: absolute;
   top: 16px;
@@ -981,7 +951,6 @@
   color: #f59e0b;
 }
 
-/* Bottom Controls Section */
 .camera-controls-row {
   display: flex;
   align-items: center;
@@ -1025,7 +994,6 @@
   color: #475569;
 }
 
-/* Shutter Button concentric design */
 .shutter-btn-outer {
   width: 80px;
   height: 80px;
@@ -1065,7 +1033,6 @@
   font-size: 28px;
 }
 
-/* Step 3: Confirmation form styling */
 .wc-confirm-container {
   display: flex;
   flex-direction: column;
@@ -1207,7 +1174,6 @@
   box-shadow: none;
 }
 
-/* Step 4: Success Screen Styling */
 .wc-success-container {
   display: flex;
   flex-direction: column;
@@ -1311,10 +1277,6 @@
   transform: scale(0.98);
 }
 
-/* ═══════════════════════════════════════════════
-   SOS Emergency Flow Styles
-   ═══════════════════════════════════════════════ */
-
 .sos-flow-page {
   display: flex;
   flex-direction: column;
@@ -1327,7 +1289,6 @@
   position: relative;
 }
 
-/* Header */
 .sos-flow-header {
   display: block;
   padding: 16px 20px 12px;
@@ -1405,7 +1366,6 @@
   }
 }
 
-/* ── Step 1: Location ── */
 .sos-location-step {
   display: flex;
   flex-direction: column;
@@ -1427,7 +1387,6 @@
   }
 }
 
-/* Map preview circle */
 .sos-map-preview-circle {
   width: 120px;
   height: 120px;
@@ -1583,7 +1542,9 @@
 
 .sos-detail-textarea {
   width: 100%;
+  height: 140px;
   min-height: 140px;
+  max-height: 140px;
   border-radius: 12px;
   border: 1px solid #c7d2e1;
   background: #eef6fb;
@@ -1591,8 +1552,17 @@
   font-size: 13px;
   line-height: 1.45;
   color: #334155;
-  resize: vertical;
+  resize: none;
   outline: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sos-detail-textarea::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .sos-detail-textarea:focus {
@@ -1606,6 +1576,7 @@
   bottom: 8px;
   font-size: 11px;
   color: #64748b;
+  pointer-events: none;
 }
 
 .sos-photo-row {
@@ -2173,7 +2144,6 @@
   line-height: 1.5;
 }
 
-/* Method cards */
 .sos-method-card {
   display: flex;
   align-items: center;
@@ -2265,7 +2235,6 @@
   color: #2479ad;
 }
 
-/* Manual input area */
 .sos-manual-input-area {
   width: 100%;
   display: flex;
@@ -2396,7 +2365,6 @@
   color: #b91c1c;
 }
 
-/* Cancel link */
 .sos-cancel-link {
   margin-top: auto;
   padding-top: 24px;
@@ -2416,7 +2384,6 @@
   opacity: 0.7;
 }
 
-/* Spinner */
 .sos-spinner-small {
   width: 20px;
   height: 20px;
@@ -2432,7 +2399,6 @@
   }
 }
 
-/* ── Step 2: Calling ── */
 .sos-calling-step {
   display: flex;
   flex-direction: column;
@@ -2441,7 +2407,6 @@
   animation: fadeSlideUp 0.5s ease-out;
 }
 
-/* Signal icon animation */
 .sos-signal-container {
   position: relative;
   width: 100px;
@@ -2536,7 +2501,6 @@
   font-weight: 700;
 }
 
-/* Status cards */
 .sos-status-cards {
   width: 100%;
   display: flex;
@@ -2575,7 +2539,6 @@
   font-size: 24px;
 }
 
-/* Wave animation bars */
 .sos-status-wave {
   display: flex;
   align-items: center;
@@ -2629,7 +2592,6 @@
   line-height: 1.4;
 }
 
-/* Cancel button */
 .sos-cancel-btn {
   display: flex;
   align-items: center;
@@ -2661,7 +2623,6 @@
   font-size: 18px;
 }
 
-/* Location card */
 .sos-location-card {
   width: 100%;
   background: #ffffff;
@@ -2685,7 +2646,6 @@
   color: #64748b;
 }
 
-/* Map mock */
 .sos-map-container {
   display: flex;
   flex-direction: column;
@@ -2701,7 +2661,6 @@
   overflow: hidden;
 }
 
-/* Road grid */
 .sos-map-roads {
   position: absolute;
   inset: 0;
@@ -2786,7 +2745,6 @@
   padding: 10px 12px;
 }
 
-/* Safety section */
 .sos-safety-section {
   width: 100%;
   background: #ffffff;
@@ -2831,7 +2789,6 @@
   margin-top: 1px;
 }
 
-/* Bottom info bar */
 .sos-bottom-info {
   display: flex;
   align-items: center;
@@ -2853,10 +2810,6 @@
 .sos-info-item .material-symbols-outlined {
   color: #94a3b8;
 }
-
-/* ═══════════════════════════════════════════════
-   GLACIER — My Device Page Styles
-   ═══════════════════════════════════════════════ */
 
 .device-container {
   display: flex;
@@ -2938,7 +2891,6 @@
   font-size: 22px;
 }
 
-/* Quick Controls Row */
 .dev-controls-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2997,7 +2949,6 @@
   text-align: center;
 }
 
-/* Speed Mode Selector */
 .dev-speed-selector {
   display: flex;
   flex-direction: column;
@@ -3047,7 +2998,6 @@
   opacity: 0.8;
 }
 
-/* Diagnostics checklist */
 .dev-diagnostics-list {
   display: flex;
   flex-direction: column;
@@ -3145,7 +3095,6 @@
   cursor: not-allowed;
 }
 
-/* Scanning Progress UI */
 .dev-scan-progress-area {
   display: flex;
   flex-direction: column;
@@ -3175,7 +3124,6 @@
   transition: width 0.1s linear;
 }
 
-/* Mock Map & Safe Zone */
 .dev-map-container {
   position: relative;
   height: 180px;
@@ -3190,7 +3138,6 @@
   background-position: 0 0, 10px 10px;
 }
 
-/* Mock streets on map */
 .dev-map-street-h1 {
   position: absolute;
   top: 40%;
@@ -3366,7 +3313,6 @@
   text-decoration: underline;
 }
 
-/* Switch styling */
 .dev-toggle-row {
   display: flex;
   align-items: center;
@@ -3438,7 +3384,6 @@
   transform: translateX(20px);
 }
 
-/* Sound animation wave */
 .dev-sound-wave-overlay {
   position: fixed;
   inset: 0;
@@ -3535,10 +3480,6 @@
   margin: 0;
 }
 
-/* ═══════════════════════════════════════════════
-   REPAIR HISTORY — List Page (Premium EV Design)
-   ═══════════════════════════════════════════════ */
-
 .rh-container {
   display: flex;
   flex-direction: column;
@@ -3546,16 +3487,11 @@
   padding-bottom: 32px;
 }
 
-/* Header */
 .rh-page-header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 16px 0 14px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--color-canvas);
+  padding: 8px 0 14px;
 }
 
 .rh-brand-pill {
@@ -3591,7 +3527,6 @@
   font-weight: 400;
 }
 
-/* Search Bar */
 .rh-search-bar {
   display: flex;
   align-items: center;
@@ -3651,7 +3586,6 @@
   color: #0a2540;
 }
 
-/* Filter Tabs */
 .rh-filter-tabs {
   display: flex;
   gap: 8px;
@@ -3720,14 +3654,12 @@
   color: #ffffff;
 }
 
-/* History Cards List */
 .rh-cards-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* Individual Card (Ultra Premium) */
 .rh-card {
   background: #ffffff;
   border-radius: var(--radius-card);
@@ -3755,7 +3687,6 @@
   transform: translateY(-2px);
 }
 
-/* Card Top Meta Bar */
 .rh-card-meta-bar {
   display: flex;
   align-items: center;
@@ -3800,7 +3731,6 @@
   max-width: 140px;
 }
 
-/* Status Pill with Pulsing Live Dot */
 .rh-status-pill {
   display: inline-flex;
   align-items: center;
@@ -3893,7 +3823,6 @@
   background: #94a3b8;
 }
 
-/* Card Body */
 .rh-card-body {
   display: flex;
   align-items: center;
@@ -3928,6 +3857,7 @@
   margin: 0 0 6px 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
@@ -3962,14 +3892,12 @@
   border-radius: 6px;
 }
 
-/* Card Divider */
 .rh-card-divider {
   height: 1px;
   background: #eef6fb;
   margin: 14px 0 12px 0;
 }
 
-/* Card Footer */
 .rh-card-footer {
   display: flex;
   align-items: center;
@@ -4008,7 +3936,6 @@
   color: #059669;
 }
 
-/* Action Button */
 .rh-action-btn {
   display: inline-flex;
   align-items: center;
@@ -4042,7 +3969,6 @@
   transform: translateX(3px);
 }
 
-/* Legacy compatibility classes */
 .rh-status-badge {
   flex-shrink: 0;
   padding: 4px 10px;
@@ -4119,7 +4045,6 @@
   box-shadow: 0 4px 12px rgba(0, 119, 182, 0.35);
 }
 
-/* Skeleton Loading for History */
 .rh-skeleton-card {
   pointer-events: none;
   border-color: #f0f2f7 !important;
@@ -4141,7 +4066,6 @@
   }
 }
 
-/* Empty State */
 .rh-empty-state {
   display: flex;
   flex-direction: column;
@@ -4181,7 +4105,6 @@
   margin: 0;
 }
 
-/* Footer Hint */
 .rh-footer-hint {
   display: flex;
   flex-direction: column;
@@ -4192,7 +4115,6 @@
   font-size: 13px;
   font-weight: 500;
 }
-
 
 .rh-loading-spinner {
   width: 28px;
@@ -4209,7 +4131,6 @@
   }
 }
 
-/* Booking flow — follows the SOS interaction pattern with scheduling added */
 .booking-home-content {
   padding: 0 0 calc(84px + env(safe-area-inset-bottom));
 }
@@ -4851,18 +4772,12 @@
   }
 }
 
-
-/* ═══════════════════════════════════════════════
-   REPAIR HISTORY — Detail Page
-   ═══════════════════════════════════════════════ */
-
 .rd-container {
   display: flex;
   flex-direction: column;
   min-height: 100%;
 }
 
-/* Header */
 .rd-header {
   display: flex;
   align-items: center;
@@ -4900,7 +4815,6 @@
   margin: 0;
 }
 
-/* Scrollable Content */
 .rd-scroll-content {
   display: flex;
   flex-direction: column;
@@ -4909,7 +4823,6 @@
   animation: fadeSlideUp 0.35s ease-out;
 }
 
-/* Order Section */
 .rd-order-section {
   display: flex;
   flex-direction: column;
@@ -4982,7 +4895,6 @@
   background: #f59e0b;
 }
 
-/* Info Card (Time & Location) */
 .rd-info-card {
   background: #ffffff;
   border-radius: 16px;
@@ -5034,7 +4946,6 @@
   margin: 14px 0;
 }
 
-/* Technician Card */
 .rd-technician-card {
   background: #ffffff;
   border-radius: 16px;
@@ -5118,7 +5029,6 @@
   font-weight: 500;
 }
 
-/* Job Details Section */
 .rd-jobs-section {
   background: #ffffff;
   border-radius: 16px;
@@ -5179,7 +5089,6 @@
   font-weight: 800;
 }
 
-/* Payment Section */
 .rd-payment-section {
   border-top: 1.5px solid #e8ecf2;
   margin-top: 8px;
@@ -5231,7 +5140,6 @@
   letter-spacing: -0.02em;
 }
 
-/* Images Section */
 .rd-images-section {
   display: flex;
   flex-direction: column;
@@ -5284,7 +5192,6 @@
   backdrop-filter: blur(2px);
 }
 
-/* Action Buttons */
 .rd-actions {
   display: flex;
   flex-direction: column;
@@ -5344,7 +5251,6 @@
   transform: scale(0.98);
 }
 
-/* Not Found State */
 .rd-not-found {
   display: flex;
   flex-direction: column;

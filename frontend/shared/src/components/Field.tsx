@@ -13,13 +13,10 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   hint?: string;
   error?: string;
-  /** Icon shown inside the input on the left. */
   icon?: ReactNode;
-  /** Element shown inside the input on the right (e.g. show-password toggle). */
   trailing?: ReactNode;
 }
 
-/** Label above, input, then hint or error below. */
 export function Field({ label, hint, error, icon, trailing, id, className, ...rest }: FieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -31,7 +28,7 @@ export function Field({ label, hint, error, icon, trailing, id, className, ...re
       </label>
       <div className="relative">
         {icon ? (
-          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 [&>svg]:size-[18px]">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 [&>svg]:size-4.5">
             {icon}
           </span>
         ) : null}

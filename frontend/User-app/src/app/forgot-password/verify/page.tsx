@@ -37,7 +37,6 @@ function OtpVerificationContent() {
         queueMicrotask(() => setDevelopmentCode(data.developmentCode ?? ""));
       }
     } catch {
-      // The development helper is optional.
     }
   }, [phone]);
 

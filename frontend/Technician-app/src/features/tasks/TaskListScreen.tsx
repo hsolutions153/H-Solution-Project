@@ -9,7 +9,6 @@ import { TaskCard } from "./components/TaskCard";
 import { TaskTabs } from "./components/TaskTabs";
 import { TaskDetailScreen } from "./TaskDetailScreen";
 
-import { MOCK_TASKS } from "@/constants/mockTasks";
 import { HistoryTask,Task,TaskStatus } from "@/types/task";
 import { EmptyState } from "@h-mobility/ui";
 import { ClipboardList,Plus } from "lucide-react";
@@ -45,9 +44,7 @@ function filterTasksByTab(tasks: Task[], tab: string): Task[] {
 
 interface TaskListScreenProps {
   onCompleteRepair?: (completedTask: HistoryTask) => void;
-  /** "home" shows the overview, "tasks" the full task list and the task flow. */
   view?: "home" | "tasks";
-  /** Switches the bottom-nav tab, used to open a job from Home in the Tasks tab. */
   onNavigate?: (tab: "home" | "tasks") => void;
 }
 
@@ -64,8 +61,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   }, []);
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const savedTasks = sessionStorage.getItem("tasksList");
-    return savedTasks ? JSON.parse(savedTasks) : MOCK_TASKS;
+    if (typeof window !== "undefined") {
+      try {
+        const savedTasks = sessionStorage.getItem("tasksList");
+        if (savedTasks) return JSON.parse(savedTasks);
+      } catch {}
+    }
+    return [];
   });
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -160,7 +162,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           }
         }
       } catch (err) {
-        console.warn("Using fallback tasks:", err);
+        console.warn("Lỗi tải danh sách công việc:", err);
       }
     }
 
@@ -188,12 +190,17 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     setCurrentView("detail");
     if (view === "home") onNavigate?.("tasks");
 
-    import("@/lib/api-client").then(({ fetchApi }) => {
-      fetchApi(`/repair-requests/${taskId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "ACCEPTED" }),
-      }).catch((err) => console.error("Error accepting task:", err));
-    });
+    (async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        await fetchApi(`/repair-requests/${taskId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "ACCEPTED" }),
+        });
+      } catch (err) {
+        console.error("Lỗi khi tiếp nhận đơn:", err);
+      }
+    })();
   };
 
   const handleRejectAssignment = (taskId: string) => {
@@ -229,12 +236,17 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     setSelectedTask(null);
 
     const cancelReason = [reason, note].filter(Boolean).join(" - ");
-    import("@/lib/api-client").then(({ fetchApi }) => {
-      fetchApi(`/repair-requests/${taskId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "REJECTED", cancel_reason: cancelReason }),
-      }).catch((err) => console.error("Error rejecting task:", err));
-    });
+    (async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        await fetchApi(`/repair-requests/${taskId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "REJECTED", cancel_reason: cancelReason }),
+        });
+      } catch (err) {
+        console.error("Lỗi khi từ chối đơn:", err);
+      }
+    })();
   };
 
   const handleUpdateTaskStatus = (
@@ -279,11 +291,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     }
 
     if (backendStatus) {
-      import("@/lib/api-client").then(({ fetchApi }) => {
-        fetchApi<any>(`/repair-requests/${taskId}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: backendStatus }),
-        }).then((updatedRequest) => {
+      (async () => {
+        try {
+          const { fetchApi } = await import("@/lib/api-client");
+          const updatedRequest = await fetchApi<any>(`/repair-requests/${taskId}/status`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: backendStatus }),
+          });
           const updatedTask = mapApiTask(updatedRequest);
           setTasks((prev) => prev.map((task) => task.id === taskId ? updatedTask : task));
           setSelectedTask((prev) => {
@@ -291,8 +305,10 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             sessionStorage.setItem("selectedTask", JSON.stringify(updatedTask));
             return updatedTask;
           });
-        }).catch((err) => console.warn("Error syncing status to backend:", err));
-      });
+        } catch (err) {
+          console.warn("Lỗi đồng bộ trạng thái đơn lên máy chủ:", err);
+        }
+      })();
     }
   };
 

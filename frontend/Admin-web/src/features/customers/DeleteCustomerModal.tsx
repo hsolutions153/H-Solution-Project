@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, Trash2, X, RefreshCw } from "lucide-react";
 
 export interface DeleteCustomerModalProps {
@@ -48,7 +48,6 @@ export const DeleteCustomerModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header cảnh báo màu đỏ */}
         <div className="p-6 bg-rose-600 text-white flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
@@ -70,7 +69,6 @@ export const DeleteCustomerModal = ({
           </button>
         </div>
 
-        {/* Nội dung Popup */}
         <div className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">

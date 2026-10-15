@@ -3,7 +3,6 @@ import { cn } from "../cn";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padded?: boolean;
-  /** Adds hover elevation for clickable cards. */
   interactive?: boolean;
 }
 

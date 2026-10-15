@@ -20,7 +20,7 @@ export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => 
         const res = await fetchApi<Technician[]>("/technicians");
         setTechs(Array.isArray(res) ? res : []);
       } catch (err) {
-        console.warn("Could not fetch technicians:", err);
+        console.warn("Lỗi tải danh sách kỹ thuật viên:", err);
       } finally {
         setLoading(false);
       }
@@ -45,7 +45,7 @@ export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => 
       <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
           <span className="flex items-center gap-2 text-slate-700 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
             <b>{loading ? "..." : onlineCount}</b> Kỹ thuật viên online
           </span>
           <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md text-xs">

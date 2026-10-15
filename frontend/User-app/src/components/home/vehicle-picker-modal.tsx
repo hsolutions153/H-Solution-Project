@@ -174,7 +174,6 @@ export function VehiclePickerModal({
   return (
     <div className="vp-modal-overlay" onClick={handleClose}>
       <div className="vp-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="vp-modal-header">
           <div className="vp-header-left">
             {step !== "SELECT_BRAND" && (
@@ -212,7 +211,6 @@ export function VehiclePickerModal({
           </button>
         </div>
 
-        {/* Thanh tìm kiếm (chỉ hiện ở các bước danh sách) */}
         {(step === "SELECT_BRAND" || step === "SELECT_MODEL") && (
           <div className="vp-search-wrap">
             <Search size={17} className="vp-search-icon" />
@@ -240,9 +238,7 @@ export function VehiclePickerModal({
           </div>
         )}
 
-        {/* Nội dung theo từng Step */}
         <div className="vp-modal-body">
-          {/* BƯỚC 1: Chọn Thương hiệu */}
           {step === "SELECT_BRAND" && (
             <div className="vp-brands-step">
               <div className="vp-section-label">Thương hiệu phổ biến tại Việt Nam</div>
@@ -281,7 +277,6 @@ export function VehiclePickerModal({
                   );
                 })}
 
-                {/* Thẻ chọn Thương hiệu khác */}
                 <button
                   type="button"
                   className="vp-brand-card vp-other-brand-card"
@@ -316,7 +311,6 @@ export function VehiclePickerModal({
             </div>
           )}
 
-          {/* BƯỚC 2: Chọn Dòng xe của Thương hiệu đã chọn */}
           {step === "SELECT_MODEL" && selectedBrand && (
             <div className="vp-models-step">
               <div className="vp-models-header-card">
@@ -380,7 +374,6 @@ export function VehiclePickerModal({
                   );
                 })}
 
-                {/* Mục chọn dòng xe khác của hãng này */}
                 <button
                   type="button"
                   className="vp-model-row vp-other-model-row"
@@ -414,7 +407,6 @@ export function VehiclePickerModal({
             </div>
           )}
 
-          {/* BƯỚC 3A: Xác nhận nhập Thương hiệu & Dòng xe "Khác" hoàn toàn */}
           {step === "CUSTOM_BRAND" && (
             <form onSubmit={handleConfirmCustomBrand} className="vp-custom-form">
               <div className="vp-notice-box">
@@ -505,7 +497,6 @@ export function VehiclePickerModal({
             </form>
           )}
 
-          {/* BƯỚC 3B: Xác nhận nhập Dòng xe "Khác" cho Hãng đã chọn */}
           {step === "CUSTOM_MODEL" && selectedBrand && (
             <form onSubmit={handleConfirmCustomModel} className="vp-custom-form">
               <div className="vp-notice-box">

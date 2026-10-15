@@ -127,14 +127,11 @@ export default function OnboardingPage() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Floating particles */}
       <FloatingParticles color={slide.accentColor} />
 
-      {/* Decorative rings */}
       <div className="onboarding-ring onboarding-ring--1" aria-hidden="true" />
       <div className="onboarding-ring onboarding-ring--2" aria-hidden="true" />
 
-      {/* ── Top Bar: Logo E-Mobi Care & Skip button ── */}
       <header className="onboarding-top-bar">
         <div className="onboarding-brand-badge">
           <div className="onboarding-brand-icon-wrap">
@@ -150,9 +147,7 @@ export default function OnboardingPage() {
         )}
       </header>
 
-      {/* ── Main content ── */}
       <main className="onboarding-content">
-        {/* Icon badge */}
         <div
           className={`onboarding-icon-wrap ${isAnimating
               ? direction === "next"
@@ -175,7 +170,6 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Text */}
         <div
           className={`onboarding-text ${isAnimating
               ? direction === "next"
@@ -185,7 +179,6 @@ export default function OnboardingPage() {
             }`}
           key={`text-${current}`}
         >
-          {/* Tag Chip */}
           <div
             className="onboarding-tag-chip"
             style={{ color: slide.accentColor, borderColor: `${slide.accentColor}40` }}
@@ -203,7 +196,6 @@ export default function OnboardingPage() {
           </h1>
           <p className="onboarding-subtitle">{slide.subtitle}</p>
 
-          {/* Feature highlights */}
           <div className="onboarding-features-row">
             {slide.features.map((feat, idx) => (
               <span key={idx} className="onboarding-feature-pill">
@@ -220,9 +212,7 @@ export default function OnboardingPage() {
         </div>
       </main>
 
-      {/* ── Bottom controls ── */}
       <footer className="onboarding-bottom">
-        {/* Dot indicators */}
         <div className="onboarding-dots">
           {slides.map((_, i) => (
             <button
@@ -239,7 +229,6 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        {/* CTA Button */}
         <Link
           href="/login"
           className="onboarding-cta"
@@ -258,7 +247,6 @@ export default function OnboardingPage() {
           </span>
         </Link>
 
-        {/* Already have account */}
         <p className="onboarding-login-hint">
           Đã có tài khoản?{" "}
           <Link href="/login" className="onboarding-login-link">

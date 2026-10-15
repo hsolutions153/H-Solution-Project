@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ForgotPasswordFormData } from '@/types/auth';
-import { User, ArrowRight } from 'lucide-react'; // Import các icon từ lucide-react
+import { User, ArrowRight } from 'lucide-react';
 
 interface ForgotPasswordFormProps {
   loading?: boolean;

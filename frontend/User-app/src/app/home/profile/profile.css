@@ -133,14 +133,13 @@
 .profile-vehicle-card { min-height: 113px; padding: 12px 17px 12px 12px; display: flex; align-items: center; gap: 18px; color: inherit; text-decoration: none; border-color: #d7eaf5; transition: transform 150ms ease, box-shadow 150ms ease; }
 .profile-vehicle-card:hover { transform: translateY(-1px); box-shadow: 0 5px 15px rgba(16, 24, 40, 0.07); }
 .profile-vehicle-card--empty { border-style: dashed; background: #eef6fb; min-height: 80px; }
-.profile-vehicle-image { flex: 0 0 118px; height: 86px; position: relative; display: grid; place-items: center; }
+.profile-vehicle-image { flex: 0 0 118px; height: 86px; position: relative; display: grid; place-items: center; border-radius: 8px; overflow: hidden; background: #f8fafc; }
 .profile-vehicle-image img { object-fit: contain; }
-.profile-vehicle-image span { position: absolute; left: 19px; top: 2px; z-index: 2; color: #e32f43; font-size: 12px; font-weight: 800; }
 .profile-vehicle-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .profile-vehicle-copy small { color: #12537d; font-size: 12px; line-height: 1.2; font-weight: 800; }
-.profile-vehicle-copy strong { margin-top: 7px; color: #0a2540; font-size: 16px; line-height: 1.2; font-weight: 500; }
-.profile-vehicle-copy span { margin-top: 11px; display: flex; align-items: center; gap: 4px; color: #12537d; font-size: 12px; font-weight: 700; }
-.profile-vehicle-copy span svg { width: 11px; height: 11px; }
+.profile-vehicle-copy strong { margin-top: 5px; color: #0a2540; font-size: 15px; line-height: 1.3; font-weight: 600; }
+.profile-vehicle-serial { margin-top: 7px; display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 12px; font-weight: 500; }
+.profile-vehicle-code { color: #0a2540; font-size: 12px; font-weight: 700; font-family: monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #f0f4f8; padding: 2px 7px; border-radius: 5px; border: 1px solid #d9e3ed; }
 
 .profile-support-section { margin-bottom: 0; }
 .profile-logout-button { border: 1px solid #e9ebef; color: #c42735; cursor: pointer; font: inherit; text-align: left; }
@@ -172,13 +171,46 @@
 .profile-notice { margin: -10px 0 12px; font-size: 11px; text-align: center; }
 .profile-notice--success { color: #087f5b; }
 .profile-notice--error { color: #c92a2a; }
-.profile-save-wrap { position: sticky; bottom: 0; margin: 0 -20px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: var(--color-brand-600); }
-.profile-save-button { width: 100%; min-height: 48px; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #156495; color: white; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 10px rgba(6, 123, 172, 0.22); transition: background 150ms ease, transform 150ms ease; }
-.profile-save-button:hover { background: #156495; }
-.profile-save-button:active { transform: scale(0.99); }
-.profile-save-button:disabled { cursor: wait; opacity: 0.8; }
-.profile-save-button svg { width: 17px; height: 17px; }
-.profile-spinner { animation: profile-spin 800ms linear infinite; }
+.profile-save-wrap {
+  margin: 24px 0 32px;
+  padding: 0;
+  background: transparent;
+}
+.profile-save-button {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0077b6;
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+.profile-save-button:hover {
+  background: #00669c;
+}
+.profile-save-button:active {
+  background: #005582;
+}
+.profile-save-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+.profile-save-button svg {
+  width: 18px;
+  height: 18px;
+}
+.profile-spinner {
+  animation: profile-spin 800ms linear infinite;
+}
 
 @keyframes profile-spin { to { transform: rotate(360deg); } }
 
@@ -186,7 +218,7 @@
 
   .profile-scroll-area { height: calc(100dvh - 56px); padding: 20px 14px 28px; }
   .profile-edit-form { height: calc(100dvh - 56px); padding-inline: 14px; }
-  .profile-save-wrap { margin-inline: -14px; padding-inline: 14px; }
+  .profile-save-wrap { margin: 20px 0 24px; padding: 0; }
   .profile-vehicle-image { flex-basis: 96px; }
 }
 

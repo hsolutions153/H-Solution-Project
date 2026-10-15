@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Clock,
   Wrench,
   AlertTriangle,
+  Check,
   CheckCircle2,
   XCircle,
   UserCheck,
@@ -21,6 +22,8 @@ import {
   CreditCard,
   ZoomIn,
   ExternalLink,
+  Search,
+  RefreshCw,
 } from "lucide-react";
 import { getStatusBadge, ISSUE_TYPE_LABELS } from "@/constants/orderStatus";
 
@@ -156,8 +159,9 @@ export const OrderDetailModal = ({
   );
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [selectedTechId, setSelectedTechId] = useState<string>(
-    order?.technician_id || (technicians[0]?.user_id || "TECH000001")
+    order?.technician_id || (technicians.find((t) => t.is_online)?.user_id || technicians.find((t) => t.is_online)?.id || "")
   );
+  const [techSearch, setTechSearch] = useState<string>("");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedPresetReason, setSelectedPresetReason] = useState<string>("Khách hàng yêu cầu hủy");
   const [customReasonNote, setCustomReasonNote] = useState<string>("");
@@ -169,7 +173,7 @@ export const OrderDetailModal = ({
   });
   const [quoteData, setQuoteData] = useState<QuoteDetail | null>(order?.quote || null);
 
-  // Fetch full details (images, quote, device, customer) on mount
+  // Tải thông tin chi tiết đơn hàng khi mở modal
   useEffect(() => {
     let isMounted = true;
     if (order?.id) {
@@ -221,7 +225,7 @@ export const OrderDetailModal = ({
             setQuoteData(sorted[0]);
           }
         })
-        .catch((err) => console.warn("Error fetching full order detail:", err));
+        .catch((err) => console.warn("Lỗi tải chi tiết đơn hàng:", err));
     }
     return () => {
       isMounted = false;
@@ -258,8 +262,23 @@ export const OrderDetailModal = ({
   const isFinished =
     orderDetail.status === "COMPLETED" || orderDetail.status === "CANCELLED";
 
+  const canAssignTechnician = (() => {
+    const st = (orderDetail.status || "").toUpperCase();
+    return st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
+  })();
+
   const handleAssign = async () => {
-    if (!selectedTechId || isFinished) return;
+    if (!selectedTechId || isFinished || !canAssignTechnician) {
+      if (!canAssignTechnician) {
+        onToast("Đơn ở trạng thái này không thể phân công thợ!");
+      }
+      return;
+    }
+    const targetTech = technicians.find((t) => (t.user_id || t.id) === selectedTechId);
+    if (!targetTech?.is_online) {
+      onToast("Kỹ thuật viên này đang Ngoại tuyến (Offline), không thể phân công!");
+      return;
+    }
     setActionLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
@@ -267,12 +286,12 @@ export const OrderDetailModal = ({
         method: "PATCH",
         body: JSON.stringify({ technician_id: selectedTechId }),
       });
-      onToast("Phân công kỹ thuật viên thành công!");
+      onToast("Đã gửi yêu cầu cho kỹ thuật viên, đang chờ thợ xác nhận nhận việc.");
       onRefresh();
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Lỗi khi phân công kỹ thuật viên";
-      alert(msg);
+      onToast(msg);
     } finally {
       setActionLoading(false);
     }
@@ -294,7 +313,7 @@ export const OrderDetailModal = ({
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái";
-      alert(msg);
+      onToast(msg);
     } finally {
       setActionLoading(false);
     }
@@ -902,48 +921,321 @@ export const OrderDetailModal = ({
               );
             })()}
 
-            <div className="p-4.5 rounded-2xl border border-brand-200/90 bg-brand-50/50 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-brand-950 uppercase">
-                  <div className="w-6 h-6 rounded-lg bg-brand-100 flex items-center justify-center text-brand-800">
-                    <UserCheck className="w-3.5 h-3.5" />
+            {(() => {
+              const assignedTech = technicians.find(
+                (t) => (t.user_id || t.id) === (orderDetail.technician_id || orderDetail.technician?.id || orderDetail.technician?.user_id)
+              );
+              const isAssignedOnline = assignedTech ? assignedTech.is_online : undefined;
+              const selectedTechObj = technicians.find((t) => (t.user_id || t.id) === selectedTechId);
+              const isSelectedOnline = Boolean(selectedTechObj?.is_online);
+
+              const q = techSearch.trim().toLowerCase();
+              const filteredTechs = technicians.filter((t) => {
+                if (!q) return true;
+                const name = (t.user?.full_name || t.full_name || t.name || "").toLowerCase();
+                const phone = (t.user?.phone || t.phone || "").toLowerCase();
+                const spec = (t.specialization || "").toLowerCase();
+                return name.includes(q) || phone.includes(q) || spec.includes(q);
+              });
+
+              const onlineList = filteredTechs.filter((t) => t.is_online);
+              const offlineList = filteredTechs.filter((t) => !t.is_online);
+
+              return (
+                <div className="p-5 rounded-2xl border border-brand-200 bg-brand-50/40 space-y-4 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-200/60 pb-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-brand-950 uppercase tracking-wide">
+                      <div className="w-6 h-6 rounded-lg bg-brand-100 flex items-center justify-center text-brand-800">
+                        <UserCheck className="w-3.5 h-3.5" />
+                      </div>
+                      <span>Kỹ thuật viên phụ trách & Điều phối</span>
+                    </div>
+
+                    {orderDetail.technician ? (
+                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-brand-200/90 shadow-2xs">
+                        <div className="w-5 h-5 rounded-full bg-brand-100 text-brand-900 flex items-center justify-center text-[10px] font-black">
+                          {(orderDetail.technician.user?.full_name || orderDetail.technician.name || "K").charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs text-brand-950 font-bold">
+                          {orderDetail.technician.user?.full_name || orderDetail.technician.name || orderDetail.technician.full_name}
+                        </span>
+                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-xs text-slate-600 font-medium">
+                          {orderDetail.technician.user?.phone || orderDetail.technician.phone || "---"}
+                        </span>
+                        {isAssignedOnline !== undefined && (
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ml-1 ${
+                            isAssignedOnline
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-500 border border-slate-200"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isAssignedOnline ? "bg-emerald-500" : "bg-slate-400"}`}></span>
+                            <span>{isAssignedOnline ? "Online" : "Offline"}</span>
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-500 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                        Chưa phân công kỹ thuật viên
+                      </span>
+                    )}
                   </div>
-                  <span>Kỹ thuật viên phụ trách & Điều phối</span>
+
+                  {canAssignTechnician ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase text-slate-700 block">
+                          Chọn Kỹ thuật viên trực tuyến (Sẵn sàng nhận việc)
+                        </label>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span>{technicians.filter((t) => t.is_online).length} thợ đang Online</span>
+                        </span>
+                      </div>
+
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={techSearch}
+                          onChange={(e) => setTechSearch(e.target.value)}
+                          placeholder="Tìm theo tên thợ, số điện thoại, chuyên môn..."
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-700 font-medium shadow-2xs"
+                        />
+                        {techSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setTechSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded transition cursor-pointer"
+                            title="Xóa tìm kiếm"
+                            aria-label="Xóa tìm kiếm"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto space-y-2 p-1.5 rounded-2xl border border-slate-200/90 bg-white/70">
+                        {onlineList.length === 0 && offlineList.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200 font-medium">
+                            Không tìm thấy kỹ thuật viên nào phù hợp
+                          </div>
+                        ) : (
+                          <>
+                            {onlineList.length === 0 && (
+                              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                                <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                  Không có thợ trực tuyến phù hợp
+                                </p>
+                                <p className="mt-1 text-[11px] text-amber-800 leading-relaxed">
+                                  Tất cả thợ đang ngoại tuyến hoặc không khớp từ khóa tìm kiếm. Vui lòng liên hệ KTV mở app trực tuyến để nhận việc.
+                                </p>
+                              </div>
+                            )}
+
+                            {onlineList.map((t) => {
+                              const id = t.user_id || t.id || "";
+                              const name = t.user?.full_name || t.full_name || t.name || "KTV";
+                              const phone = t.user?.phone || t.phone || "";
+                              const spec = t.specialization || "Kỹ thuật viên";
+                              const isSelected = id === selectedTechId;
+
+                              return (
+                                <div
+                                  key={id}
+                                  onClick={() => setSelectedTechId(id)}
+                                  className={`w-full p-2.5 rounded-xl transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                                    isSelected
+                                      ? "bg-brand-50/90 border-2 border-brand-800 shadow-xs"
+                                      : "bg-white border-2 border-slate-200/90 hover:border-brand-400 hover:bg-slate-50 shadow-2xs"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="relative shrink-0">
+                                      <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-900 flex items-center justify-center font-black text-xs border border-brand-200">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white"></span>
+                                    </div>
+                                    <div className="min-w-0 flex flex-col text-left">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-900 truncate">{name}</span>
+                                        {isSelected && (
+                                          <span className="bg-brand-900 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                                            Đang chọn
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[11px] text-slate-500 truncate mt-0.5">
+                                        {spec} {phone ? `· ${phone}` : ""}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                      <span>Online</span>
+                                    </span>
+                                    <div
+                                      className={`w-5 h-5 rounded-full flex items-center justify-center transition ${
+                                        isSelected ? "bg-brand-900 text-white" : "border-2 border-slate-300 bg-white"
+                                      }`}
+                                    >
+                                      {isSelected && <Check className="w-3.5 h-3.5 stroke-3" />}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {offlineList.length > 0 && (
+                              <div className="pt-2">
+                                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                  <span>Ngoại tuyến ({offlineList.length}) - Không thể gán</span>
+                                </div>
+                                {offlineList.map((t) => {
+                                  const id = t.user_id || t.id || "";
+                                  const name = t.user?.full_name || t.full_name || t.name || "KTV";
+                                  const phone = t.user?.phone || t.phone || "";
+                                  const spec = t.specialization || "Kỹ thuật viên";
+
+                                  return (
+                                    <div
+                                      key={id}
+                                      className="w-full p-2.5 rounded-xl border border-slate-200/80 bg-slate-100/60 flex items-center justify-between gap-3 opacity-50 cursor-not-allowed select-none mb-1"
+                                      title="Kỹ thuật viên này đang Ngoại tuyến, không thể nhận đơn mới"
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          {name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0 flex flex-col text-left">
+                                          <span className="text-xs font-bold text-slate-600 truncate">{name}</span>
+                                          <span className="text-[11px] text-slate-400 truncate">
+                                            {spec} {phone ? `· ${phone}` : ""}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-600 border border-slate-300 shrink-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                        <span>Offline</span>
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="pt-2.5 border-t border-brand-200/60 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                        <div className="text-xs text-slate-600 text-center sm:text-left">
+                          {selectedTechObj && isSelectedOnline ? (
+                            <span className="text-slate-800 font-medium flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span>
+                                Đang chọn: <strong className="text-brand-950 font-bold">{selectedTechObj.user?.full_name || selectedTechObj.full_name || selectedTechObj.name}</strong>
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 font-medium text-[11px]">
+                              Vui lòng nhấp chọn một kỹ thuật viên đang trực tuyến ở trên
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAssign}
+                          disabled={actionLoading || isFinished || !isSelectedOnline}
+                          title={!isSelectedOnline ? "Kỹ thuật viên đang Ngoại tuyến, không thể giao việc" : ""}
+                          className="bg-brand-900 hover:bg-brand-950 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0 w-full sm:w-auto"
+                        >
+                          {actionLoading ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <UserCheck className="w-4 h-4" />
+                          )}
+                          <span>{orderDetail.technician_id ? "Xác nhận đổi thợ" : "Xác nhận phân công"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white p-4 rounded-xl border border-brand-200/80 shadow-2xs space-y-3">
+                      {orderDetail.technician ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className="w-11 h-11 rounded-full bg-brand-100 text-brand-900 flex items-center justify-center font-black text-sm border border-brand-200">
+                                {(orderDetail.technician.user?.full_name || orderDetail.technician.name || "K").charAt(0).toUpperCase()}
+                              </div>
+                              {isAssignedOnline !== undefined && (
+                                <span
+                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                                    isAssignedOnline ? "bg-emerald-500" : "bg-slate-400"
+                                  }`}
+                                  title={isAssignedOnline ? "Trực tuyến" : "Ngoại tuyến"}
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900 truncate">
+                                  {orderDetail.technician.user?.full_name || orderDetail.technician.name || orderDetail.technician.full_name}
+                                </span>
+                                {isAssignedOnline !== undefined && (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isAssignedOnline
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        : "bg-slate-100 text-slate-600 border border-slate-200"
+                                    }`}
+                                  >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isAssignedOnline ? "bg-emerald-500" : "bg-slate-400"}`}></span>
+                                    <span>{isAssignedOnline ? "Online" : "Offline"}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+                                <span>{assignedTech?.specialization || "Kỹ thuật viên Sửa chữa"}</span>
+                                {(orderDetail.technician.user?.phone || orderDetail.technician.phone) && (
+                                  <>
+                                    <span>·</span>
+                                    <a
+                                      href={`tel:${orderDetail.technician.user?.phone || orderDetail.technician.phone}`}
+                                      className="font-medium text-brand-700 hover:text-brand-900 font-mono hover:underline inline-flex items-center gap-1"
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                      <span>{orderDetail.technician.user?.phone || orderDetail.technician.phone}</span>
+                                    </a>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0 self-start sm:self-center">
+                            Thợ đã tiếp nhận đơn
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic text-center py-2">
+                          Đơn hàng không có kỹ thuật viên phụ trách.
+                        </div>
+                      )}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Đơn hàng đã chuyển qua trạng thái xử lý</span>
+                        <span className="italic font-medium text-slate-500">Cố định thợ phụ trách</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {orderDetail.technician && (
-                  <span className="text-xs text-brand-900 font-bold bg-white px-2.5 py-1 rounded-lg border border-brand-200">
-                    {orderDetail.technician.user?.full_name || orderDetail.technician.name || orderDetail.technician.full_name} (
-                    {orderDetail.technician.user?.phone || orderDetail.technician.phone || "---"})
-                  </span>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <select
-                  disabled={isFinished}
-                  value={selectedTechId}
-                  onChange={(e) => setSelectedTechId(e.target.value)}
-                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-semibold focus:ring-2 focus:ring-brand-800 outline-none disabled:opacity-50 disabled:bg-slate-100 cursor-pointer"
-                >
-                  {technicians.map((t: TechnicianItem) => (
-                    <option key={t.user_id || t.id} value={t.user_id || t.id}>
-                      {t.full_name || t.user?.full_name || t.name || t.user_id} -{" "}
-                      {t.specialization || "Chung"} (
-                      {t.is_online ? "🟢 Online" : "⚪ Offline"})
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={handleAssign}
-                  disabled={actionLoading || isFinished}
-                  className="bg-brand-900 hover:bg-brand-950 text-white px-4.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                >
-                  <UserCheck className="w-4 h-4" />
-                  <span>{orderDetail.technician_id ? "Đổi thợ" : "Phân công"}</span>
-                </button>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">

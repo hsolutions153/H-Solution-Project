@@ -6,7 +6,6 @@ interface BrandMarkProps {
   className?: string;
 }
 
-/** The H-Mobility Care app mark: an "H" carrying an electric bolt. */
 export function BrandMark({ size = 36, className }: BrandMarkProps) {
   const id = useId().replace(/:/g, "");
   return (

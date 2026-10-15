@@ -16,9 +16,7 @@ import {
   LogOut,
   Mail,
   MapPin,
-  Pencil,
   Phone,
-  RefreshCw,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -60,7 +58,6 @@ function Avatar({ avatar, large = false, uploading = false }: { avatar: string; 
   );
 }
 
-/** Center-crops the photo to a 360px square JPEG so uploads stay small. */
 async function resizeAvatar(file: File): Promise<Blob> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -158,7 +155,6 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
           setPrimaryDevice(null);
         }
       } catch {
-        // Fallback to initialProfile gracefully
       }
     }
     loadCustomerProfile();
@@ -357,11 +353,6 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
           <PageHeader
             title="Hồ sơ cá nhân"
             backHref="/home"
-            trailing={
-              <Link href="/home/profile/edit" className="profile-icon-button" aria-label="Chỉnh sửa hồ sơ">
-                <Pencil />
-              </Link>
-            }
           />
         </header>
 
@@ -419,12 +410,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
               <Link href="/home/device" className="profile-vehicle-card">
                 <div className="profile-vehicle-image">
                   <Image src={primaryDevice.image || "/electric-scooter.jpg"} alt={primaryDevice.model} fill sizes="100px" style={{ objectFit: "cover" }} unoptimized />
-                  {primaryDevice.serialNumber && <span>{primaryDevice.serialNumber}</span>}
                 </div>
                 <div className="profile-vehicle-copy">
                   <small>Dòng xe hiện tại</small>
                   <strong>{primaryDevice.model}</strong>
-                  <span>Đổi phương tiện <RefreshCw /></span>
+                  {primaryDevice.serialNumber && (
+                    <span className="profile-vehicle-serial">
+                      Mã thiết bị: <span className="profile-vehicle-code">{primaryDevice.serialNumber}</span>
+                    </span>
+                  )}
                 </div>
               </Link>
             ) : (
@@ -453,7 +447,6 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
             </button>
           </section>
 
-          {/* Modal xác nhận đăng xuất */}
           {showLogoutConfirm && (
             <div
               style={{

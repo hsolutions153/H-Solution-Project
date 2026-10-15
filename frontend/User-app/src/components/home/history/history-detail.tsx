@@ -152,7 +152,6 @@ export function HistoryDetail() {
   const params = useParams();
   const id = params?.id as string;
 
-  // Rating states
   const [ratingStars, setRatingStars] = useState<number>(5);
   const [ratingHover, setRatingHover] = useState<number>(0);
   const [ratingComment, setRatingComment] = useState<string>("");
@@ -163,7 +162,7 @@ export function HistoryDetail() {
   const [ratingSuccessMsg, setRatingSuccessMsg] = useState<string>("");
   const [isEditingRating, setIsEditingRating] = useState<boolean>(false);
 
-  // Load rating from localStorage & handle #rating hash
+  // Tải thông tin đánh giá từ localStorage & xử lý hash #rating
   useEffect(() => {
     if (!id || typeof window === "undefined") return;
     try {
@@ -176,7 +175,6 @@ export function HistoryDetail() {
         setIsRated(true);
       }
     } catch {
-      // ignore
     }
 
     const hash = window.location.hash;
@@ -227,7 +225,7 @@ export function HistoryDetail() {
     }
   };
 
-  // Instant cache lookup: renders within 0ms if visited or coming from history list
+  // Tải nhanh từ bộ nhớ đệm (hiển thị tức thì 0ms)
   const [detail, setDetail] = useState<RepairDetail | null>(() => {
     if (!id) return null;
     if (typeof window !== "undefined") {
@@ -293,9 +291,47 @@ export function HistoryDetail() {
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrData, setQrData] = useState<any>(null);
   const [qrError, setQrError] = useState("");
-  const [activePaymentTab, setActivePaymentTab] = useState<"VIETQR" | "COD" | "MOMO_ATM">("VIETQR");
+  const [activePaymentTab, setActivePaymentTab] = useState<"VIETQR" | "COD" | null>(null);
   const [paymentNotice, setPaymentNotice] = useState("");
-  const [momoData, setMomoData] = useState<any>(null);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+  // Tự động kiểm tra trạng thái thanh toán từ KTV khi modal đang mở hoặc khi đang chờ thợ xác nhận
+  useEffect(() => {
+    if (!id) return;
+    if (!showQrModal && detail?.paymentStatus !== "PENDING") return;
+    const timer = setInterval(async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const res = await fetchApi<any>(`/repair-requests/${id}`);
+        if (res && res.payment_status === "PAID") {
+          setDetail((prev) => prev ? { ...prev, paymentStatus: "PAID", paymentMethod: res.payment_method || prev.paymentMethod, rawStatus: "COMPLETED", status: "completed" } : null);
+          if (showQrModal) {
+            setPaymentNotice("Kỹ thuật viên đã xác nhận thanh toán thành công!");
+            setTimeout(() => {
+              setShowQrModal(false);
+            }, 1500);
+          }
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [showQrModal, id, detail?.paymentStatus]);
+
+  // Khi modal mở trong trạng thái PENDING, tự động chọn đúng tab phương thức đã chọn & tải QR nếu cần
+  useEffect(() => {
+    if (!showQrModal || detail?.paymentStatus !== "PENDING" || !detail?.id) return;
+    const isCash = String(detail.paymentMethod || "").toUpperCase() === "CASH" || String(detail.paymentMethod || "").toUpperCase() === "COD";
+    const targetTab = isCash ? "COD" : "VIETQR";
+    setActivePaymentTab(targetTab);
+    if (!isCash && !qrData && !isQrLoading) {
+      setIsQrLoading(true);
+      import("@/lib/api-client")
+        .then(({ fetchApi }) => fetchApi<any>(`/payments/repair/${detail.id}/qr?method=BANK_TRANSFER`))
+        .then((res) => setQrData(res))
+        .catch((err) => setQrError(err instanceof Error ? err.message : "Không thể tải thông tin thanh toán."))
+        .finally(() => setIsQrLoading(false));
+    }
+  }, [showQrModal, detail?.paymentStatus, detail?.paymentMethod, detail?.id, qrData, isQrLoading]);
 
   const isFetchingRef = useRef(false);
   const refreshDetailRef = useRef<(() => Promise<void>) | null>(null);
@@ -311,7 +347,6 @@ export function HistoryDetail() {
 
       try {
         const { fetchApi } = await import("@/lib/api-client");
-        // Backend /repair-requests/{id} returns full request, images, device, quotes and items in ONE fast mega-query
         const res = await fetchApi<any>(`/repair-requests/${id}`);
         if (res && res.id) {
           let status: "completed" | "cancelled" | "in_progress" = "in_progress";
@@ -331,12 +366,12 @@ export function HistoryDetail() {
               }
             : null;
 
-          // Quotes are already included by backend, eliminating redundant network roundtrips
+          // Danh sách báo giá từ backend
           const quotesList: any[] = res.quotes || (res.quote ? [res.quote] : []);
           const pendingQuote = quotesList.find((q: any) => q.status === "PENDING") || null;
           const acceptedQuotes = quotesList.filter((q: any) => q.status === "ACCEPTED");
 
-          // Earliest quote is the initial estimate
+          // Báo giá đầu tiên là chi phí ước tính ban đầu
           const sortedQuotes = [...quotesList].sort((a: any, b: any) => (a.created_at || "").localeCompare(b.created_at || ""));
           const initialEstimate = Number(
             (res.initial_estimate !== undefined && res.initial_estimate !== null && Number(res.initial_estimate) > 0)
@@ -346,16 +381,15 @@ export function HistoryDetail() {
                   : (res.total_amount || 0))
           );
 
-          // Total approved estimate: sum of accepted quotes
+          // Tổng ước tính đã duyệt từ các báo giá được chấp thuận
           let approvedEstimate = Number(res.approved_estimate || 0);
           if (!approvedEstimate && acceptedQuotes.length > 0) {
             approvedEstimate = acceptedQuotes.reduce((sum: number, q: any) => sum + Number(q.estimated_price || 0), 0);
           }
-          // Active quote to inspect
           const activeQuote = pendingQuote || res.quote || (quotesList.length > 0 ? quotesList[0] : null);
           if (isMounted) setQuoteData(activeQuote);
 
-          // Check if this is a supplementary quote (i.e. already has an accepted quote and now a pending quote)
+          // Kiểm tra báo giá phát sinh (đã có báo giá duyệt và có thêm báo giá chờ duyệt)
           const isSupplementaryQuote = Boolean(activeQuote && activeQuote.status !== "ACCEPTED" && acceptedQuotes.length > 0);
           const additionalAmount = isSupplementaryQuote ? Number(pendingQuote?.estimated_price || 0) : 0;
           const detailQuote = !pendingQuote && acceptedQuotes.length > 0 ? {
@@ -365,7 +399,7 @@ export function HistoryDetail() {
             parts_cost: acceptedQuotes.reduce((sum: number, quote: any) => sum + Number(quote.parts_cost || 0), 0),
           } : activeQuote;
 
-          // In completed state, res.total_amount IS the final cost!
+          // Khi đơn hoàn tất, res.total_amount là chi phí thực tế cuối cùng
           const isCompleted = status === "completed" || res.status === "COMPLETED" || res.status === "PAID";
           const finalCost = isCompleted && res.total_amount !== null && res.total_amount !== undefined
             ? Number(res.total_amount)
@@ -380,22 +414,18 @@ export function HistoryDetail() {
             effectiveTotal = Number(activeQuote.estimated_price);
           }
 
-          // Phân loại linh kiện và tiền công — ưu tiên item_type từ backend thay vì regex tên
+          // Phân loại linh kiện và tiền công từ dữ liệu backend
           let parsedParts: Array<{ name: string; quantity: number; unitPrice: number; subtotal: number }> = [];
           let parsedLaborCost = 0;
           let parsedPartsCost = 0;
 
-          // Helper: kiểm tra item có phải tiền công hay không
           const isLaborItem = (it: any): boolean => {
-            // Ưu tiên item_type nếu backend trả về
             if (it.item_type) return it.item_type === "LABOR";
-            // Fallback: regex tên cho dữ liệu cũ
             const name = (it.item_name || it.name || "").toLowerCase();
             return name.includes("tiền công") || name.includes("công sửa") || name.includes("công kỹ thuật");
           };
 
           if (detailQuote && detailQuote.items && detailQuote.items.length > 0) {
-            // Tách items thành labor vs parts/service
             const partsItems = detailQuote.items.filter((it: any) => !isLaborItem(it));
             const laborItems = detailQuote.items.filter((it: any) => isLaborItem(it));
 
@@ -407,24 +437,19 @@ export function HistoryDetail() {
             }));
             parsedPartsCost = parsedParts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
 
-            // Tổng hợp tất cả mục tiền công (có thể > 1 item LABOR)
             parsedLaborCost = laborItems.reduce(
               (sum: number, it: any) => sum + Number(it.subtotal || it.unit_price || it.price || 0),
               0
             );
 
-            // Nếu không tìm thấy labor item nào, dùng labor_fee từ quote record
             if (parsedLaborCost === 0 && detailQuote.labor_fee) {
               parsedLaborCost = Number(detailQuote.labor_fee);
             }
           } else if (detailQuote) {
-            // Quote không có items chi tiết → dùng trực tiếp labor_fee / parts_cost từ backend
             parsedLaborCost = Number(detailQuote.labor_fee || detailQuote.laborCost || 0);
             parsedPartsCost = Number(detailQuote.parts_cost || detailQuote.partsCost || 0);
           }
 
-          // Fallback cuối: nếu có quote với labor_fee/parts_cost nhưng items parsing ra 0
-          // → ưu tiên dùng giá trị từ quote record thay vì bịa số
           if (parsedLaborCost === 0 && parsedPartsCost === 0 && detailQuote) {
             if (detailQuote.labor_fee) parsedLaborCost = Number(detailQuote.labor_fee);
             if (detailQuote.parts_cost) parsedPartsCost = Number(detailQuote.parts_cost);
@@ -441,46 +466,9 @@ export function HistoryDetail() {
             ];
           }
 
-          // Fallback khi đơn hàng có tổng tiền (effectiveTotal > 0) nhưng chưa có danh sách bóc tách chi tiết (ví dụ đơn seed mẫu REQ0000001)
+          // Nếu đơn có tổng tiền nhưng chưa bóc tách từng linh kiện, tính toàn bộ là chi phí xử lý trọn gói
           if (parsedLaborCost === 0 && parsedPartsCost === 0 && effectiveTotal > 0) {
-            if (effectiveTotal === 450000) {
-              parsedLaborCost = 200000;
-              parsedPartsCost = 250000;
-              parsedParts = [
-                {
-                  name: "Bộ xích truyền động",
-                  quantity: 1,
-                  unitPrice: 250000,
-                  subtotal: 250000,
-                },
-              ];
-            } else if (effectiveTotal === 1800000) {
-              parsedLaborCost = 300000;
-              parsedPartsCost = 1500000;
-              parsedParts = [
-                {
-                  name: "Pin xe lăn điện",
-                  quantity: 1,
-                  unitPrice: 1500000,
-                  subtotal: 1500000,
-                },
-              ];
-            } else if (effectiveTotal >= 300000) {
-              parsedLaborCost = 200000;
-              parsedPartsCost = effectiveTotal - 200000;
-              parsedParts = [
-                {
-                  name: "Phụ tùng & vật tư sửa chữa",
-                  quantity: 1,
-                  unitPrice: parsedPartsCost,
-                  subtotal: parsedPartsCost,
-                },
-              ];
-            } else {
-              // Dưới 300k coi như phí công thợ / phí kiểm tra xử lý sự cố trọn gói
-              parsedLaborCost = effectiveTotal;
-              parsedPartsCost = 0;
-            }
+            parsedLaborCost = effectiveTotal;
           }
 
           if (isMounted) {
@@ -525,7 +513,7 @@ export function HistoryDetail() {
           if (isMounted) setError("Không tìm thấy lịch sử sửa chữa");
         }
       } catch (err: any) {
-        console.warn("Failed to fetch detail:", err);
+        console.warn("Lỗi tải chi tiết đơn hàng:", err);
       } finally {
         isFetchingRef.current = false;
         if (isMounted) setLoading(false);
@@ -535,7 +523,7 @@ export function HistoryDetail() {
     refreshDetailRef.current = fetchDetail;
     fetchDetail();
 
-    // Background refresh every 8s (only if in progress and tab is visible)
+    // Làm mới dữ liệu ngầm mỗi 8s khi đơn đang tiến hành
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       if (detail?.status === "in_progress" || (detail?.status === "completed" && detail.paymentStatus !== "PAID")) {
@@ -546,7 +534,6 @@ export function HistoryDetail() {
     return () => {
       isMounted = false;
       if (refreshDetailRef.current === fetchDetail) refreshDetailRef.current = null;
-      // Let the next effect run fetch again; otherwise a cancelled run (e.g. StrictMode) leaves the page loading forever.
       isFetchingRef.current = false;
       clearInterval(interval);
     };
@@ -632,14 +619,11 @@ export function HistoryDetail() {
 
   return (
     <div className="rd-container">
-      {/* Header */}
       <div className="rd-header">
         <PageHeader title="Chi tiết sửa chữa" subtitle={`Mã đơn #${detail.orderCode}`} backHref="/home/history" />
       </div>
 
-      {/* Scrollable Content */}
       <div className="rd-scroll-content">
-        {/* Order Code & Title */}
         <div className="rd-order-section">
           <div className="rd-title-row">
             <h2 className="rd-repair-title">{detail.title}</h2>
@@ -650,7 +634,6 @@ export function HistoryDetail() {
           </div>
         </div>
 
-        {/* Stepper 5 Bước Tiến Độ */}
         {detail.rawStatus !== "CANCELLED" && (
           <div className="bg-white rounded-2xl p-3 mb-3 border border-slate-100 shadow-xs">
             <div className="flex items-center justify-between relative px-2">
@@ -704,7 +687,6 @@ export function HistoryDetail() {
           </div>
         )}
 
-        {/* Khối Duyệt Báo Giá khi status = WAITING_FOR_APPROVAL / ESTIMATE_SUBMITTED / DIAGNOSED */}
         {["WAITING_FOR_APPROVAL", "ESTIMATE_SUBMITTED", "DIAGNOSED"].includes(detail.rawStatus) && (
           <div className="bg-brand-50/60 border border-brand-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
             <div className="flex items-start gap-2.5">
@@ -723,7 +705,6 @@ export function HistoryDetail() {
               </div>
             </div>
 
-            {/* Chi tiết linh kiện & Phụ tùng phát sinh / thay thế */}
             <div className="space-y-2">
               <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-brand-700 text-sm">settings</span>
@@ -760,7 +741,6 @@ export function HistoryDetail() {
               )}
             </div>
 
-            {/* Tiền công kỹ thuật viên */}
             <div className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs">
               <div>
                 <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
@@ -773,14 +753,12 @@ export function HistoryDetail() {
               </div>
             </div>
 
-            {/* Ghi chú KTV nếu có */}
             {quoteData?.diagnosis_note && (
               <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-brand-100">
                 <span className="font-bold text-brand-950">{detail.isSupplementaryQuote ? "Ghi chú phát sinh:" : "Ghi chú sửa chữa:"}</span> {quoteData.diagnosis_note}
               </div>
             )}
 
-            {/* Tổng chi phí phát sinh & báo giá */}
             <div className="bg-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2">
               {detail.isSupplementaryQuote && (
                 <div className="space-y-1.5 pb-2 border-b border-brand-800/80 text-xs">
@@ -810,7 +788,6 @@ export function HistoryDetail() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-2 pt-1">
               <button
                 disabled={isApprovingQuote}
@@ -830,7 +807,6 @@ export function HistoryDetail() {
           </div>
         )}
 
-        {/* Time & Location */}
         <div className="rd-info-card">
           <div className="rd-info-row">
             <div className="rd-info-icon-wrap">
@@ -857,7 +833,6 @@ export function HistoryDetail() {
           </div>
         </div>
 
-        {/* Technician Profile Card */}
         <div className="rd-technician-card">
           <span className="rd-section-label">Kỹ thuật viên phụ trách</span>
           {detail.technician?.verified && (
@@ -879,7 +854,7 @@ export function HistoryDetail() {
                       alt={`Ảnh kỹ thuật viên ${detail.technician.name}`}
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {
-                        // Broken link: hide the photo so the initial underneath shows.
+                        // Ẩn ảnh lỗi để hiển thị chữ cái đại diện
                         e.currentTarget.style.display = "none";
                       }}
                     />
@@ -897,7 +872,6 @@ export function HistoryDetail() {
                 </div>
               </div>
 
-              {/* KTV Specs & Experience */}
               <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-brand-600" style={{ fontSize: 18 }}>workspace_premium</span>
@@ -915,7 +889,6 @@ export function HistoryDetail() {
                 </div>
               </div>
 
-              {/* Contact Actions */}
               {detail.technician.phone && (
                 <div className="flex gap-2 pt-1">
                   <a
@@ -950,7 +923,6 @@ export function HistoryDetail() {
           )}
         </div>
 
-        {/* Đánh Giá Kỹ Thuật Viên (Khi đơn đã hoàn thành) */}
         {(detail.status === "completed" || detail.rawStatus === "COMPLETED" || detail.rawStatus === "PAID") && (
           <div
             id="rating-section"
@@ -977,7 +949,6 @@ export function HistoryDetail() {
             )}
 
             {isRated && !isEditingRating ? (
-              /* Already Rated Summary View */
               <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1033,7 +1004,6 @@ export function HistoryDetail() {
                 )}
               </div>
             ) : (
-              /* Interactive Rating Form */
               <form onSubmit={handleSubmitRating} className="space-y-4">
                 <div className="text-center py-2 space-y-2">
                   <p className="text-xs text-slate-600 font-medium">
@@ -1041,7 +1011,6 @@ export function HistoryDetail() {
                     <b>{detail.technician?.name || "phụ trách"}</b>?
                   </p>
 
-                  {/* Star Rating Buttons */}
                   <div className="flex items-center justify-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((star) => {
                       const active = (ratingHover || ratingStars) >= star;
@@ -1071,12 +1040,11 @@ export function HistoryDetail() {
                     })}
                   </div>
 
-                  <div className="text-xs font-bold text-amber-700 min-h-[18px]">
+                  <div className="text-xs font-bold text-amber-700 min-h-4.5">
                     {RATING_LABELS[ratingHover || ratingStars] || "Chọn mức đánh giá"}
                   </div>
                 </div>
 
-                {/* Quick Tags */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                     Điểm bạn hài lòng
@@ -1108,7 +1076,6 @@ export function HistoryDetail() {
                   </div>
                 </div>
 
-                {/* Comment Textarea */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                     Nhận xét thêm (không bắt buộc)
@@ -1118,11 +1085,10 @@ export function HistoryDetail() {
                     onChange={(e) => setRatingComment(e.target.value)}
                     rows={3}
                     placeholder="Chia sẻ cảm nhận của bạn về thái độ phục vụ và tay nghề của kỹ thuật viên..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition"
+                    className="w-full resize-none bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition"
                   />
                 </div>
 
-                {/* Submit & Cancel Buttons */}
                 <div className="flex items-center gap-2 pt-1">
                   {isEditingRating && (
                     <button
@@ -1155,11 +1121,9 @@ export function HistoryDetail() {
           </div>
         )}
 
-        {/* 1. KHỐI CHI TIẾT CÔNG VIỆC: LOẠI SỰ CỐ, MÔ TẢ SỰ CỐ & THAY GÌ */}
         <div className="rd-jobs-section">
           <span className="rd-section-label">Chi tiết công việc</span>
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3.5">
-            {/* 1. Loại sự cố gặp phải */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <span className="material-symbols-outlined text-brand-600 text-base">report_problem</span>
@@ -1183,7 +1147,6 @@ export function HistoryDetail() {
               </div>
             </div>
 
-            {/* 2. Mô tả chi tiết sự cố */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <span className="material-symbols-outlined text-brand-600 text-base">description</span>
@@ -1194,7 +1157,6 @@ export function HistoryDetail() {
               </div>
             </div>
 
-            {/* Ghi chú xử lý từ KTV nếu có */}
             {detail.diagnosisNote && detail.diagnosisNote !== detail.issueDescription && (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
@@ -1211,11 +1173,9 @@ export function HistoryDetail() {
           </div>
         </div>
 
-        {/* 2. KHỐI TỔNG HỢP CHI PHÍ THANH TOÁN */}
         <div className="rd-jobs-section">
           <span className="rd-section-label">Chi phí thanh toán</span>
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3 text-xs">
-            {/* Tiền công kỹ thuật viên */}
             <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-600 text-base">engineering</span>
@@ -1229,7 +1189,6 @@ export function HistoryDetail() {
               </span>
             </div>
 
-            {/* Tiền linh kiện thay thế */}
             <div className="flex justify-between items-center text-slate-700 pb-2 border-b border-dashed border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-600 text-base">precision_manufacturing</span>
@@ -1273,7 +1232,6 @@ export function HistoryDetail() {
               </span>
             </div>
 
-            {/* Đối soát Báo giá ước tính (Estimate) & Chi phí thực tế (Final Cost) */}
             {(Boolean(detail.initialEstimate || detail.approvedEstimate) || detail.status === "completed" || detail.rawStatus === "COMPLETED") && (
               <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200/80 space-y-2 mt-2">
                 <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
@@ -1313,7 +1271,6 @@ export function HistoryDetail() {
                   </span>
                 </div>
 
-                {/* Badge so sánh chi phí theo test matrix */}
                 {(() => {
                   const est = detail.initialEstimate || detail.approvedEstimate || 0;
                   const finalVal = detail.finalCost !== undefined ? detail.finalCost : detail.total;
@@ -1344,7 +1301,6 @@ export function HistoryDetail() {
               </div>
             )}
 
-            {/* Tổng cộng */}
             <div className="bg-brand-50/80 border border-brand-200/80 p-3.5 rounded-xl flex justify-between items-center mt-2">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-brand-900 block">
@@ -1361,7 +1317,6 @@ export function HistoryDetail() {
           </div>
         </div>
 
-        {/* Images After Repair */}
         {detail.images.length > 0 && (
           <div className="rd-images-section">
             <span className="rd-section-label">Ảnh sau sửa chữa</span>
@@ -1387,7 +1342,6 @@ export function HistoryDetail() {
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="rd-actions">
           {(detail.status === "completed" || detail.rawStatus === "COMPLETED" || detail.rawStatus === "PAID") && (
             <button
@@ -1412,31 +1366,29 @@ export function HistoryDetail() {
               {isRated ? "Xem lại đánh giá KTV" : "Đánh giá kỹ thuật viên"}
             </button>
           )}
-          {detail.total > 0 && detail.status === "completed" && ["UNPAID", "PENDING", "FAILED", "CANCELLED", "EXPIRED"].includes(detail.paymentStatus || "") && (
+          {detail.total > 0 && (detail.status === "completed" || detail.status === "in_progress") && ["UNPAID", "PENDING", "FAILED", "CANCELLED", "EXPIRED", undefined, ""].includes(detail.paymentStatus || "") && (
             <button
               className="rd-action-primary"
-              style={{ background: "linear-gradient(135deg, #4896c4, #4896c4)" }}
-              onClick={async () => {
-                setActivePaymentTab("VIETQR");
-                setQrData(null); setMomoData(null); setPaymentNotice("");
-                setShowQrModal(true);
-                setIsQrLoading(true);
-                setQrError("");
-                try {
-                  const { fetchApi } = await import("@/lib/api-client");
-                  const qrRes = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=BANK_TRANSFER`);
-                  setQrData(qrRes);
-                } catch (err: any) {
-                  setQrError(err.message || "Không thể khởi tạo thanh toán.");
-                } finally {
-                  setIsQrLoading(false);
+              style={{ background: detail.paymentStatus === "PENDING" ? "linear-gradient(135deg, #10B981, #059669)" : "linear-gradient(135deg, #4896c4, #3b82f6)" }}
+              onClick={() => {
+                if (detail.paymentStatus !== "PENDING") {
+                  setActivePaymentTab(null);
+                  setQrData(null);
+                } else {
+                  const isCash = String(detail.paymentMethod || "").toUpperCase() === "CASH" || String(detail.paymentMethod || "").toUpperCase() === "COD";
+                  setActivePaymentTab(isCash ? "COD" : "VIETQR");
                 }
+                setPaymentNotice("");
+                setQrError("");
+                setShowQrModal(true);
               }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                payments
+                {detail.paymentStatus === "PENDING" ? "hourglass_top" : "payments"}
               </span>
-              Thanh toán ngay ({formatCurrency(detail.total)})
+              {detail.paymentStatus === "PENDING"
+                ? `Đã báo thanh toán (${formatCurrency(detail.total)}) - Chờ KTV xác nhận`
+                : `Thanh toán ngay (${formatCurrency(detail.total)})`}
             </button>
           )}
           <button className="rd-action-primary" id="download-invoice">
@@ -1453,7 +1405,6 @@ export function HistoryDetail() {
           </button>
         </div>
 
-        {/* Multi-Method Payment Modal */}
         {showQrModal && (
           <div
             style={{
@@ -1480,7 +1431,7 @@ export function HistoryDetail() {
             >
               <div className="flex justify-between items-center mb-3">
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0a2540" }}>
-                  Chọn Phương Thức Thanh Toán
+                  {detail.paymentStatus === "PENDING" ? "Thông Tin Thanh Toán" : "Chọn Phương Thức Thanh Toán"}
                 </h3>
                 <button
                   type="button"
@@ -1503,75 +1454,66 @@ export function HistoryDetail() {
                 </button>
               </div>
 
-              {/* Payment Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl mb-4 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActivePaymentTab("VIETQR");
-                    setQrError(""); setQrData(null); setMomoData(null);
-                    setIsQrLoading(true);
-                    try {
-                      const { fetchApi } = await import("@/lib/api-client");
-                      const res = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=BANK_TRANSFER`);
-                      setQrData(res);
-                    } catch (error) {
-                      setQrError(error instanceof Error ? error.message : "Không thể khởi tạo thanh toán.");
-                    } finally {
-                      setIsQrLoading(false);
-                    }
-                  }}
-                  className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "VIETQR" ? "bg-white text-brand-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                >
-                  📲 VietQR
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActivePaymentTab("COD");
-                    setQrError(""); setQrData(null); setMomoData(null);
-                    setIsQrLoading(true);
-                    try {
-                      const { fetchApi } = await import("@/lib/api-client");
-                      const res = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=COD`);
-                      setQrData(res);
-                    } catch (error) {
-                      setQrError(error instanceof Error ? error.message : "Không thể khởi tạo thanh toán.");
-                    } finally {
-                      setIsQrLoading(false);
-                    }
-                  }}
-                  className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "COD" ? "bg-white text-emerald-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                >
-                  💵 Tiền mặt (COD)
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActivePaymentTab("MOMO_ATM");
-                    setQrError(""); setQrData(null); setMomoData(null);
-                    setIsQrLoading(true);
-                    setQrError("");
-                    try {
-                      const { fetchApi } = await import("@/lib/api-client");
-                      const res = await fetchApi<any>(`/payments/repair/${detail.id}/momo?request_type=payWithATM`, { method: "POST" });
-                      setMomoData(res);
-                    } catch (err: any) {
-                      setQrError(err.message || "Không thể kết nối MoMo.");
-                    } finally {
-                      setIsQrLoading(false);
-                    }
-                  }}
-                  className={`py-2 px-1 rounded-lg transition text-center cursor-pointer ${activePaymentTab === "MOMO_ATM" ? "bg-white text-pink-700 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                >
-                  💳 MoMo (ATM)
-                </button>
-              </div>
+              {activePaymentTab === null ? (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-slate-500 mb-1">
+                    Số tiền cần thanh toán: <strong className="text-slate-900">{formatCurrency(detail.total)}</strong>
+                  </p>
+                  {([
+                    { id: "VIETQR" as const, method: "BANK_TRANSFER", icon: "qr_code_2", title: "Chuyển khoản", desc: "Quét mã QR bằng ứng dụng ngân hàng", color: "text-brand-700 bg-brand-50" },
+                    { id: "COD" as const, method: "COD", icon: "payments", title: "Tiền mặt", desc: "Thanh toán trực tiếp cho kỹ thuật viên", color: "text-emerald-700 bg-emerald-50" },
+                  ]).map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      id={`payment-method-${option.id.toLowerCase()}`}
+                      onClick={async () => {
+                        setActivePaymentTab(option.id);
+                        setQrError("");
+                        setQrData(null);
+                        setIsQrLoading(true);
+                        try {
+                          const { fetchApi } = await import("@/lib/api-client");
+                          const res = await fetchApi<any>(`/payments/repair/${detail.id}/qr?method=${option.method}`);
+                          setQrData(res);
+                        } catch (error) {
+                          setQrError(error instanceof Error ? error.message : "Không thể khởi tạo thanh toán.");
+                        } finally {
+                          setIsQrLoading(false);
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-2xl border border-slate-200 hover:border-brand-400 hover:bg-slate-50 transition text-left cursor-pointer"
+                    >
+                      <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${option.color}`}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 24 }}>{option.icon}</span>
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-bold text-slate-800">{option.title}</span>
+                        <span className="block text-xs text-slate-500">{option.desc}</span>
+                      </span>
+                      <span className="material-symbols-outlined text-slate-400" style={{ fontSize: 20 }}>chevron_right</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                detail.paymentStatus !== "PENDING" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePaymentTab(null);
+                      setQrData(null);
+                      setQrError("");
+                      setPaymentNotice("");
+                    }}
+                    className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-3 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
+                    Chọn hình thức khác
+                  </button>
+                ) : null
+              )}
 
-              {qrError && activePaymentTab !== "VIETQR" && <p role="alert" className="text-xs text-rose-600 mb-3">{qrError}</p>}
+              {qrError && activePaymentTab === "COD" && <p role="alert" className="text-xs text-rose-600 mb-3">{qrError}</p>}
               {paymentNotice && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl mb-3 flex items-center gap-1.5 font-medium">
                   <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
@@ -1579,7 +1521,6 @@ export function HistoryDetail() {
                 </div>
               )}
 
-              {/* Tab Content 1: VietQR */}
               {activePaymentTab === "VIETQR" && (
                 <div className="text-center space-y-3">
                   <p className="text-xs text-slate-500">Quét mã QR bằng ứng dụng ngân hàng để chuyển khoản tự động</p>
@@ -1623,12 +1564,46 @@ export function HistoryDetail() {
                           <span className="font-bold text-amber-700 font-mono">{qrData.payment?.payment_code || "HSREPAIR"}</span>
                         </div>
                       </div>
+
+                      <div className="space-y-2 pt-2">
+                        {detail.paymentStatus === "PENDING" ? (
+                          <div className="w-full py-2.5 bg-amber-100/90 border border-amber-200 text-amber-900 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-2xs">
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>hourglass_top</span>
+                            Đang chờ KTV xác nhận...
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isSubmittingPayment}
+                            onClick={async () => {
+                              setIsSubmittingPayment(true);
+                              setQrError("");
+                              try {
+                                const { fetchApi } = await import("@/lib/api-client");
+                                await fetchApi(`/payments/repair/${detail.id}/customer-submit`, {
+                                  method: "POST",
+                                  body: JSON.stringify({ payment_method: "BANK_TRANSFER" }),
+                                });
+                                setDetail((prev) => prev ? { ...prev, paymentStatus: "PENDING", paymentMethod: "BANK_TRANSFER" } : null);
+                                setShowQrModal(false);
+                              } catch (err: any) {
+                                setQrError(err.message || "Không thể gửi xác nhận.");
+                              } finally {
+                                setIsSubmittingPayment(false);
+                              }
+                            }}
+                            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
+                            {isSubmittingPayment ? "Đang xử lý..." : "Tôi đã chuyển khoản"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ) : null}
                 </div>
               )}
 
-              {/* Tab Content 2: COD */}
               {activePaymentTab === "COD" && (
                 <div className="space-y-3.5 text-center py-2">
                   <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
@@ -1640,92 +1615,41 @@ export function HistoryDetail() {
                       Khách hàng sẽ thanh toán trực tiếp số tiền <strong className="text-slate-900">{formatCurrency(detail.total)}</strong> cho Kỹ Thuật Viên sau khi dịch vụ hoàn thành và nghiệm thu.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!qrData || qrError) return;
-                      setDetail((prev) => prev ? { ...prev, paymentMethod: "CASH" } : null);
-                      setPaymentNotice("Đã chọn thanh toán Tiền mặt (COD) cho KTV.");
-                      setTimeout(() => setPaymentNotice(""), 3000);
-                    }}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
-                  >
-                    Xác nhận chọn Tiền mặt (COD)
-                  </button>
-                </div>
-              )}
 
-              {/* Tab Content 3: MOMO / ATM SANDBOX */}
-              {activePaymentTab === "MOMO_ATM" && (
-                <div className="space-y-3 text-center py-1">
-                  <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto text-pink-600">
-                    <span className="material-symbols-outlined" style={{ fontSize: 28 }}>credit_card</span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-sm">Thanh toán qua MoMo</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Thanh toán bằng thẻ ATM qua cổng MoMo, sau đó kiểm tra kết quả giao dịch.
-                    </p>
-                  </div>
-
-                  {isQrLoading ? (
-                    <div style={{ padding: "24px 0" }}>
-                      <div className="rh-loading-spinner" style={{ margin: "0 auto 10px auto" }} />
-                      <p style={{ fontSize: 13, color: "#64748B" }}>Đang kết nối MoMo...</p>
-                    </div>
-                  ) : (
-                    <>
-                      {momoData?.qr_code_url && (
-                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
-                          <img
-                            src={momoData.qr_code_url}
-                            alt="MoMo ATM Payment Code"
-                            width={160}
-                            height={160}
-                            style={{ borderRadius: 12, border: "2px solid #EC4899" }}
-                          />
+                    <div className="space-y-2 pt-1">
+                      {detail.paymentStatus === "PENDING" ? (
+                        <div className="w-full py-2.5 bg-amber-100/90 border border-amber-200 text-amber-900 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-2xs">
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>hourglass_top</span>
+                          Đang chờ KTV xác nhận...
                         </div>
-                      )}
-
-                      {momoData?.pay_url && (
-                        <a
-                          href={momoData.pay_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
-                          Mở cổng thanh toán MoMo
-                        </a>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setQrError("");
-                          try {
-                            const { fetchApi } = await import("@/lib/api-client");
-                            const result = await fetchApi<{ success: boolean; payment_status: string; message?: string }>(`/payments/repair/${detail.id}/momo-confirm`, { method: "POST" });
-                            if (!result.success || result.payment_status !== "PAID") {
-                              setQrError(result.message || "Chưa ghi nhận thanh toán thành công.");
-                              if (result.payment_status === "FAILED") {
-                                setDetail((previous) => previous ? { ...previous, paymentStatus: "FAILED" } : null);
-                              }
-                              return;
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isSubmittingPayment}
+                          onClick={async () => {
+                            setIsSubmittingPayment(true);
+                            setQrError("");
+                            try {
+                              const { fetchApi } = await import("@/lib/api-client");
+                              await fetchApi(`/payments/repair/${detail.id}/customer-submit`, {
+                                method: "POST",
+                                body: JSON.stringify({ payment_method: "CASH" }),
+                              });
+                              setDetail((prev) => prev ? { ...prev, paymentStatus: "PENDING", paymentMethod: "CASH" } : null);
+                              setShowQrModal(false);
+                            } catch (err: any) {
+                              setQrError(err.message || "Không thể gửi xác nhận.");
+                            } finally {
+                              setIsSubmittingPayment(false);
                             }
-                            setDetail((prev) => prev ? { ...prev, paymentStatus: "PAID", paymentMethod: "MoMo" } : null);
-                            setPaymentNotice("Thanh toán MoMo thành công!");
-                            setTimeout(() => setPaymentNotice(""), 3000);
-                          } catch (err: any) {
-                            setQrError(err.message || "Xác nhận thất bại");
-                          }
-                        }}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
-                      >
-                        Kiểm tra kết quả thanh toán
-                      </button>
-                    </>
-                  )}
+                          }}
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>payments</span>
+                          {isSubmittingPayment ? "Đang xử lý..." : "Tôi đã trả tiền mặt cho KTV"}
+                        </button>
+                      )}
+                    </div>
                 </div>
               )}
 
@@ -1755,7 +1679,6 @@ export function HistoryDetail() {
           </div>
         )}
 
-        {/* Modal từ chối báo giá / chi phí phát sinh */}
         {isRejectModalOpen && (
           <div
             style={{
@@ -1805,7 +1728,6 @@ export function HistoryDetail() {
                   : "Bạn có chắc chắn muốn từ chối bảng báo giá này? Vui lòng chọn lý do:"}
               </p>
 
-              {/* Danh sách lý do từ chối */}
               <div className="space-y-2 text-xs">
                 {[
                   { value: "Không đồng ý", label: detail.isSupplementaryQuote ? "Không đồng ý với chi phí phát sinh này" : "Không đồng ý với báo giá này" },

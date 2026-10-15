@@ -88,3 +88,42 @@ def get_valid_otp(phone: str, now: str):
 def mark_otp_used(otp_id: str, used_at: str):
     response = supabase.table("otps").update({"is_used": True, "used_at": used_at}).eq("id", otp_id).execute()
     return response.data[0] if response and response.data else None
+
+
+REFRESH_TOKENS_TABLE = "refresh_tokens"
+
+
+def create_refresh_token(data: dict):
+    response = supabase.table(REFRESH_TOKENS_TABLE).insert(data).execute()
+    return response.data[0] if response and response.data else None
+
+
+def get_refresh_token_by_hash(token_hash: str):
+    response = (
+        supabase.table(REFRESH_TOKENS_TABLE)
+        .select("*")
+        .eq("token_hash", token_hash)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response and response.data else None
+
+
+def revoke_refresh_token(token_id: str, revoked_at: str):
+    return (
+        supabase.table(REFRESH_TOKENS_TABLE)
+        .update({"revoked_at": revoked_at, "updated_at": revoked_at})
+        .eq("id", token_id)
+        .is_("revoked_at", "null")
+        .execute()
+    )
+
+
+def revoke_all_user_refresh_tokens(user_id: str, revoked_at: str):
+    return (
+        supabase.table(REFRESH_TOKENS_TABLE)
+        .update({"revoked_at": revoked_at, "updated_at": revoked_at})
+        .eq("user_id", user_id)
+        .is_("revoked_at", "null")
+        .execute()
+    )

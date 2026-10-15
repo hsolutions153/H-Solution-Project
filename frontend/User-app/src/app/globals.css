@@ -48,7 +48,6 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* User's custom colors */
   --color-inverse-surface: var(--inverse-surface);
   --color-on-tertiary-fixed: var(--on-tertiary-fixed);
   --color-tertiary-container: var(--tertiary-container);
@@ -94,7 +93,6 @@
   --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
   --color-surface-variant: var(--surface-variant);
 
-  /* User's custom spacing */
   --spacing-xs: var(--spacing-xs);
   --spacing-margin-desktop: var(--spacing-margin-desktop);
   --spacing-sm: var(--spacing-sm);
@@ -137,7 +135,6 @@
   --sidebar-border: #c1c6d5;
   --sidebar-ring: #2479ad;
 
-  /* Custom palette values */
   --inverse-surface: #2f3133;
   --on-tertiary-fixed: #131d24;
   --tertiary-container: #5f6972;
@@ -237,7 +234,6 @@
   }
 }
 
-/* Custom Text utilities from user theme */
 @utility text-headline-md {
   font-size: 20px;
   line-height: 28px;
@@ -281,12 +277,10 @@
   font-weight: 700;
 }
 
-/* Material Symbols configuration helper */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Responsive layout rules for login & register pages to prevent scrolling */
 .responsive-illustration {
   display: block;
 }
@@ -353,7 +347,6 @@
   }
 }
 
-/* Responsive padding and icon positioning for grid inputs on small screens */
 .responsive-input {
   padding-left: 40px !important;
   padding-right: 12px !important;
@@ -377,13 +370,6 @@
   font-size: 18px !important;
 }
 
-
-
-/* ── Mobile app frame ──
-   The whole app renders inside a phone-width frame. It is the query container
-   for width-based rules, and the containing block for
-   fixed-position UI (bottom nav, FABs, modals), so tablets and desktops show
-   exactly the phone layout, centered. */
 html,
 body {
   height: 100%;

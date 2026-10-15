@@ -68,7 +68,6 @@ export const EditCustomerModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
@@ -90,7 +89,6 @@ export const EditCustomerModal = ({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
@@ -98,9 +96,8 @@ export const EditCustomerModal = ({
             </div>
           )}
 
-          {/* Mã khách hàng - Không cho phép chỉnh sửa */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase mb-1.5">
               <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span>Mã khách hàng (Cố định)</span>
             </label>
@@ -116,7 +113,6 @@ export const EditCustomerModal = ({
             </p>
           </div>
 
-          {/* Họ và tên */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
               Họ và tên <span className="text-rose-500">*</span>
@@ -131,9 +127,8 @@ export const EditCustomerModal = ({
             />
           </div>
 
-          {/* Số điện thoại */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Phone className="w-4 h-4 text-brand-700" />
               Số điện thoại
             </label>
@@ -146,9 +141,8 @@ export const EditCustomerModal = ({
             />
           </div>
 
-          {/* Email */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <Mail className="w-4 h-4 text-brand-700" />
               Email <span className="text-rose-500">*</span>
             </label>
@@ -162,9 +156,8 @@ export const EditCustomerModal = ({
             />
           </div>
 
-          {/* Địa chỉ */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-1.5">
               <MapPin className="w-4 h-4 text-brand-700" />
               Địa chỉ
             </label>
@@ -177,7 +170,6 @@ export const EditCustomerModal = ({
             />
           </div>
 
-          {/* Footer buttons */}
           <div className="pt-2 flex justify-end gap-3 border-t border-slate-100">
             <button
               type="button"

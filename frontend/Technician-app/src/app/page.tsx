@@ -76,7 +76,6 @@ export default function HomePage() {
       >
         
         {(activeTab === "home" || activeTab === "tasks") && (
-          // Keyed by tab so switching remounts it; the task flow restores itself from sessionStorage.
           <TaskListScreen
             key={activeTab}
             view={activeTab as "home" | "tasks"}
@@ -85,11 +84,9 @@ export default function HomePage() {
           />
         )}
 
-        
         {activeTab === "schedule" && (
           <ScheduleScreen
             onOpenTask={(task) => {
-              // TaskListScreen restores this view when the Tasks tab mounts.
               sessionStorage.setItem("selectedTask", JSON.stringify(task));
               sessionStorage.setItem("currentView", "detail");
               setActiveTab("tasks");

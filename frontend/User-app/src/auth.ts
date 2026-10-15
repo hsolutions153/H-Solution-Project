@@ -95,7 +95,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         ) {
           return;
         }
-        console.error(error);
+        console.error("Lỗi xác thực NextAuth:", error);
       },
     },
     providers,
@@ -111,7 +111,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         if (account?.provider === "google") {
           if (!account.id_token) throw new Error("Thiếu thông tin xác minh Google.");
           try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
             const res = await fetch(`${apiUrl}/auth/google`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -122,6 +122,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             if (res.ok) {
               const data = await res.json();
               token.accessToken = data.access_token;
+              token.refreshToken = data.refresh_token;
               token.backendUser = data.user;
               token.isNewUser = data.is_new_user;
               token.isProfileComplete = data.is_profile_complete;
@@ -129,7 +130,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
               throw new Error("Không thể xác minh tài khoản Google.");
             }
           } catch (err) {
-            console.error("Backend auth/google call failed:", err);
+            console.error("Lỗi gọi API đăng nhập Google backend:", err);
             throw new Error("Không thể hoàn tất đăng nhập Google.");
           }
         }
@@ -138,6 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       async session({ session, token }) {
         if (token?.accessToken) {
           (session as any).accessToken = token.accessToken;
+          (session as any).refreshToken = token.refreshToken;
           (session as any).backendUser = token.backendUser;
           (session as any).isNewUser = token.isNewUser;
           (session as any).isProfileComplete = token.isProfileComplete;

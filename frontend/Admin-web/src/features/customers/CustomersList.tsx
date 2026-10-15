@@ -58,8 +58,6 @@ export const CustomersList = () => {
   const [selectedCustomerForDevices, setSelectedCustomerForDevices] = useState<CustomerItem | null>(null);
   const [customerDevices, setCustomerDevices] = useState<CustomerDeviceItem[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  
-  // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -72,7 +70,7 @@ export const CustomersList = () => {
       const list = Array.isArray(res) ? res : res?.items ?? [];
       setCustomers(list);
     } catch (err: unknown) {
-      console.warn("Error fetching customers:", err);
+      console.warn("Lỗi tải danh sách khách hàng:", err);
     } finally {
       setLoading(false);
     }
@@ -108,7 +106,7 @@ export const CustomersList = () => {
         }
       })
       .catch((err: unknown) => {
-        console.warn("Failed to load customer devices:", err);
+        console.warn("Lỗi tải thiết bị của khách hàng:", err);
       })
       .finally(() => {
         if (!ignore) {
@@ -143,7 +141,7 @@ export const CustomersList = () => {
       );
       fetchCustomers();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái");
+      handleShowToast(err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái");
     } finally {
       setTogglingId(null);
     }
@@ -168,7 +166,7 @@ export const CustomersList = () => {
   return (
     <div className="p-6 space-y-6">
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-70 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
@@ -280,7 +278,6 @@ export const CustomersList = () => {
                       </button>
                     </td>
 
-                    {/* Trạng thái tài khoản (Thanh công tắc bật/tắt) */}
                     <td className="py-3.5 px-4">
                       <button
                         type="button"
@@ -295,7 +292,6 @@ export const CustomersList = () => {
                             : "Nhấp để kích hoạt tài khoản khách hàng này"
                         }
                       >
-                        {/* Thanh trượt toggle */}
                         <span
                           className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out border-2 border-transparent ${
                             c.is_active !== false ? "bg-emerald-500" : "bg-slate-300"
@@ -307,7 +303,6 @@ export const CustomersList = () => {
                             }`}
                           />
                         </span>
-                        {/* Nhãn chữ trạng thái */}
                         <span
                           className={`text-xs font-bold transition-colors ${
                             c.is_active !== false ? "text-emerald-700" : "text-slate-400"
@@ -322,10 +317,8 @@ export const CustomersList = () => {
                       </button>
                     </td>
 
-                    {/* Cột Chức năng: Xem, Sửa, Xóa */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center justify-center gap-1.5">
-                        {/* Nút Xem chi tiết (bảng 2 cột tên trường & giá trị) */}
                         <button
                           type="button"
                           onClick={() => setViewingCustomer(c)}
@@ -336,7 +329,6 @@ export const CustomersList = () => {
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {/* Nút Sửa thông tin (không đổi được mã KH) */}
                         <button
                           type="button"
                           onClick={() => setEditingCustomer(c)}
@@ -347,7 +339,6 @@ export const CustomersList = () => {
                           <Pencil className="w-4 h-4" />
                         </button>
 
-                        {/* Nút Xóa khách hàng (popup xác nhận) */}
                         <button
                           type="button"
                           onClick={() => setDeletingCustomer(c)}
@@ -366,7 +357,6 @@ export const CustomersList = () => {
           </table>
         </div>
 
-        {/* Gắn Component Pagination ngay sau thẻ đóng của bảng (hoặc trong khung chứa bảng) */}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -462,7 +452,6 @@ export const CustomersList = () => {
         </div>
       )}
 
-      {/* Modal Xem chi tiết khách hàng (Bảng 2 cột: Tên trường và Giá trị) */}
       {viewingCustomer && (
         <ViewCustomerModal
           customer={viewingCustomer}
@@ -470,7 +459,6 @@ export const CustomersList = () => {
         />
       )}
 
-      {/* Modal Sửa khách hàng (Hiển thị lại thông tin, không sửa được mã KH) */}
       {editingCustomer && (
         <EditCustomerModal
           customer={editingCustomer}
@@ -482,7 +470,6 @@ export const CustomersList = () => {
         />
       )}
 
-      {/* Popup Xác nhận Xóa khách hàng */}
       {deletingCustomer && (
         <DeleteCustomerModal
           customer={deletingCustomer}

@@ -48,7 +48,7 @@ export const TechniciansList = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("MONTH");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // View Mode: 'table' (dạng bảng) hoặc 'grid' (dạng lưới)
+  // Chế độ xem: bảng hoặc lưới
   const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("admin_technicians_view_mode");
@@ -57,23 +57,23 @@ export const TechniciansList = () => {
     return "table";
   });
 
-  // Phân trang cho Dạng Bảng (10 bản ghi 1 trang)
+  // Phân trang danh sách kỹ thuật viên
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Modals Quản lý KTV ở Dạng Bảng
+  // Modal quản lý kỹ thuật viên
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingTech, setViewingTech] = useState<Technician | null>(null);
   const [editingTech, setEditingTech] = useState<Technician | null>(null);
   const [deletingTech, setDeletingTech] = useState<Technician | null>(null);
   const [togglingOnlineId, setTogglingOnlineId] = useState<string | null>(null);
 
-  // KYC Review Modal State
+  // Trạng thái modal duyệt KYC
   const [selectedKycTech, setSelectedKycTech] = useState<Technician | null>(null);
   const [kycLoading, setKycLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Stats Detail Modal State (Dạng lưới)
+  // Trạng thái modal chi tiết thống kê kỹ thuật viên
   const [detailStatsTech, setDetailStatsTech] = useState<(Technician & { stats: NonNullable<Technician["stats"]> }) | null>(null);
 
   const now = new Date();
@@ -113,7 +113,7 @@ export const TechniciansList = () => {
       setTechnicians(techList);
       setAllOrders(ordersList);
     } catch (err: unknown) {
-      console.warn("Error fetching data:", err);
+      console.warn("Lỗi tải danh sách kỹ thuật viên và đơn hàng:", err);
     } finally {
       setLoading(false);
     }
@@ -147,7 +147,7 @@ export const TechniciansList = () => {
       );
       fetchTechniciansAndOrders();
     } catch (err: unknown) {
-      alert(errorMessage(err, "Lỗi khi cập nhật trạng thái"));
+      handleShowToast(errorMessage(err, "Lỗi khi cập nhật trạng thái"));
     } finally {
       setTogglingOnlineId(null);
     }
@@ -175,7 +175,7 @@ export const TechniciansList = () => {
       setRejectionReason("");
       fetchTechniciansAndOrders();
     } catch (err: unknown) {
-      alert(errorMessage(err, "Lỗi khi duyệt KYC"));
+      handleShowToast(errorMessage(err, "Lỗi khi duyệt KYC"));
     } finally {
       setKycLoading(false);
     }
@@ -355,15 +355,13 @@ export const TechniciansList = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 right-6 z-70 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl border border-brand-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="text-sm font-bold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Header & Thanh trượt Dạng Bảng / Dạng Lưới */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -377,7 +375,6 @@ export const TechniciansList = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Thanh trượt hiển thị Dạng Bảng / Dạng Lưới */}
           <div className="relative flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 select-none">
             <div
               className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-xs transition-all duration-200 ease-out pointer-events-none ${
@@ -418,7 +415,6 @@ export const TechniciansList = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
 
-          {/* Nút Thêm KTV mới (ở chế độ Dạng bảng) */}
           {viewMode === "table" && (
             <button
               onClick={() => setShowCreateModal(true)}
@@ -431,14 +427,10 @@ export const TechniciansList = () => {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 1. CHẾ ĐỘ DẠNG BẢNG (TABLE VIEW - QUẢN LÝ THÔNG TIN KỸ THUẬT VIÊN)       */}
-      {/* ========================================================================= */}
       {viewMode === "table" ? (
         <div className="space-y-6">
-          {/* Search & Filter Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-            <div className="relative flex-1 min-w-[260px]">
+            <div className="relative flex-1 min-w-65">
               <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
               <input
                 type="text"
@@ -495,7 +487,6 @@ export const TechniciansList = () => {
             </div>
           </div>
 
-          {/* Table Container */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -537,12 +528,10 @@ export const TechniciansList = () => {
 
                       return (
                         <tr key={techId} className="hover:bg-slate-50/80 transition group">
-                          {/* Mã KTV */}
                           <td className="py-3.5 px-4 font-mono text-xs text-slate-500 font-bold">
                             {techId}
                           </td>
 
-                          {/* Kỹ thuật viên (Avatar, Tên, Liên hệ) */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-brand-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
@@ -570,8 +559,7 @@ export const TechniciansList = () => {
                             </div>
                           </td>
 
-                          {/* Chuyên môn & Kinh nghiệm */}
-                          <td className="py-3.5 px-4 max-w-[220px]">
+                          <td className="py-3.5 px-4 max-w-55">
                             <div className="font-semibold text-slate-800 text-xs truncate">
                               {tech.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}
                             </div>
@@ -587,7 +575,6 @@ export const TechniciansList = () => {
                             </div>
                           </td>
 
-                          {/* Trạng thái hoạt động (Công tắc Toggle Switch) */}
                           <td className="py-3.5 px-4">
                             <button
                               type="button"
@@ -627,7 +614,6 @@ export const TechniciansList = () => {
                             </button>
                           </td>
 
-                          {/* Xác thực KYC */}
                           <td className="py-3.5 px-4">
                             {tech.kyc_status === "APPROVED" ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
@@ -649,7 +635,6 @@ export const TechniciansList = () => {
                             )}
                           </td>
 
-                          {/* Đánh giá & Đơn làm */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1 text-xs font-bold text-amber-600">
                               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -660,10 +645,8 @@ export const TechniciansList = () => {
                             </div>
                           </td>
 
-                          {/* Chức năng: Xem, Sửa, Xóa */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center justify-center gap-1.5">
-                              {/* Xem */}
                               <button
                                 type="button"
                                 onClick={() => setViewingTech(tech)}
@@ -674,7 +657,6 @@ export const TechniciansList = () => {
                                 <Eye className="w-4 h-4" />
                               </button>
 
-                              {/* Sửa */}
                               <button
                                 type="button"
                                 onClick={() => setEditingTech(tech)}
@@ -685,7 +667,6 @@ export const TechniciansList = () => {
                                 <Pencil className="w-4 h-4" />
                               </button>
 
-                              {/* Xóa */}
                               <button
                                 type="button"
                                 onClick={() => setDeletingTech(tech)}
@@ -705,7 +686,6 @@ export const TechniciansList = () => {
               </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -722,11 +702,7 @@ export const TechniciansList = () => {
           </div>
         </div>
       ) : (
-        /* ========================================================================= */
-        /* 2. CHẾ ĐỘ DẠNG LƯỚI (GRID VIEW - BẢNG TỔNG HỢP DOANH THU & THẺ KTV)       */
-        /* ========================================================================= */
         <div className="space-y-6">
-          {/* TOP KPI CARDS: TỔNG HỢP THEO NGÀY / THÁNG / NĂM */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -743,7 +719,6 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              {/* Mốc thời gian Tabs */}
               <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
                 <button
                   onClick={() => setTimeRange("TODAY")}
@@ -792,9 +767,8 @@ export const TechniciansList = () => {
               </div>
             </div>
 
-            {/* 4 Cards Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-50/80 to-brand-50/40 border border-brand-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-linear-to-br from-brand-50/80 to-brand-50/40 border border-brand-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
                   <DollarSign className="w-6 h-6" />
                 </div>
@@ -816,7 +790,7 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-brand-50/40 border border-emerald-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-linear-to-br from-emerald-50/80 to-brand-50/40 border border-emerald-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
                   <Wrench className="w-6 h-6" />
                 </div>
@@ -830,7 +804,7 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-50/80 to-pink-50/40 border border-brand-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-linear-to-br from-brand-50/80 to-pink-50/40 border border-brand-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
                   <Activity className="w-6 h-6" />
                 </div>
@@ -844,7 +818,7 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-amber-50/40 border border-amber-100 flex items-center gap-3.5">
+              <div className="p-4 rounded-2xl bg-linear-to-br from-amber-50/80 to-amber-50/40 border border-amber-100 flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
                   <Star className="w-6 h-6 fill-white" />
                 </div>
@@ -860,9 +834,8 @@ export const TechniciansList = () => {
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-            <div className="relative flex-1 min-w-[260px]">
+            <div className="relative flex-1 min-w-65">
               <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
               <input
                 type="text"
@@ -919,7 +892,6 @@ export const TechniciansList = () => {
             </div>
           </div>
 
-          {/* Grid Cards for each Technician */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {loading ? (
               <div className="col-span-full py-16 text-center text-slate-400">
@@ -954,7 +926,6 @@ export const TechniciansList = () => {
                     className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-brand-200 transition group"
                   >
                     <div>
-                      {/* Top Badge */}
                       <div className="flex items-center justify-between mb-3.5">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
@@ -965,7 +936,7 @@ export const TechniciansList = () => {
                         >
                           <span
                             className={`w-2 h-2 rounded-full ${
-                              tech.is_online ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                              tech.is_online ? "bg-emerald-500" : "bg-slate-400"
                             }`}
                           />
                           {tech.is_online ? "Sẵn sàng nhận đơn" : "Đang ngoại tuyến"}
@@ -984,7 +955,6 @@ export const TechniciansList = () => {
                         </span>
                       </div>
 
-                      {/* Info & Avatar */}
                       <div className="flex items-center gap-3.5 mb-4">
                         <div className="w-12 h-12 rounded-2xl bg-brand-900 text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm">
                           {name.charAt(0).toUpperCase()}
@@ -1000,11 +970,10 @@ export const TechniciansList = () => {
                         </div>
                       </div>
 
-                      {/* Chi tiết chuyên môn */}
                       <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3 mb-4">
                         <div className="flex justify-between text-slate-600">
                           <span className="text-slate-400">Chuyên môn:</span>
-                          <span className="font-semibold text-slate-800 text-right max-w-[190px] truncate">
+                          <span className="font-semibold text-slate-800 text-right max-w-47.5 truncate">
                             {tech.specialization || "Kỹ thuật viên Sửa chữa H-Solution"}
                           </span>
                         </div>
@@ -1023,7 +992,6 @@ export const TechniciansList = () => {
                         </div>
                       </div>
 
-                      {/* Doanh số & Năng suất (Dạng thẻ KPI) */}
                       <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 mb-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold uppercase text-slate-500">
@@ -1066,7 +1034,6 @@ export const TechniciansList = () => {
                       </div>
                     </div>
 
-                    {/* Actions */}
                     <div className="pt-2 flex items-center gap-2">
                       {!isApproved && (
                         <button
@@ -1094,9 +1061,6 @@ export const TechniciansList = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 3. MODALS CHỨC NĂNG DẠNG BẢNG: THÊM, XEM, SỬA, XÓA                        */}
-      {/* ========================================================================= */}
       {showCreateModal && (
         <CreateTechnicianModal
           onClose={() => setShowCreateModal(false)}
@@ -1136,10 +1100,6 @@ export const TechniciansList = () => {
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* 4. MODALS PHỤ CỦA GRID VIEW: BÁO CÁO CHI TIẾT & DUYỆT KYC                 */}
-      {/* ========================================================================= */}
-      {/* Detail Stats Modal */}
       {detailStatsTech && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
@@ -1161,7 +1121,6 @@ export const TechniciansList = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* 3 Chu kỳ so sánh */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-center">
                   <span className="text-[11px] font-bold text-slate-400 uppercase block">
@@ -1200,7 +1159,6 @@ export const TechniciansList = () => {
                 </div>
               </div>
 
-              {/* Lịch sử đơn hàng gần nhất */}
               <div>
                 <h4 className="text-xs font-bold uppercase text-slate-500 mb-2 tracking-wider">
                   Đơn hàng gần đây ({detailStatsTech.stats.orderList.length})
@@ -1251,7 +1209,6 @@ export const TechniciansList = () => {
         </div>
       )}
 
-      {/* KYC Review Modal */}
       {selectedKycTech && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">

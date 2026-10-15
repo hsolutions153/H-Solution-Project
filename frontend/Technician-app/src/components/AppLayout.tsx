@@ -37,7 +37,7 @@ export const AppLayout = ({
       </div>
 
       
-      <div id="fab-container" className="absolute bottom-[5.5rem] right-4 z-30 pointer-events-auto" />
+      <div id="fab-container" className="absolute bottom-22 right-4 z-30 pointer-events-auto" />
 
       
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />

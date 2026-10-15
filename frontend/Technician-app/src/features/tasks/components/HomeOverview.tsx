@@ -35,7 +35,6 @@ function greeting(hour: number) {
   return "Chào buổi tối";
 }
 
-/** Vietnamese names put the given name last: "Hoàng Đức Kiên" -> "Kiên". */
 const givenName = (fullName: string) => fullName.trim().split(/\s+/).pop() ?? fullName;
 
 interface HomeOverviewProps {
@@ -44,10 +43,6 @@ interface HomeOverviewProps {
   onViewAll: () => void;
 }
 
-/**
- * Technician home: greeting, key numbers and the next jobs.
- * Same layout as the User-app home (hero, 1 tall + 2 small tiles, short list).
- */
 export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps) {
   const [summary, setSummary] = useState<TechnicianSummary | null>(null);
 
@@ -77,7 +72,7 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
   const stats = useMemo(() => {
     const open = tasks.filter((t) => OPEN_STATUSES.has(t.status));
     const completed = tasks.filter((t) => t.status === "COMPLETED");
-    // New assignments first: they expire if not answered.
+    // Ưu tiên công việc mới chờ xác nhận lên đầu
     const upcoming = [...open].sort(
       (a, b) => Number(b.status === "WAITING_ACCEPT") - Number(a.status === "WAITING_ACCEPT"),
     );
@@ -124,7 +119,7 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
         <button
           type="button"
           onClick={onViewAll}
-          className="row-span-2 flex min-h-[200px] flex-col justify-between rounded-card bg-brand-600 p-4 text-left text-white shadow-card transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98] cursor-pointer"
+          className="row-span-2 flex min-h-50 flex-col justify-between rounded-card bg-brand-600 p-4 text-left text-white shadow-card transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98] cursor-pointer"
         >
           <span className="flex size-10 items-center justify-center rounded-control bg-white/15">
             <ClipboardList className="size-5" />

@@ -2,6 +2,7 @@
 @import "@h-mobility/ui/tokens.css";
 @source "../../../shared/src";
 
+
 * {
   box-sizing: border-box;
 }
@@ -15,7 +16,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

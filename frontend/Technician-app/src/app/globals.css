@@ -10,19 +10,13 @@ body {
 .scroll-area {
   overflow-y: auto;
 
-  /* Firefox */
   scrollbar-width: none;
 }
 
-/* Chrome, Edge, Safari */
 .scroll-area::-webkit-scrollbar {
   display: none;
 }
 
-/* ── Mobile app frame ──
-   The whole app renders inside a phone-width frame that is also the containing
-   block for fixed-position UI (modals), so tablets and desktops show exactly
-   the phone layout, centered. */
 html,
 body {
   height: 100%;
@@ -55,9 +49,6 @@ body {
   }
 }
 
-/* ── Overlay transitions ──
-   Only used to show that a dialog or sheet opened. tokens.css collapses them
-   under prefers-reduced-motion. */
 @keyframes overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
