@@ -34,7 +34,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 ALLOWED_COOKIE_ROLES = {"admin", "technician", "customer"}
 COOKIE_SECURE = os.getenv("APP_ENV", "development").lower() == "production"
 COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "lax").lower()
-REFRESH_COOKIE_PATH = "/auth"
+# API được mount tại /api/v1, nên cookie phải có Path khớp URL thực tế
+# (/api/v1/auth/login, /api/v1/auth/refresh và /api/v1/auth/logout).
+REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 
 def _cookie_name(role: str) -> str:

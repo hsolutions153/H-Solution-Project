@@ -7,7 +7,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlencode
+from urllib.parse import quote
 
 import logging
 import requests
@@ -21,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 PAYMENT_CODE_PREFIX = os.getenv('PAYMENT_CODE_PREFIX') or 'HS'
 SEPAY_BANK_ACCOUNT = os.getenv('SEPAY_BANK_ACCOUNT')
-SEPAY_BANK_NAME = os.getenv('SEPAY_BANK_NAME')
-SEPAY_BANK_ACCOUNT_NAME = os.getenv('SEPAY_BANK_ACCOUNT_NAME', '')
 SEPAY_API_KEY = os.getenv('SEPAY_API_KEY')
-SEPAY_QR_BASE_URL = 'https://qr.sepay.vn/img'
 MOMO_FINAL_FAILURE_CODES = {98, 99, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1017, 1026, 4001, 4002, 4100}
 
 
@@ -90,10 +87,6 @@ def _metadata(payment: dict) -> dict:
         return {}
 
 
-def build_qr_url(payment_code: str, amount: int) -> str:
-    return f'{SEPAY_QR_BASE_URL}?{urlencode({"acc": SEPAY_BANK_ACCOUNT, "bank": SEPAY_BANK_NAME, "amount": amount, "des": payment_code, "template": "compact"})}'
-
-
 def _ensure_payment(repair: dict, current_user: dict, method: str) -> dict:
     amount = _final_amount(repair)
     payment = repository.get_payment_by_repair_id(repair['id'])
@@ -148,25 +141,54 @@ def _settle(payment: dict, transaction_code: str, changed_by: str | None = None)
         'old_status': payment['payment_status'], 'new_status': 'PAID',
         'amount': str(payment['amount']), 'transaction_code': transaction_code, 'changed_by': changed_by,
     })
-    # Payment never changes the repair status or the final cost.
+    # Thanh toán không thay đổi trạng thái hoặc chi phí cuối của đơn sửa chữa
     return updated
 
 
 def fetch_qr(repair_id: str, current_user: dict, payment_method: str = 'BANK_TRANSFER'):
+    from app.technicians.repository import get_bank_account
+
     repair = _authorize_repair(repair_id, current_user)
     method = 'CASH' if payment_method == 'COD' else payment_method
     if method not in {'CASH', 'BANK_TRANSFER'}:
         raise AppException(ErrorCode.VALIDATION_ERROR, message='Phương thức thanh toán không hợp lệ.')
     amount = _final_amount(repair)
-    if amount > 0 and method == 'BANK_TRANSFER' and not (SEPAY_BANK_ACCOUNT and SEPAY_BANK_NAME):
-        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message='Thanh toán chuyển khoản chưa được cấu hình.')
+
+    # Lấy thông tin STK của kỹ thuật viên phụ trách đơn
+    tech_id = repair.get('technician_id')
+    tech_bank = get_bank_account(tech_id) if tech_id else None
+
+    if amount > 0 and method == 'BANK_TRANSFER':
+        if tech_bank and tech_bank.get('account_number'):
+            bank = (tech_bank.get('bank_name') or tech_bank.get('bank_code') or '').replace(' ', '')
+            acc = tech_bank['account_number']
+            holder = (tech_bank.get('account_holder') or '').strip().upper()
+            clean_holder = quote(holder)
+            qr_url = f"https://vietqr.app/img?bank={bank}&acc={acc}&template=qronly&amount={int(amount)}&showinfo=true&fullacc=true&holder={clean_holder}"
+            bank_account = acc
+            bank_name = tech_bank.get('bank_name') or bank
+            bank_account_name = holder
+        else:
+            raise AppException(
+                ErrorCode.SERVICE_UNAVAILABLE,
+                message='Kỹ thuật viên phụ trách chưa liên kết tài khoản ngân hàng nhận tiền.',
+            )
+    else:
+        qr_url = None
+        bank_account = None
+        bank_name = None
+        bank_account_name = None
+
     payment = _ensure_payment(repair, current_user, method)
     if amount == 0:
         payment = _settle(payment, f'FREE:{payment["id"]}', current_user['sub'])
+
     return {
         'payment': payment,
-        'qr_url': build_qr_url(payment['payment_code'], int(amount)) if amount > 0 and method == 'BANK_TRANSFER' else None,
-        'bank_account': SEPAY_BANK_ACCOUNT, 'bank_name': SEPAY_BANK_NAME, 'bank_account_name': SEPAY_BANK_ACCOUNT_NAME,
+        'qr_url': qr_url,
+        'bank_account': bank_account,
+        'bank_name': bank_name,
+        'bank_account_name': bank_account_name,
     }
 
 
@@ -323,7 +345,7 @@ def handle_sepay_webhook(payload, auth_header: str | None):
         return {'success': True}
     if payment.get('payment_method') != 'BANK_TRANSFER' or payload.transferAmount is None:
         return {'success': True}
-    # A partial transfer is acknowledged but must not settle the full invoice.
+    # Chuyển tiền một phần: ghi nhận nhưng không quyết toán
     if _amount(payload.transferAmount) < _amount(payment['amount']):
         return {'success': True}
     reference = payload.referenceCode or str(payload.id)
@@ -396,8 +418,7 @@ def create_momo_payment(repair_id: str, current_user: dict, request_type: str = 
         'ipnUrl': os.getenv('MOMO_IPN_URL') or f'{os.getenv("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")}/api/v1/payments/webhook/momo',
         'lang': 'vi', 'requestType': request_type, 'autoCapture': True, 'extraData': '',
     }
-    # Save the invoice before contacting the gateway, so a timeout does not lose
-    # its callback mapping. Retries reuse the same request for gateway idempotency.
+    # Lưu metadata trước khi gọi gateway để không mất mapping nếu timeout
     metadata = {'provider': 'MOMO', 'request_id': request_id, 'request': dict(payload)}
     pending = payment if payment.get('payment_status') == 'PENDING' and _metadata(payment).get('request') else repository.begin_momo_payment(payment['id'], {'payment_status': 'PENDING', 'note': json.dumps(metadata), 'updated_by': current_user['sub']})
     if not pending:

@@ -1,26 +1,81 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Phone, Mail, Award, CheckCircle2, Star, ShieldCheck, Wrench, Camera, LoaderCircle, UserRound } from "lucide-react";
+import {
+  Phone,
+  Mail,
+  Award,
+  CheckCircle2,
+  Star,
+  ShieldCheck,
+  Wrench,
+  Camera,
+  LoaderCircle,
+  Banknote,
+  Pencil,
+  Check,
+  UserRound,
+} from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@h-mobility/ui";
 import { InfoRow, SkeletonList } from "@/components/ui";
+import { BankSelect } from "@/components/BankSelect";
 import { uploadTechnicianAvatar } from "@/lib/avatar";
+
+interface ProfileFormState {
+  full_name: string;
+  phone: string;
+  bank_code: string;
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+}
+
+function getCurrentLocation(): Promise<GeolocationCoordinates> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Thiết bị không hỗ trợ định vị GPS."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve(position.coords),
+      () => reject(new Error("Hãy cho phép vị trí GPS để nhận việc mới.")),
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 }
+    );
+  });
+}
 
 export function TechnicianProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [presenceError, setPresenceError] = useState<string | null>(null);
   const [avatarMessage, setAvatarMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Trạng thái chỉnh sửa thông tin thợ (không cho sửa chuyên môn và kinh nghiệm)
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [form, setForm] = useState<ProfileFormState>({
+    full_name: "",
+    phone: "",
+    bank_code: "",
+    bank_name: "",
+    account_number: "",
+    account_holder: "",
+  });
+
   const fetchProfile = async () => {
+    setFetchError(null);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const me = await fetchApi<any>("/technicians/me");
       setProfile(me);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Lỗi tải thông tin cá nhân KTV:", err);
+      setFetchError(err?.message || "Không thể kết nối đến máy chủ.");
     } finally {
       setLoading(false);
     }
@@ -30,19 +85,127 @@ export function TechnicianProfileScreen() {
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    if (!profile?.is_online) return;
+
+    let cancelled = false;
+    const refreshLocation = async () => {
+      try {
+        const coordinates = await getCurrentLocation();
+        const { fetchApi } = await import("@/lib/api-client");
+        const updated = await fetchApi<any>("/technicians/me/presence", {
+          method: "PATCH",
+          body: JSON.stringify({
+            is_online: true,
+            last_latitude: coordinates.latitude,
+            last_longitude: coordinates.longitude,
+          }),
+        });
+        if (!cancelled) {
+          setProfile((prev: any) => ({ ...prev, ...updated }));
+          setPresenceError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPresenceError(err instanceof Error ? err.message : "Không thể cập nhật vị trí GPS.");
+        }
+      }
+    };
+
+    refreshLocation();
+    const interval = window.setInterval(refreshLocation, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [profile?.is_online]);
+
+  const startEditing = () => {
+    if (!profile) return;
+    const user = profile.user || {};
+    const bank = profile.bank_account || {};
+    setForm({
+      full_name: user.full_name || "",
+      phone: user.phone || "",
+      bank_code: bank.bank_code || "",
+      bank_name: bank.bank_name || "",
+      account_number: bank.account_number || "",
+      account_holder: bank.account_holder || "",
+    });
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.full_name.trim()) {
+      setEditError("Vui lòng nhập họ và tên.");
+      return;
+    }
+    if (form.account_number.trim()) {
+      if (!/^\d+$/.test(form.account_number.trim())) {
+        setEditError("Số tài khoản ngân hàng chỉ gồm chữ số.");
+        return;
+      }
+      if (!form.bank_code.trim()) {
+        setEditError("Vui lòng chọn ngân hàng thụ hưởng.");
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    setEditError(null);
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const bankAccountPayload = form.account_number.trim()
+        ? {
+            bank_code: form.bank_code.trim(),
+            bank_name: form.bank_name.trim() || form.bank_code.trim(),
+            account_number: form.account_number.trim(),
+            account_holder: (form.account_holder.trim() || form.full_name.trim()).toUpperCase(),
+          }
+        : null;
+
+      const payload = {
+        full_name: form.full_name.trim(),
+        phone: form.phone.trim() || null,
+        bank_account: bankAccountPayload,
+      };
+
+      const updated = await fetchApi<any>("/technicians/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      setProfile(updated);
+      setIsEditing(false);
+    } catch (err: any) {
+      setEditError(err?.message ?? "Không thể cập nhật thông tin.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleToggleOnline = async () => {
     if (!profile) return;
     setIsToggling(true);
+    setPresenceError(null);
     try {
       const { fetchApi } = await import("@/lib/api-client");
+      const coordinates = profile.is_online ? null : await getCurrentLocation();
       const updated = await fetchApi<any>("/technicians/me/presence", {
         method: "PATCH",
         body: JSON.stringify({
           is_online: !profile.is_online,
+          ...(coordinates
+            ? { last_latitude: coordinates.latitude, last_longitude: coordinates.longitude }
+            : {}),
         }),
       });
-      setProfile((prev: any) => ({ ...prev, is_online: updated.is_online }));
+      setProfile((prev: any) => ({ ...prev, ...updated }));
     } catch (err) {
+      setPresenceError(err instanceof Error ? err.message : "Không thể thay đổi trạng thái nhận việc.");
       console.error("Lỗi chuyển đổi trạng thái trực tuyến:", err);
     } finally {
       setIsToggling(false);
@@ -75,17 +238,18 @@ export function TechnicianProfileScreen() {
           <SkeletonList count={1} className="h-20" />
         </div>
         <SkeletonList count={1} className="h-64" />
+        <SkeletonList count={1} className="h-32" />
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-12">
         <EmptyState
-          icon={<UserRound />}
+          icon={<UserRound className="size-8 text-slate-400" />}
           title="Không tải được hồ sơ"
-          description="Kiểm tra kết nối mạng rồi thử lại."
+          description={fetchError || "Kiểm tra kết nối mạng rồi thử lại."}
           action={
             <Button
               variant="secondary"
@@ -159,6 +323,7 @@ export function TechnicianProfileScreen() {
               {profile.is_online ? "Đang hoạt động" : "Ngoại tuyến"}
             </p>
           </div>
+          {presenceError ? <p role="alert" className="mr-auto text-xs text-rose-700">{presenceError}</p> : null}
           <button
             type="button"
             role="switch"
@@ -207,26 +372,162 @@ export function TechnicianProfileScreen() {
       </div>
 
       <Card className="py-1">
-        <h3 className="pt-3 text-sm font-semibold text-ink">Thông tin chi tiết</h3>
-        <div className="divide-y divide-line">
-          <InfoRow icon={<Phone />} label="Số điện thoại">
-            <span className="tabular-nums">{user.phone || "Chưa cập nhật"}</span>
-          </InfoRow>
-          <InfoRow icon={<Mail />} label="Email">
-            <span className="break-all">{user.email || "Chưa cập nhật"}</span>
-          </InfoRow>
-          <InfoRow icon={<Wrench />} label="Kỹ năng chuyên môn">
-            {profile.skills || "Sửa chữa xe lăn & Scooter"}
-          </InfoRow>
-          <InfoRow icon={<Award />} label="Kinh nghiệm">
-            {profile.experience_years || 0} năm
-          </InfoRow>
-          <InfoRow icon={<ShieldCheck />} label="Xác thực danh tính (KYC)">
-            <Badge tone={kycApproved ? "success" : "warning"} className="mt-0.5">
-              {kycApproved ? "Đã xác thực" : profile.kyc_status || "Chưa xác thực"}
-            </Badge>
-          </InfoRow>
-        </div>
+        {isEditing ? (
+          <form onSubmit={handleSaveProfile} className="space-y-4 px-1 py-3">
+            <div className="border-b border-line pb-2.5">
+              <h3 className="text-sm font-bold text-ink">Chỉnh sửa thông tin thợ</h3>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Họ và tên <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.full_name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                  placeholder="VD: Nguyễn Văn A"
+                  className="w-full rounded-control border border-line bg-white px-3 py-2 text-xs text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Số điện thoại</label>
+                <input
+                  type="text"
+                  value={form.phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="VD: 0987654321"
+                  className="w-full rounded-control border border-line bg-white px-3 py-2 text-xs text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-line pt-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold text-ink">
+                <Banknote className="size-4 text-brand-600" />
+                <span>Tài khoản ngân hàng nhận tiền (STK)</span>
+              </div>
+
+              <div className="space-y-2.5">
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Ngân hàng thụ hưởng</label>
+                  <BankSelect
+                    valueCode={form.bank_code}
+                    valueName={form.bank_name}
+                    onChange={(code, name) => setForm((prev) => ({ ...prev, bank_code: code, bank_name: name }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Số tài khoản</label>
+                  <input
+                    type="text"
+                    value={form.account_number}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      setForm((prev) => ({ ...prev, account_number: val }));
+                    }}
+                    placeholder="Chỉ nhập số tài khoản"
+                    inputMode="numeric"
+                    className="w-full rounded-control border border-line bg-white px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Chủ tài khoản</label>
+                  <input
+                    type="text"
+                    value={form.account_holder}
+                    onChange={(e) => setForm((prev) => ({ ...prev, account_holder: e.target.value.toUpperCase() }))}
+                    placeholder="Họ tên chủ tài khoản"
+                    className="w-full rounded-control border border-line bg-white px-2.5 py-1.5 text-xs uppercase text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {editError && <p className="text-xs font-medium text-rose-600">{editError}</p>}
+
+            <div className="flex gap-2 pt-2 border-t border-line">
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex-1 gap-1.5 text-xs cursor-pointer"
+                type="submit"
+                disabled={isSaving}
+              >
+                {isSaving ? <LoaderCircle className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                {isSaving ? "Đang lưu…" : "Lưu thay đổi"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="rounded-control border border-line px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="flex items-center justify-between pt-3">
+              <h3 className="text-sm font-semibold text-ink">Thông tin chi tiết</h3>
+              <button
+                type="button"
+                onClick={startEditing}
+                className="flex items-center gap-1 rounded-control px-2.5 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 transition-colors cursor-pointer"
+              >
+                <Pencil className="size-3" />
+                <span>Chỉnh sửa</span>
+              </button>
+            </div>
+            <div className="divide-y divide-line">
+              <InfoRow icon={<Phone />} label="Số điện thoại">
+                <span className="tabular-nums">{user.phone || "Chưa cập nhật"}</span>
+              </InfoRow>
+              <InfoRow icon={<Mail />} label="Email">
+                <span className="break-all">{user.email || "Chưa cập nhật"}</span>
+              </InfoRow>
+              <InfoRow icon={<Wrench />} label="Kỹ năng chuyên môn">
+                {profile.skills === "SCOOTER"
+                  ? "Chuyên Scooter điện"
+                  : profile.skills === "WHEELCHAIR"
+                  ? "Chuyên xe hỗ trợ"
+                  : profile.skills || "Sửa chữa xe lăn & Scooter"}
+              </InfoRow>
+              <InfoRow icon={<Award />} label="Kinh nghiệm">
+                {profile.experience_years || 0} năm
+              </InfoRow>
+              <InfoRow icon={<ShieldCheck />} label="Xác thực danh tính (KYC)">
+                <Badge tone={kycApproved ? "success" : "warning"} className="mt-0.5">
+                  {kycApproved ? "Đã xác thực" : profile.kyc_status || "Chưa xác thực"}
+                </Badge>
+              </InfoRow>
+              <InfoRow icon={<Banknote />} label="Tài khoản ngân hàng (STK)">
+                {profile.bank_account?.account_number ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    <p className="font-semibold text-ink">
+                      {profile.bank_account.bank_name}{" "}
+                      <span className="text-xs font-normal text-slate-400">({profile.bank_account.bank_code})</span>
+                    </p>
+                    <p className="font-mono text-xs font-bold text-brand-700">
+                      {profile.bank_account.account_number}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">
+                      {profile.bank_account.account_holder?.toUpperCase()}
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-slate-400 font-normal">Chưa liên kết tài khoản ngân hàng</span>
+                )}
+              </InfoRow>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );

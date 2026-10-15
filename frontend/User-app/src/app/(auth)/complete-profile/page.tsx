@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -169,13 +168,9 @@ export default function CompleteProfilePage() {
     }
   }
 
-  async function handleLogout() {
+  function handleLogout() {
     removeAuthToken();
-    try {
-      await signOut({ redirectTo: "/login?logged_out=1" });
-    } catch {
-      router.replace("/login?logged_out=1");
-    }
+    router.replace("/login?logged_out=1");
   }
 
   if (loading) {

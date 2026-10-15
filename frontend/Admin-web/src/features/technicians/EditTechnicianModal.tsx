@@ -1,7 +1,7 @@
 "use client";
 import type { Technician } from "@/types/api";
 
-import { Award,Edit3,Lock,Phone,RefreshCw,Save,X } from "lucide-react";
+import { Award, CreditCard, Edit3, Lock, Phone, RefreshCw, Save, X } from "lucide-react";
 import React,{ useState } from "react";
 
 export interface EditTechnicianModalProps {
@@ -30,6 +30,10 @@ export const EditTechnicianModal = ({
   );
   const [skills, setSkills] = useState(technician.skills || "BOTH");
   const [isOnline, setIsOnline] = useState(Boolean(technician.is_online));
+  const [bankCode, setBankCode] = useState(technician.bank_account?.bank_code || "");
+  const [bankName, setBankName] = useState(technician.bank_account?.bank_name || "");
+  const [accountNumber, setAccountNumber] = useState(technician.bank_account?.account_number || "");
+  const [accountHolder, setAccountHolder] = useState(technician.bank_account?.account_holder || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,6 +49,15 @@ export const EditTechnicianModal = ({
 
     try {
       const { fetchApi } = await import("@/lib/api-client");
+      const bankAccountPayload = accountNumber.trim()
+        ? {
+            bank_code: bankCode.trim() || "MB",
+            bank_name: bankName.trim() || "MB Bank",
+            account_number: accountNumber.trim(),
+            account_holder: accountHolder.trim() || fullName.trim(),
+          }
+        : null;
+
       await fetchApi(`/technicians/${techId}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -54,6 +67,7 @@ export const EditTechnicianModal = ({
           experience_years: Number(experienceYears),
           skills: skills,
           is_online: isOnline,
+          bank_account: bankAccountPayload,
         }),
       });
 
@@ -209,6 +223,57 @@ export const EditTechnicianModal = ({
                 />
                 <span>{isOnline ? "Đang Online (Sẵn sàng nhận việc)" : "Đang Offline (Ngoại tuyến)"}</span>
               </button>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase mb-2">
+              <CreditCard className="w-4 h-4 text-brand-700" />
+              Tài khoản ngân hàng nhận tiền (STK)
+            </label>
+            <div className="grid grid-cols-2 gap-3 mb-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Mã ngân hàng</label>
+                <input
+                  type="text"
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                  placeholder="VD: MB, VCB"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tên ngân hàng</label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="VD: MB Bank, Vietcombank"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Số tài khoản</label>
+                <input
+                  type="text"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder="Chỉ gồm chữ số"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Chủ tài khoản (IN HOA)</label>
+                <input
+                  type="text"
+                  value={accountHolder}
+                  onChange={(e) => setAccountHolder(e.target.value)}
+                  placeholder="Họ tên chủ thẻ"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
+                />
+              </div>
             </div>
           </div>
 

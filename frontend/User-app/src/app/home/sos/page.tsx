@@ -6,6 +6,7 @@ import Image from "next/image";
 import { PageHeader } from "@/components/home/page-header";
 import { Badge, Card, StatusBadge, buttonClasses } from "@h-mobility/ui";
 import { Activity, Phone, RefreshCw, Star, UserRound, Wrench, XCircle } from "lucide-react";
+import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
 
 /** Header subtitle on the technician step, by request status. */
 const TECH_SUBTITLE: Record<string, string> = {
@@ -38,6 +39,9 @@ export default function SosPage() {
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
+  const [location, setLocation] = useState<CurrentLocation | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const locationLoadedRef = useRef(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState("");
   const [cameraFlash, setCameraFlash] = useState(false);
@@ -88,6 +92,29 @@ export default function SosPage() {
     return () => {
       if (dotsTimerRef.current) clearInterval(dotsTimerRef.current);
     };
+  }, [step]);
+
+  const fillCurrentLocation = async () => {
+    setIsLocating(true);
+    setFormError("");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const nextLocation = await getCurrentLocation(fetchApi);
+      setLocation(nextLocation);
+      setStreetAddress(nextLocation.address);
+      setWard(nextLocation.ward);
+      setProvince(nextLocation.province);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể lấy vị trí hiện tại.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== "LOCATION" || locationLoadedRef.current) return;
+    locationLoadedRef.current = true;
+    fillCurrentLocation();
   }, [step]);
 
   const [reassignedNotice, setReassignedNotice] = useState<string | null>(null);
@@ -372,6 +399,10 @@ export default function SosPage() {
         router.push("/login?redirect=/home/sos");
         return;
       }
+      if (!location) {
+        setFormError("Cần bật vị trí GPS để gửi yêu cầu SOS.");
+        return;
+      }
 
       let deviceId = "DEV-DEFAULT";
       try {
@@ -388,6 +419,8 @@ export default function SosPage() {
         issue_type: selectedIssue ? selectedIssue.toUpperCase() : "GENERAL",
         issue_description: problemDetails || "Yêu cầu cứu hộ khẩn cấp SOS",
         location_address: [streetAddress.trim(), ward.trim(), province.trim()].join(", "),
+        latitude: location.latitude,
+        longitude: location.longitude,
         is_sos: true,
         request_type: "EMERGENCY",
         images: [],
@@ -642,7 +675,11 @@ export default function SosPage() {
         <section className="sos-step-panel sos-location-select-panel">
           <div className="sos-location-select-card">
             <h2>Địa điểm cần hỗ trợ</h2>
-            <p>Nhập đầy đủ địa chỉ để nhân viên SOS có thể đến đúng nơi.</p>
+            <p>Địa chỉ được tự điền theo GPS. Bạn có thể chỉnh lại trước khi gửi.</p>
+
+            <button type="button" className="sos-ghost-btn" onClick={fillCurrentLocation} disabled={isLocating}>
+              {isLocating ? "Đang lấy vị trí…" : "Dùng vị trí hiện tại"}
+            </button>
 
             <div className="booking-address-form">
               <label htmlFor="sos-province">

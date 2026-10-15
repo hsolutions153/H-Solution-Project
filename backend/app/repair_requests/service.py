@@ -2,8 +2,11 @@ import secrets
 import uuid
 import logging
 import math
+import os
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +183,8 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
 _TECH_CACHE: dict[str, tuple[float, dict]] = {}
 _USER_CACHE: dict[str, tuple[float, dict]] = {}
 TECH_CACHE_TTL_SECONDS = 300
+TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 300
+EARTH_RADIUS_KM = 6371.0088
 
 
 def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
@@ -236,7 +241,7 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
 
 
 def invalidate_technician_cache(technician_id: str) -> None:
-    """Drop a technician's cached card so profile changes (e.g. a new avatar) show up immediately."""
+    # Xóa cache KTV
     _TECH_CACHE.pop(technician_id, None)
 
 
@@ -254,30 +259,66 @@ def _list(customer_id: str | None, technician_id: str | None, request_status: st
     return {"items": _attach_images_to_list(items), "total": total, "page": page, "limit": limit}
 
 
-def _find_best_sos_technician(customer_lat=None, customer_lng=None, exclude_tech_ids=None):
+def _parse_location_timestamp(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _has_fresh_technician_location(technician: dict, now: datetime | None = None) -> bool:
+    if technician.get("last_latitude") is None or technician.get("last_longitude") is None:
+        return False
+    timestamp = _parse_location_timestamp(technician.get("last_location_at"))
+    if not timestamp:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return 0 <= (now - timestamp).total_seconds() <= TECHNICIAN_LOCATION_MAX_AGE_SECONDS
+
+
+def _haversine_km(lat_a: float, lng_a: float, lat_b: float, lng_b: float) -> float:
+    lat_delta = math.radians(lat_b - lat_a)
+    lng_delta = math.radians(lng_b - lng_a)
+    a = math.sin(lat_delta / 2) ** 2 + math.cos(math.radians(lat_a)) * math.cos(math.radians(lat_b)) * math.sin(lng_delta / 2) ** 2
+    return EARTH_RADIUS_KM * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _skill_matches_device(technician: dict, device_type: str | None) -> bool:
+    if not device_type:
+        return True
+    skill = (technician.get("skills") or "BOTH").upper()
+    return skill in {"BOTH", str(device_type).upper()}
+
+
+def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type: str | None = None, exclude_tech_ids=None):
     from app.db.database import supabase
-    import math
 
     excluded = set(exclude_tech_ids or [])
 
     try:
-        resp = supabase.table("technician_profiles").select("*").eq("is_online", True).execute()
+        resp = (
+            supabase.table("technician_profiles")
+            .select("*")
+            .eq("is_online", True)
+            .eq("kyc_status", "APPROVED")
+            .execute()
+        )
         techs = resp.data if resp and resp.data else []
 
+        now = datetime.now(timezone.utc)
+        techs = [
+            technician for technician in techs
+            if technician.get("user_id") not in excluded
+            and _skill_matches_device(technician, device_type)
+            and _has_fresh_technician_location(technician, now)
+        ]
         if not techs:
-            resp = supabase.table("technician_profiles").select("*").execute()
-            techs = resp.data if resp and resp.data else []
-
-        if not techs:
+            logger.info("No eligible SOS technician: online, KYC-approved, matching skill and fresh GPS are required")
             return None
 
-        # Filter out previously rejected/assigned technician IDs
-        techs = [t for t in techs if t.get("user_id") not in excluded]
-        if not techs:
-            logger.info(f"No available technicians found excluding: {excluded}")
-            return None
-
-        # Query active jobs count per technician to prioritize IDLE (rảnh) technicians
         active_statuses = [
             "ASSIGNED", "ACCEPTED", "EN_ROUTE", "ARRIVED",
             "DIAGNOSING", "ESTIMATE_SUBMITTED", "ESTIMATE_APPROVED", "REPAIRING"
@@ -293,10 +334,6 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, exclude_tech
         except Exception as j_err:
             logger.warning(f"Failed to fetch active jobs count: {j_err}")
 
-        # Multi-tier priority sorting:
-        # Priority 1: Fewest active jobs (0 active jobs = IDLE/RẢNH = Highest priority)
-        # Priority 2: Nearest distance (if customer coordinates are available)
-        # Priority 3: Highest rating average
         c_lat = float(customer_lat) if customer_lat is not None else None
         c_lng = float(customer_lng) if customer_lng is not None else None
 
@@ -310,8 +347,8 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, exclude_tech
                 t_lng = t.get("last_longitude")
                 if t_lat is not None and t_lng is not None:
                     try:
-                        dist = math.sqrt((float(t_lat) - c_lat) ** 2 + (float(t_lng) - c_lng) ** 2)
-                    except Exception:
+                        dist = _haversine_km(c_lat, c_lng, float(t_lat), float(t_lng))
+                    except (TypeError, ValueError):
                         pass
 
             rating = t.get("rating_avg") or 0.0
@@ -327,7 +364,7 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, exclude_tech
 
 
 def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
-    """Tự động tìm và tái phân công KTV mới cho các đơn hàng ASSIGNED quá timeout_seconds (mặc định 2 phút) mà KTV chưa ACCEPTED."""
+    # Tự động điều phối KTV mới nếu đơn ASSIGNED quá thời gian chờ
     from app.db.database import supabase
     from datetime import timedelta
 
@@ -386,6 +423,7 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
             next_tech_id = _find_best_sos_technician(
                 customer_lat=req.get("latitude"),
                 customer_lng=req.get("longitude"),
+                device_type=repository.get_device_type(req.get("device_id")),
                 exclude_tech_ids=excluded_tech_ids,
             )
 
@@ -483,7 +521,8 @@ def create_request(current_user: dict, data):
         issue_type = "OTHER"
 
     device_id = payload.get("device_id")
-    if not device_id or not repository.get_device_for_customer(device_id, customer_id):
+    device = repository.get_device_for_customer(device_id, customer_id) if device_id else None
+    if not device:
         if is_admin:
             raise AppException(ErrorCode.DEVICE_ACCESS_DENIED, message="Thiết bị được chọn không thuộc khách hàng này.")
         existing_device_id = repository.get_any_device_for_customer(customer_id)
@@ -491,11 +530,12 @@ def create_request(current_user: dict, data):
             device_id = existing_device_id
         else:
             device_id = repository.create_default_device_for_customer(customer_id)
+        device = repository.get_device_for_customer(device_id, customer_id)
 
     description = payload.get("description") or payload.get("issue_description") or ""
     address = payload.get("address_detail") or payload.get("location_address") or ""
-    lat = payload.get("location_lat") or payload.get("latitude")
-    lng = payload.get("location_lng") or payload.get("longitude")
+    lat = payload.get("location_lat") if payload.get("location_lat") is not None else payload.get("latitude")
+    lng = payload.get("location_lng") if payload.get("location_lng") is not None else payload.get("longitude")
 
     booking_date = payload.get("booking_date") or payload.get("appointment_date")
     booking_slot = payload.get("booking_slot") or payload.get("appointment_slot")
@@ -511,6 +551,16 @@ def create_request(current_user: dict, data):
     if payload.get("request_type") in ["SOS", "EMERGENCY"]:
         is_sos = True
 
+    if is_sos:
+        if lat is None or lng is None:
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="YÃªu cáº§u SOS cáº§n báº­t vá»‹ trÃ­ GPS Ä‘á»ƒ Ä‘iá»u phá»‘i KTV.")
+        try:
+            valid_coordinates = -90 <= float(lat) <= 90 and -180 <= float(lng) <= 180
+        except (TypeError, ValueError):
+            valid_coordinates = False
+        if not valid_coordinates:
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tá»a Ä‘á»™ GPS khÃ´ng há»£p lá»‡.")
+
     images = payload.get("image_urls") or payload.get("inspection_images") or payload.get("images") or []
 
     # Limit address to fit VARCHAR(255) column constraint
@@ -522,7 +572,7 @@ def create_request(current_user: dict, data):
 
     # Auto-assign available technician for emergency SOS requests
     if is_sos:
-        tech_id = _find_best_sos_technician(lat, lng)
+        tech_id = _find_best_sos_technician(lat, lng, device_type=(device or {}).get("device_type"))
         if tech_id:
             initial_status = "ASSIGNED"
 
@@ -579,6 +629,115 @@ def fetch_technician_requests(current_user: dict, request_status: str | None, pa
     if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
         raise AppException(ErrorCode.FORBIDDEN)
     return _list(None, current_user["sub"], request_status, page, limit)
+
+
+def fetch_mapbox_public_token(current_user: dict):
+    if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
+        raise AppException(ErrorCode.FORBIDDEN)
+    token = os.getenv("MAPBOX_ACCESS_TOKEN")
+    if not token or not token.startswith("pk."):
+        logger.error("A Mapbox public token is required to render the map")
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message="Bản đồ chưa được cấu hình.")
+    return {"access_token": token}
+
+
+def reverse_geocode_location(latitude: float, longitude: float, current_user: dict):
+    if not (_is_role(current_user, CUSTOMER_ROLE_CODE) or _is_role(current_user, TECHNICIAN_ROLE_CODE) or _is_role(current_user, ADMIN_ROLE_CODE)):
+        raise AppException(ErrorCode.FORBIDDEN)
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Tọa độ GPS không hợp lệ.")
+
+    token = os.getenv("MAPBOX_ACCESS_TOKEN")
+    if not token:
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message="Dịch vụ địa chỉ chưa được cấu hình.")
+    try:
+        response = requests.get(
+            "https://api.mapbox.com/search/geocode/v6/reverse",
+            params={"longitude": longitude, "latitude": latitude, "country": "vn", "language": "vi", "access_token": token},
+            timeout=8,
+        )
+        response.raise_for_status()
+        features = response.json().get("features") or []
+        if not features:
+            raise ValueError("Mapbox returned no address")
+        properties = features[0].get("properties") or {}
+        context = properties.get("context") or {}
+        address = properties.get("name_preferred") or properties.get("name") or properties.get("full_address") or ""
+        ward = (context.get("neighborhood") or context.get("locality") or {}).get("name") or ""
+        province = (context.get("place") or context.get("region") or {}).get("name") or ""
+        return {"address": address, "ward": ward, "province": province, "latitude": latitude, "longitude": longitude}
+    except (requests.RequestException, KeyError, TypeError, ValueError) as error:
+        logger.warning("Mapbox reverse geocoding failed: %s", error)
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message="Chưa thể xác định địa chỉ từ GPS.")
+
+
+def fetch_route_for_technician(request_id: str, current_user: dict):
+    """Return the current driving route for the assigned technician only."""
+    if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
+        raise AppException(ErrorCode.FORBIDDEN)
+
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if request.get("technician_id") != current_user["sub"]:
+        raise AppException(ErrorCode.TECHNICIAN_NOT_ASSIGNED)
+
+    technician = repository.get_technician_profile(current_user["sub"])
+    origin_lat = (technician or {}).get("last_latitude")
+    origin_lng = (technician or {}).get("last_longitude")
+    destination_lat = request.get("latitude")
+    destination_lng = request.get("longitude")
+    if origin_lat is None or origin_lng is None:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message="Chưa có vị trí GPS hiện tại của thợ để tính đường đi.",
+        )
+    if destination_lat is None or destination_lng is None:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message="Đơn này chưa có vị trí GPS của khách hàng. Hãy dùng đơn được tạo sau khi bật GPS.",
+        )
+
+    token = os.getenv("MAPBOX_ACCESS_TOKEN")
+    if not token:
+        logger.error("MAPBOX_ACCESS_TOKEN is not configured")
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message="Dịch vụ chỉ đường chưa được cấu hình.")
+
+    try:
+        coordinates = f"{float(origin_lng)},{float(origin_lat)};{float(destination_lng)},{float(destination_lat)}"
+    except (TypeError, ValueError):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Tọa độ GPS không hợp lệ.")
+
+    try:
+        response = requests.get(
+            f"https://api.mapbox.com/directions/v5/mapbox/driving-traffic/{coordinates}",
+            params={
+                "access_token": token,
+                "alternatives": "false",
+                "overview": "full",
+                "geometries": "geojson",
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        routes = response.json().get("routes") or []
+        if not routes:
+            raise ValueError("Mapbox returned no route")
+        route = routes[0]
+        geometry = route.get("geometry", {}).get("coordinates")
+        if not isinstance(geometry, list) or len(geometry) < 2:
+            raise ValueError("Mapbox route has no GeoJSON geometry")
+        return {
+            "distance_meters": round(float(route["distance"]), 1),
+            "duration_seconds": round(float(route["duration"]), 1),
+            "profile": "driving-traffic",
+            "geometry": geometry,
+            "origin": [float(origin_lng), float(origin_lat)],
+            "destination": [float(destination_lng), float(destination_lat)],
+        }
+    except (requests.RequestException, KeyError, TypeError, ValueError) as error:
+        logger.warning("Mapbox route request failed for repair %s: %s", request_id, error)
+        raise AppException(ErrorCode.SERVICE_UNAVAILABLE, message="Chưa thể tính thời gian di chuyển, vui lòng thử lại.")
 
 
 def fetch_all_requests(current_user: dict, request_status: str | None, customer_id: str | None, technician_id: str | None, page: int, limit: int):
@@ -835,6 +994,7 @@ def update_request_status(request_id: str, current_user: dict, data):
         next_tech_id = _find_best_sos_technician(
             customer_lat=request.get("latitude"),
             customer_lng=request.get("longitude"),
+            device_type=repository.get_device_type(request.get("device_id")),
             exclude_tech_ids=excluded_tech_ids,
         )
 

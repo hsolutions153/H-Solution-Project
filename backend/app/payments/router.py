@@ -69,7 +69,6 @@ def customer_submit(
     payload: CustomerPaymentSubmitRequest = CustomerPaymentSubmitRequest(),
     current_user: dict = Depends(get_current_user),
 ):
-    """Khách hàng gửi xác nhận đã thanh toán (chuyển trạng thái sang PENDING để chờ thợ kiểm tra)."""
     return customer_submit_payment(repair_id, current_user, payload.payment_method, payload.note)
 
 
@@ -79,6 +78,4 @@ def technician_confirm(
     payload: TechnicianPaymentConfirmRequest = TechnicianPaymentConfirmRequest(),
     current_user: dict = Depends(get_current_user),
 ):
-    """DUY NHẤT Thợ phụ trách ca sửa xác nhận đã nhận tiền (chuyển trạng thái sang PAID)."""
     return technician_confirm_payment(repair_id, current_user, payload.payment_method, payload.note)
-

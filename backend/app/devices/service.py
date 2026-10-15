@@ -132,7 +132,7 @@ def _is_role(current_user: dict, code: str) -> bool:
 def _validate_device_values(data: dict):
     if "device_type" in data and data["device_type"]:
         data["device_type"] = data["device_type"].upper()
-        # Ánh xạ tương thích với ràng buộc kiểm tra của cơ sở dữ liệu hiện tại
+        # Tương thích với các tên cũ: đổi sang SCOOTER
         if data["device_type"] in {"ELECTRIC_MOTORBIKE", "ELECTRIC_BIKE", "MOTORBIKE"}:
             data["device_type"] = "SCOOTER"
         elif data["device_type"] not in DEVICE_TYPES:
@@ -208,7 +208,6 @@ def create_device(data, current_user: dict):
     requested_default = payload.pop("is_default", None)
     has_existing_devices = bool(get_devices_by_customer_id(customer_id))
     if not has_existing_devices:
-        # First device for this customer is always the default one.
         payload["is_default"] = True
     elif requested_default:
         clear_default_device(customer_id)
@@ -221,8 +220,7 @@ def create_device(data, current_user: dict):
     payload["created_by"] = current_user["sub"]
     payload["updated_by"] = current_user["sub"]
 
-    # Thử chèn trực tiếp. Nếu database từ xa chưa chạy migration cho cột mới,
-    # tự động đóng gói pin và năm sản xuất vào metadata trường notes.
+    # Nếu DB chưa có cột mới (battery_type/manufacturing_year), đóng gói vào notes
     try:
         created = insert_device(dict(payload))
     except Exception as exc:
@@ -262,7 +260,7 @@ def update_device(device_id: str, data, current_user: dict):
             raise AppException(ErrorCode.SERIAL_NUMBER_EXISTS)
 
     if payload.get("is_default") is True:
-        # Only one device can be default per customer, so unset the others first.
+        # Bỏ mặc định của các xe khác cùng chủ trước khi set cái mới
         clear_default_device(existing["customer_id"], exclude_device_id=device_id)
 
     payload["updated_by"] = current_user["sub"]
@@ -312,9 +310,7 @@ def delete_device(device_id: str, current_user: dict):
     except Exception as exc:
         err_msg = str(exc)
         if "fk_repair_device" in err_msg or "23503" in err_msg:
-            # Phương tiện đã có lịch sử sửa chữa trong hệ thống.
-            # Thực hiện soft-delete để không làm hỏng khóa ngoại của đơn sửa chữa,
-            # nhưng ẩn hoàn toàn khỏi danh sách phương tiện của khách hàng.
+            # Phương tiện đã có lịch sử sửa chữa, soft-delete để giữ toàn vẹn FK
             notes = existing.get("notes") or ""
             meta: dict = {"is_deleted": True}
             if existing.get("battery_type"):
@@ -337,7 +333,7 @@ def delete_device(device_id: str, current_user: dict):
             raise
 
     if existing.get("is_default"):
-        # Chuyển quyền mặc định cho xe tiếp theo của khách hàng nếu còn xe
+        # Chuyển quyền mặc định sang xe kế tiếp nếu còn
         remaining = _enrich_device_list(get_devices_by_customer_id(existing["customer_id"]))
         if remaining:
             update_device_in_db(remaining[0]["id"], {"is_default": True, "updated_by": current_user["sub"]})

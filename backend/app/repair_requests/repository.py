@@ -33,7 +33,7 @@ def save_review(data: dict):
 def get_device_for_customer(device_id: str, customer_id: str):
     response = (
         supabase.table(CUSTOMER_DEVICES_TABLE)
-        .select("id")
+        .select("id,device_type")
         .eq("id", device_id)
         .eq("customer_id", customer_id)
         .maybe_single()
@@ -62,6 +62,19 @@ def get_any_device_for_customer(customer_id: str):
         .execute()
     )
     return response.data[0]["id"] if response and response.data else None
+
+
+def get_device_type(device_id: str | None):
+    if not device_id:
+        return None
+    response = (
+        supabase.table(CUSTOMER_DEVICES_TABLE)
+        .select("device_type")
+        .eq("id", device_id)
+        .maybe_single()
+        .execute()
+    )
+    return response.data.get("device_type") if response and response.data else None
 
 
 def create_default_device_for_customer(customer_id: str):

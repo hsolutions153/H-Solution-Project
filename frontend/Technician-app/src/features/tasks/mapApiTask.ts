@@ -64,7 +64,6 @@ export function mapApiTask(item: any): Task {
     customerName,
     customerPhone,
     address: item.location_address || cust.address || "Địa chỉ không xác định",
-    distance: "2.5 km",
     time: item.created_at ? new Date(item.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "Vừa xong",
     isEmergency: item.is_sos || false,
     status,

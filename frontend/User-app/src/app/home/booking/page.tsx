@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { fileToStoredImage } from "@/utils/image-data";
 import { HomeShell } from "@/components/home/home-shell";
 import { PageHeader } from "@/components/home/page-header";
+import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
 
 type BookingStep = "PROBLEM" | "CAMERA" | "DETAILS" | "LOCATION" | "SCHEDULE" | "SUCCESS";
 type Issue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -100,6 +101,9 @@ export default function BookingPage() {
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
+  const [location, setLocation] = useState<CurrentLocation | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const locationLoadedRef = useRef(false);
   const [selectedDate, setSelectedDate] = useState(today);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedTime, setSelectedTime] = useState("09:00");
@@ -121,6 +125,29 @@ export default function BookingPage() {
 
   const isSlotDisabled = (slotId: string) => slotDateTime(selectedDate, slotId) < nowTick;
   const hasAvailableSlot = TIME_GROUPS.some((group) => group.slots.some((slot) => !isSlotDisabled(slot.id)));
+
+  const fillCurrentLocation = async () => {
+    setIsLocating(true);
+    setError("");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const nextLocation = await getCurrentLocation(fetchApi);
+      setLocation(nextLocation);
+      setStreetAddress(nextLocation.address);
+      setWard(nextLocation.ward);
+      setProvince(nextLocation.province);
+    } catch (locationError) {
+      setError(locationError instanceof Error ? locationError.message : "Không thể lấy vị trí hiện tại.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== "LOCATION" || locationLoadedRef.current) return;
+    locationLoadedRef.current = true;
+    void fillCurrentLocation();
+  }, [step]);
 
   useEffect(() => {
     if (step !== "SCHEDULE") return;
@@ -293,6 +320,10 @@ export default function BookingPage() {
   };
 
   const continueFromLocation = () => {
+    if (!location) {
+      setError("Cần bật vị trí GPS để đặt lịch. Bạn vẫn có thể chỉnh lại địa chỉ sau khi vị trí được lấy.");
+      return;
+    }
     if (!province.trim() || !ward.trim() || !streetAddress.trim()) {
       setError("Vui lòng nhập đầy đủ tỉnh/thành phố, phường/xã và số nhà – tên đường.");
       return;
@@ -320,6 +351,8 @@ export default function BookingPage() {
         location_address: fullAddress,
         is_sos: false,
         request_type: "NORMAL",
+        latitude: location?.latitude,
+        longitude: location?.longitude,
         images: [],
         booking_date: selectedDate ? toDateKey(selectedDate) : "TODAY",
         booking_slot: selectedTime,
@@ -507,7 +540,10 @@ export default function BookingPage() {
           <section className="sos-step-panel sos-location-select-panel">
             <div className="sos-location-select-card">
               <h2>Địa điểm sửa chữa</h2>
-              <p>Nhập đầy đủ địa chỉ để nhân viên có thể đến đúng nơi.</p>
+              <p>Địa chỉ được tự điền theo GPS. Bạn có thể chỉnh lại trước khi đặt lịch.</p>
+              <button type="button" className="sos-ghost-btn" onClick={fillCurrentLocation} disabled={isLocating}>
+                {isLocating ? "Đang lấy vị trí…" : "Dùng vị trí hiện tại"}
+              </button>
               <div className="booking-address-form">
                 <label htmlFor="booking-province">
                   <span>Tỉnh / Thành phố <b>*</b></span>

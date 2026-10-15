@@ -1,14 +1,16 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { removeAuthToken } from "@/lib/api-client";
 
 export default function LogoutPage() {
+  const router = useRouter();
+
   useEffect(() => {
     removeAuthToken();
-    void signOut({ redirectTo: "/login?logged_out=1" });
-  }, []);
+    router.replace("/login?logged_out=1");
+  }, [router]);
 
   return (
     <main className="min-h-screen grid place-items-center p-6 text-center">

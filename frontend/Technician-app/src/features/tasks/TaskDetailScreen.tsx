@@ -31,6 +31,68 @@ interface TaskDetailScreenProps {
   ) => void;
 }
 
+interface RoutePreviewData {
+  origin: [number, number];
+  destination: [number, number];
+}
+
+function RoutePreviewMap({ taskId }: { taskId: string }) {
+  const [route, setRoute] = useState<RoutePreviewData | null>(null);
+  const [mapToken, setMapToken] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPreview = async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const coordinates = await new Promise<GeolocationCoordinates>((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error("Thiết bị không hỗ trợ GPS."));
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (position) => resolve(position.coords),
+            () => reject(new Error("Hãy bật GPS để xem bản đồ lộ trình.")),
+            { enableHighAccuracy: true, timeout: 15_000, maximumAge: 15_000 }
+          );
+        });
+        await fetchApi("/technicians/me/presence", {
+          method: "PATCH",
+          body: JSON.stringify({
+            is_online: true,
+            last_latitude: coordinates.latitude,
+            last_longitude: coordinates.longitude,
+          }),
+        });
+        const [nextRoute, token] = await Promise.all([
+          fetchApi<RoutePreviewData>(`/repair-requests/${taskId}/route`),
+          fetchApi<{ access_token: string }>("/repair-requests/map-token"),
+        ]);
+        if (!cancelled) {
+          setRoute(nextRoute);
+          setMapToken(token.access_token);
+        }
+      } catch (previewError) {
+        if (!cancelled) setError(previewError instanceof Error ? previewError.message : "Không thể tải bản đồ lộ trình.");
+      }
+    };
+    void loadPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
+
+  if (error) return <p className="grid h-full place-items-center px-4 text-center text-xs text-rose-700">{error}</p>;
+  if (!route || !mapToken) return <p className="grid h-full place-items-center text-xs text-slate-500">Đang tải bản đồ lộ trình…</p>;
+
+  const [originLng, originLat] = route.origin;
+  const [destinationLng, destinationLat] = route.destination;
+  const markers = `pin-s-a+1976ad(${originLng},${originLat}),pin-s-b+e11d48(${destinationLng},${destinationLat})`;
+  const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${markers}/auto/800x320?padding=48&access_token=${encodeURIComponent(mapToken)}`;
+  return <img src={mapUrl} className="size-full object-cover" alt="Bản đồ vị trí và lộ trình đến khách hàng" />;
+}
+
 export const TaskDetailScreen = ({
   task,
   onBack,
@@ -303,13 +365,7 @@ export const TaskDetailScreen = ({
 
       <Card padded={false} className="overflow-hidden">
         <div className="relative h-40 w-full overflow-hidden bg-slate-100">
-          <iframe
-            title="Bản đồ vị trí khách hàng"
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1862.2937046228108!2d105.82894155000001!3d21.00916975!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ac8008dbd905%3A0x100650bea845689e!2zMTIgUC4gQ2jDuWEgQuG7mWMsIEtpbSBMacOqbiwgSMOgIE7hu5lpLCBWaeG7h3QgTmFt!5e0!3m2!1svi!2s!4v1784825224350!5m2!1svi!2s"
-            className="pointer-events-none relative top-[-25%] h-[150%] w-full border-0"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          <RoutePreviewMap taskId={task.id} />
         </div>
         <div className="flex items-center gap-3 p-3.5">
           <MapPin className="size-5 shrink-0 text-brand-600" />

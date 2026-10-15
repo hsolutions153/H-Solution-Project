@@ -4,8 +4,6 @@ PHONE_PATTERN = r"^$|^0(3|5|7|8|9)\d{8}$"
 
 
 class SignupRequest(BaseModel):
-    """Public registration: every self-registered account is a customer."""
-
     name: str = Field(min_length=1, max_length=100)
     phone: str | None = Field(default=None, max_length=10, pattern=PHONE_PATTERN)
     email: EmailStr

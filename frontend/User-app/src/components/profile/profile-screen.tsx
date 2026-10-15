@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { PageHeader } from "@/components/home/page-header";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import {
   Bell,
@@ -523,11 +522,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                       setIsLoggingOut(true);
                       const { removeAuthToken } = await import("@/lib/api-client");
                       removeAuthToken();
-                      try {
-                        await signOut({ redirectTo: "/login?logged_out=1" });
-                      } catch {
-                        router.replace("/login?logged_out=1");
-                      }
+                      router.replace("/login?logged_out=1");
                     }}
                     style={{
                       flex: 1,

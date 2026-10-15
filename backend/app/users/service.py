@@ -99,9 +99,9 @@ def update_user(user_id: str, current_user: dict, data):
             raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
     if user_id == current_user["sub"]:
         if payload.get("is_active") is False:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="Khong the khoa tai khoan dang dang nhap")
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Không thể khóa tài khoản đang đăng nhập")
         if payload.get("role_id") and payload["role_id"] != existing["role_id"]:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="Khong the doi vai tro tai khoan dang dang nhap")
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Không thể đổi vai trò tài khoản đang đăng nhập")
 
     update_payload = {
         key: value
@@ -126,5 +126,5 @@ def update_user_status(user_id: str, current_user: dict, data):
 def delete_user(user_id: str, current_user: dict):
     fetch_user(user_id)
     if user_id == current_user["sub"]:
-        raise AppException(ErrorCode.VALIDATION_ERROR, message="Khong the xoa tai khoan dang dang nhap")
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Không thể xóa tài khoản đang đăng nhập")
     repository.delete_user(user_id)

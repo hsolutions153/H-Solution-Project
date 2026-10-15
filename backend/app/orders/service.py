@@ -31,6 +31,12 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
         raise AppException(ErrorCode.TECHNICIAN_NOT_FOUND)
     if technician["kyc_status"] != "APPROVED":
         raise AppException(ErrorCode.TECHNICIAN_NOT_KYC_APPROVED)
+    if not technician.get("is_online"):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="KTV chÆ°a báº­t tráº¡ng thÃ¡i nháº­n viá»‡c.")
+
+    from app.repair_requests.service import _has_fresh_technician_location
+    if not _has_fresh_technician_location(technician):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vá»‹ trÃ­ GPS cá»§a KTV Ä‘Ã£ quÃ¡ háº¡n; yÃªu cáº§u KTV cáº­p nháº­t láº¡i.")
 
     assigned_at = datetime.now(timezone.utc).isoformat()
     repository.assign_order(order_id, technician_id, assigned_at, assigned_by)

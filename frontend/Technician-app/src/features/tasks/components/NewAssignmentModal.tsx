@@ -15,6 +15,11 @@ interface NewAssignmentModalProps {
   onTimeout?: (taskId: string) => void; // Tự động xử lý khi hết 2 phút
 }
 
+interface RouteEstimate {
+  distance_meters: number;
+  duration_seconds: number;
+}
+
 export const NewAssignmentModal = ({
   isOpen,
   task,
@@ -24,6 +29,9 @@ export const NewAssignmentModal = ({
   onTimeout,
 }: NewAssignmentModalProps) => {
   const [timeLeft, setTimeLeft] = useState(120); // 2 phút đếm ngược
+  const [route, setRoute] = useState<RouteEstimate | null>(null);
+  const [routeError, setRouteError] = useState(false);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const taskId = task?.id;
 
   useEffect(() => {
@@ -49,6 +57,33 @@ export const NewAssignmentModal = ({
 
     return () => clearInterval(timer);
   }, [isOpen, taskId, onReject, onTimeout]);
+
+  useEffect(() => {
+    if (!isOpen || !taskId) return;
+
+    let cancelled = false;
+    setRoute(null);
+    setRouteError(false);
+    setIsLoadingRoute(true);
+
+    const loadRoute = async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const result = await fetchApi<RouteEstimate>(`/repair-requests/${taskId}/route`);
+        if (!cancelled) setRoute(result);
+      } catch (error) {
+        console.warn("Không thể tính lộ trình Mapbox:", error);
+        if (!cancelled) setRouteError(true);
+      } finally {
+        if (!cancelled) setIsLoadingRoute(false);
+      }
+    };
+
+    loadRoute();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, taskId]);
 
   if (!isOpen || !task) return null;
 
@@ -113,9 +148,9 @@ export const NewAssignmentModal = ({
       <div className="mt-1 flex items-center justify-between gap-3 rounded-control bg-slate-100 px-3.5 py-3 text-[13px]">
         <span className="flex items-center gap-2 text-slate-600">
           <CarFront className="size-4 text-slate-500" />
-          Khoảng cách <strong className="font-bold text-ink">{task.distance || '2.4 km'}</strong>
+          Khoảng cách <strong className="font-bold text-ink">{isLoadingRoute ? "Đang tính…" : route ? `${(route.distance_meters / 1000).toFixed(1)} km` : "Chưa có dữ liệu"}</strong>
         </span>
-        <span className="font-semibold text-slate-700">{task.travelTime || '~ 12 phút di chuyển'}</span>
+        <span className="font-semibold text-slate-700">{isLoadingRoute ? "" : route ? `~ ${Math.ceil(route.duration_seconds / 60)} phút di chuyển` : routeError ? "Không tính được lộ trình" : ""}</span>
       </div>
 
       <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">

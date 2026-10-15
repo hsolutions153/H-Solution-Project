@@ -11,12 +11,15 @@ from app.customers.models import ADMIN_ROLE_CODE
 from app.db.database import supabase
 from app.technicians.models import KYC_STATUSES, SKILLS
 from app.technicians.repository import (
+    delete_bank_account,
     delete_technician_from_db,
     get_all_technicians,
+    get_bank_account,
     get_technician_by_id_card_number,
     get_technician_by_user_id,
     insert_technician,
     update_technician_in_db,
+    upsert_bank_account,
 )
 
 TECHNICIAN_ROLE_CODE = "TECHNICIAN"
@@ -75,34 +78,31 @@ def create_technician(data):
 
     user_id = payload.get("user_id")
     if not user_id:
+        # Tạo user mới cho KTV
         user_id = secrets.token_hex(5).upper()
         email = payload.get("email") or f"tech_{user_id.lower()}@h-solution.vn"
-        phone = payload.get("phone")
         full_name = payload.get("full_name") or f"Kỹ thuật viên {user_id}"
         password = payload.get("password") or "Abc123456@"
 
         from app.auth.utils import hash_password
-
-        user_data = {
+        supabase.table("users").insert({
             "id": user_id,
             "role_id": _role_id(TECHNICIAN_ROLE_CODE),
             "full_name": full_name,
-            "phone": phone,
+            "phone": payload.get("phone"),
             "email": email,
             "password_hash": hash_password(password),
             "is_active": True,
-        }
-        supabase.table("users").insert(user_data).execute()
+        }).execute()
     else:
-        user = auth_repository.get_user_by_id(user_id)
-        if not user:
+        if not auth_repository.get_user_by_id(user_id):
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Người dùng không tồn tại")
 
     id_card_number = payload.get("id_card_number") or f"ID-{user_id}"
     if get_technician_by_id_card_number(id_card_number):
         id_card_number = f"ID-{user_id}-{secrets.token_hex(2).upper()}"
 
-    profile_data = {
+    insert_technician({
         "user_id": user_id,
         "id_card_number": id_card_number,
         "id_card_front": payload.get("id_card_front_url") or "https://placehold.co/400x250/png?text=ID+Front",
@@ -117,8 +117,7 @@ def create_technician(data):
         "total_jobs_done": 0,
         "created_by": "ADMIN",
         "updated_by": "ADMIN",
-    }
-    insert_technician(profile_data)
+    })
     return fetch_technician_by_user_id(user_id)
 
 
@@ -129,13 +128,38 @@ def update_technician(user_id: str, data):
         return existing
     _validate_profile_values(payload)
 
+    # Tách full_name / phone sang bảng users
     user_update = {}
-    if "full_name" in payload and payload["full_name"]:
+    if "full_name" in payload and payload["full_name"] is not None:
         user_update["full_name"] = payload.pop("full_name")
-    if "phone" in payload and payload["phone"]:
+    if "phone" in payload and payload["phone"] is not None:
         user_update["phone"] = payload.pop("phone")
     if user_update:
         supabase.table("users").update(user_update).eq("id", user_id).execute()
+
+    # Tách STK sang bảng technician_bank_accounts
+    bank_data = payload.pop("bank_account", None)
+    flat_code = payload.pop("bank_code", None)
+    flat_name = payload.pop("bank_name", None)
+    flat_num = payload.pop("account_number", None)
+    flat_holder = payload.pop("account_holder", None)
+
+    if flat_num is not None or flat_code is not None or flat_name is not None or flat_holder is not None:
+        if flat_num and str(flat_num).strip():
+            bank_data = {
+                "bank_code": flat_code or "MB",
+                "bank_name": flat_name or "MB Bank",
+                "account_number": str(flat_num).strip(),
+                "account_holder": (flat_holder or "").strip(),
+            }
+        else:
+            bank_data = None
+
+    if bank_data is not None:
+        if isinstance(bank_data, dict) and bank_data.get("account_number"):
+            upsert_bank_account(user_id, bank_data)
+        else:
+            delete_bank_account(user_id)
 
     if payload:
         update_technician_in_db(user_id, payload)
@@ -147,15 +171,12 @@ def review_technician_kyc(user_id: str, data, reviewed_by: str):
     payload = _payload(data)
     if payload["kyc_status"] not in KYC_STATUSES:
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái KYC không hợp lệ")
-    update_technician_in_db(
-        user_id,
-        {
-            "kyc_status": payload["kyc_status"],
-            "kyc_note": payload.get("kyc_note"),
-            "kyc_reviewed_by": reviewed_by,
-            "kyc_reviewed_at": datetime.now(timezone.utc).isoformat(),
-        },
-    )
+    update_technician_in_db(user_id, {
+        "kyc_status": payload["kyc_status"],
+        "kyc_note": payload.get("kyc_note"),
+        "kyc_reviewed_by": reviewed_by,
+        "kyc_reviewed_at": datetime.now(timezone.utc).isoformat(),
+    })
     return fetch_technician_by_user_id(user_id)
 
 
@@ -172,14 +193,35 @@ def fetch_my_technician(current_user: dict):
     return fetch_technician_by_user_id(current_user["sub"])
 
 
+def upsert_my_bank_account(current_user: dict, data):
+    tech_id = current_user["sub"]
+    fetch_my_technician(current_user)
+
+    from app.technicians.schemas import BankAccountUpsert
+    payload = data.model_dump() if isinstance(data, BankAccountUpsert) else dict(data)
+
+    result = upsert_bank_account(tech_id, payload)
+    if not result:
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    return result
+
+
+def delete_my_bank_account(current_user: dict):
+    tech_id = current_user["sub"]
+    fetch_my_technician(current_user)
+    if not get_bank_account(tech_id):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Chưa có tài khoản ngân hàng để xóa.")
+    delete_bank_account(tech_id)
+    return {"success": True, "message": "Đã xóa tài khoản ngân hàng."}
+
+
 def upload_my_avatar(current_user: dict, file: UploadFile):
-    """Store a new profile photo for the signed-in technician on their user row."""
     fetch_my_technician(current_user)
     avatar_url = storage.upload_avatar(file, current_user["sub"])
     supabase.table("users").update({"avatar_url": avatar_url}).eq("id", current_user["sub"]).execute()
 
-    from app.repair_requests.service import invalidate_technician_cache  # local import avoids a cycle
-
+    # Xóa cache KTV trong repair_requests
+    from app.repair_requests.service import invalidate_technician_cache
     invalidate_technician_cache(current_user["sub"])
     return fetch_my_technician(current_user)
 
@@ -187,7 +229,32 @@ def upload_my_avatar(current_user: dict, file: UploadFile):
 def update_my_presence(current_user: dict, data):
     fetch_my_technician(current_user)
     payload = _payload(data)
-    if payload.get("last_latitude") is not None or payload.get("last_longitude") is not None:
+    latitude = payload.get("last_latitude")
+    longitude = payload.get("last_longitude")
+
+    # A technician may only become available after the client has supplied a
+    # fresh, complete GPS position.  Do not reuse an old position here: it
+    # could make the dispatcher send an SOS request to the wrong place.
+    if payload.get("is_online"):
+        if latitude is None or longitude is None:
+            raise AppException(
+                ErrorCode.VALIDATION_ERROR,
+                message="Báº­t vá»‹ trÃ­ GPS Ä‘á»ƒ nháº­n viá»‡c má»›i.",
+            )
+
+    if (latitude is None) != (longitude is None):
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message="Vá»‹ trÃ­ GPS pháº£i cÃ³ Ä‘á»§ cáº£ vá»‹ Ä‘á»™ vÃ  kinh Ä‘á»™.",
+        )
+
+    if latitude is not None and longitude is not None:
+        try:
+            valid_coordinates = -90 <= float(latitude) <= 90 and -180 <= float(longitude) <= 180
+        except (TypeError, ValueError):
+            valid_coordinates = False
+        if not valid_coordinates:
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tá»a Ä‘á»™ GPS khÃ´ng há»£p lá»‡.")
         payload["last_location_at"] = datetime.now(timezone.utc).isoformat()
     update_technician_in_db(current_user["sub"], payload)
     return fetch_my_technician(current_user)

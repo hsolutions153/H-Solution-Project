@@ -91,7 +91,6 @@ class PaymentVerificationTests(MockedTest):
         self.history = self.mock("app.payments.service.repository.add_payment_history")
         self.mock("app.payments.service.SEPAY_API_KEY", new="test-key")
         self.mock("app.payments.service.SEPAY_BANK_ACCOUNT", new="123456789")
-        self.mock("app.payments.service.SEPAY_BANK_NAME", new="TESTBANK")
         self.config = {"partner_code": "partner", "access_key": "access", "secret_key": "secret", "create_url": "https://example.com/create", "query_url": "https://example.com/query"}
         self.mock("app.payments.service._momo_config", return_value=self.config)
         self.gateway = self.mock("app.payments.service._momo_post")
@@ -162,6 +161,11 @@ class PaymentVerificationTests(MockedTest):
         self.assertEqual(float(result["payment"]["amount"]), 0)
         self.assertEqual(result["payment"]["payment_status"], "PAID")
         self.assertIsNone(result["qr_url"])
+
+    def test_bank_transfer_requires_assigned_technician_bank_account(self):
+        self.mock("app.technicians.repository.get_bank_account", return_value=None)
+        self.rejects(503, payments.fetch_qr, "REPAIR0001", self.customer)
+        self.writes.assert_not_called()
 
     def test_zero_cost_momo_never_contacts_gateway(self):
         self.repair["total_amount"] = 0

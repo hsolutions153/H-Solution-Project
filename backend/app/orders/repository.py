@@ -235,7 +235,7 @@ def get_order_by_id(order_id: str):
 def get_technician_profile(user_id: str):
     response = (
         supabase.table(TECHNICIAN_PROFILES_TABLE)
-        .select("user_id,kyc_status,is_online")
+        .select("user_id,kyc_status,is_online,last_latitude,last_longitude,last_location_at")
         .eq("user_id", user_id)
         .maybe_single()
         .execute()

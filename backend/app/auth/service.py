@@ -8,9 +8,9 @@ from app.auth.sms import send_password_reset_code
 from app.auth.utils import (
     REFRESH_TOKEN_EXPIRE_DAYS,
     create_access_token,
-    generate_refresh_token,
+    create_refresh_token,
+    get_refresh_token_payload,
     hash_password,
-    hash_refresh_token,
     verify_password,
 )
 from app.core.exceptions import AppException, ErrorCode
@@ -25,13 +25,16 @@ def _generate_user_id() -> str:
     return secrets.token_hex(5).upper()
 
 
-def _issue_refresh_token(user_id: str) -> str:
-    raw_token = generate_refresh_token()
+def _issue_refresh_token(user_id: str, email: str, role_id: str, role: str) -> str:
+    raw_token = create_refresh_token(
+        {"sub": user_id, "email": email, "role_id": role_id, "role": role}
+    )
     created = repository.create_refresh_token(
         {
             "id": _generate_user_id(),
             "user_id": user_id,
-            "token_hash": hash_refresh_token(raw_token),
+            # Cột có tên lịch sử là token_hash; theo luồng JWT này lưu token nguyên vẹn.
+            "token_hash": raw_token,
             "expires_at": (datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
         }
     )
@@ -41,9 +44,12 @@ def _issue_refresh_token(user_id: str) -> str:
 
 
 def refresh_access_token(raw_refresh_token: str):
+    payload = get_refresh_token_payload(raw_refresh_token)
     now = datetime.now(timezone.utc)
-    stored = repository.get_refresh_token_by_hash(hash_refresh_token(raw_refresh_token))
+    stored = repository.get_refresh_token_by_hash(raw_refresh_token)
     if not stored:
+        raise AppException(ErrorCode.TOKEN_INVALID, headers={"WWW-Authenticate": "Bearer"})
+    if stored["user_id"] != payload["sub"]:
         raise AppException(ErrorCode.TOKEN_INVALID, headers={"WWW-Authenticate": "Bearer"})
 
     if stored.get("revoked_at"):
@@ -74,13 +80,18 @@ def refresh_access_token(raw_refresh_token: str):
     )
     return {
         "access_token": access_token,
-        "refresh_token": _issue_refresh_token(user["id"]),
+        "refresh_token": _issue_refresh_token(user["id"], user["email"], role["id"], role["code"]),
         "token_type": "bearer",
     }
 
 
 def logout_refresh_token(raw_refresh_token: str):
-    stored = repository.get_refresh_token_by_hash(hash_refresh_token(raw_refresh_token))
+    try:
+        get_refresh_token_payload(raw_refresh_token)
+    except AppException:
+        return {"message": "Đăng xuất thành công"}
+
+    stored = repository.get_refresh_token_by_hash(raw_refresh_token)
     if stored and not stored.get("revoked_at"):
         repository.revoke_refresh_token(stored["id"], datetime.now(timezone.utc).isoformat())
     return {"message": "Đăng xuất thành công"}
@@ -122,7 +133,7 @@ def authenticate_user(email_or_phone: str, password: str):
 
     return {
         "access_token": access_token,
-        "refresh_token": _issue_refresh_token(user["id"]),
+        "refresh_token": _issue_refresh_token(user["id"], user["email"], role_id, role_code),
         "token_type": "bearer",
         "role_id": role_id,
         "role": role_code,
@@ -231,7 +242,7 @@ def authenticate_or_register_google_user(payload):
     )
     return {
         "access_token": access_token,
-        "refresh_token": _issue_refresh_token(user["id"]),
+        "refresh_token": _issue_refresh_token(user["id"], user["email"], user_role_id, user_role_code),
         "token_type": "bearer",
         "role_id": user_role_id,
         "role": user_role_code,

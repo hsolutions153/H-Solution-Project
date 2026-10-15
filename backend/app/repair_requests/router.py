@@ -3,9 +3,12 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from app.auth.utils import get_current_user
 from app.repair_requests.schemas import (
     QuoteCreateRequest,
+    MapboxPublicTokenResponse,
+    ReverseGeocodeResponse,
     QuoteResponse,
     RepairRequestCreate,
     RepairRequestListResponse,
+    RepairRouteResponse,
     RepairRequestResponse,
     RepairRequestStatusSyncResponse,
     RepairRequestStatusUpdate,
@@ -19,8 +22,11 @@ from app.repair_requests.service import (
     create_quote_for_request,
     create_request,
     fetch_all_requests,
+    fetch_mapbox_public_token,
+    reverse_geocode_location,
     fetch_my_requests,
     fetch_quotes_for_request,
+    fetch_route_for_technician,
     fetch_request,
     fetch_request_status_sync,
     fetch_technician_requests,
@@ -57,6 +63,25 @@ def get_my_technician_requests(
     return fetch_technician_requests(current_user, status, page, limit)
 
 
+@router.get("/map-token", response_model=MapboxPublicTokenResponse)
+def get_mapbox_public_token(current_user: dict = Depends(get_current_user)):
+    return fetch_mapbox_public_token(current_user)
+
+
+@router.get("/reverse-geocode", response_model=ReverseGeocodeResponse)
+def reverse_geocode(
+    latitude: float = Query(ge=-90, le=90),
+    longitude: float = Query(ge=-180, le=180),
+    current_user: dict = Depends(get_current_user),
+):
+    return reverse_geocode_location(latitude, longitude, current_user)
+
+
+@router.get("/{request_id}/route", response_model=RepairRouteResponse)
+def get_route_for_technician(request_id: str, current_user: dict = Depends(get_current_user)):
+    return fetch_route_for_technician(request_id, current_user)
+
+
 @router.get("", response_model=RepairRequestListResponse)
 @router.get("/", response_model=RepairRequestListResponse, include_in_schema=False)
 def get_repair_requests(
@@ -77,7 +102,6 @@ def get_repair_request(request_id: str, current_user: dict = Depends(get_current
 
 @router.get("/{request_id}/status", response_model=RepairRequestStatusSyncResponse)
 def get_repair_request_status_sync(request_id: str, current_user: dict = Depends(get_current_user)):
-    """API đồng bộ trạng thái thời gian thực và thông tin thợ cho Team A."""
     return fetch_request_status_sync(request_id, current_user)
 
 

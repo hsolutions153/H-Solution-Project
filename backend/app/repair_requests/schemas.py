@@ -142,6 +142,27 @@ class RepairRequestStatusSyncResponse(BaseModel):
     last_updated: datetime | str
 
 
+class RepairRouteResponse(BaseModel):
+    distance_meters: float
+    duration_seconds: float
+    profile: str
+    geometry: list[list[float]]
+    origin: list[float]
+    destination: list[float]
+
+
+class MapboxPublicTokenResponse(BaseModel):
+    access_token: str
+
+
+class ReverseGeocodeResponse(BaseModel):
+    address: str
+    ward: str
+    province: str
+    latitude: float
+    longitude: float
+
+
 class CustomerInfo(BaseModel):
     id: str | None = None
     full_name: str | None = None

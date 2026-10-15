@@ -9,25 +9,21 @@ from app.db.database import supabase
 logger = logging.getLogger(__name__)
 
 REPAIR_IMAGES_BUCKET = "h-solution-uploads"
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 
 
 def save_file_locally(file_content: bytes, file_path: str, content_type: str | None = None) -> str:
-    """Lưu tệp tin vào thư mục uploads cục bộ và trả về URL công khai."""
     norm_path = file_path.lstrip("/").replace("\\", "/")
-    # Bỏ tiền tố public/ nếu có để lưu trữ gọn gàng
+    # Bỏ tiền tố public/ để lưu gọn
     sub_path = norm_path[7:] if norm_path.startswith("public/") else norm_path
 
-    # Đường dẫn file cục bộ
     target_path = os.path.join(UPLOADS_DIR, sub_path.replace("/", os.sep))
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, "wb") as f:
         f.write(file_content)
 
-    # Đồng thời lưu bản sao với đường dẫn đầy đủ nếu có tiền tố public/
-    # để đảm bảo request tới /uploads/public/... hoặc /uploads/... đều tìm thấy file
+    # Lưu bản sao với đường dẫn đầy đủ để /uploads/public/... và /uploads/... đều tìm được
     if norm_path != sub_path:
         full_target_path = os.path.join(UPLOADS_DIR, norm_path.replace("/", os.sep))
         os.makedirs(os.path.dirname(full_target_path), exist_ok=True)
@@ -39,7 +35,6 @@ def save_file_locally(file_content: bytes, file_path: str, content_type: str | N
         or os.getenv("BACKEND_URL")
         or "http://127.0.0.1:8000"
     ).rstrip("/")
-
     return f"{base_url}/uploads/{sub_path}"
 
 
@@ -50,7 +45,7 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
         if not file_content:
             raise AppException(ErrorCode.IMAGE_UPLOAD_FAILED, message="Tệp ảnh tải lên bị trống")
 
-        # 1. Thử tải lên Supabase Storage
+        # Thử tải lên Supabase Storage trước
         try:
             supabase.storage.from_(REPAIR_IMAGES_BUCKET).upload(
                 path=file_path,
@@ -61,12 +56,9 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
             if public_url:
                 return public_url
         except Exception as sb_err:
-            logger.warning(
-                "Supabase storage upload failed (%s). Falling back to local storage.",
-                sb_err,
-            )
+            logger.warning("Supabase storage upload failed (%s). Falling back to local storage.", sb_err)
 
-        # 2. Dự phòng: lưu file vào server cục bộ và trả về static URL
+        # Dự phòng: lưu vào server cục bộ
         return save_file_locally(file_content, file_path, file.content_type)
 
     except AppException:
@@ -76,14 +68,12 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
         raise AppException(ErrorCode.IMAGE_UPLOAD_FAILED)
 
 
-
 MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
 AVATAR_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/x-png", "image/webp"}
 AVATAR_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 
 def upload_avatar(file: UploadFile, user_id: str) -> str:
-    """Validate a profile photo (JPEG/PNG/WebP, max 5 MB), store it and return its public URL."""
     content_type = (file.content_type or "").lower()
     extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
     if content_type not in AVATAR_CONTENT_TYPES and extension not in AVATAR_EXTENSIONS:

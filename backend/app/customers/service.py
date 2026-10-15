@@ -27,7 +27,6 @@ def _customer_role_id() -> str:
 
 
 def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Authorize customer-management APIs against the ADMIN database role ID."""
     admin_role = repository.get_role_by_code(ADMIN_ROLE_CODE)
     if not admin_role:
         raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
@@ -37,7 +36,6 @@ def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
 
 
 def require_customer(current_user: dict = Depends(get_current_user)) -> dict:
-    """Authorize self-service profile APIs against the CUSTOMER database role ID."""
     if current_user["role_id"] != _customer_role_id():
         raise AppException(ErrorCode.FORBIDDEN)
     return current_user
@@ -118,7 +116,6 @@ def update_own_customer(current_user: dict, data):
 
 
 def upload_own_avatar(current_user: dict, file: UploadFile):
-    """Store a new profile photo for the signed-in customer and save its public URL."""
     customer_id = current_user["sub"]
     fetch_customer(customer_id)
     avatar_url = storage.upload_avatar(file, customer_id)

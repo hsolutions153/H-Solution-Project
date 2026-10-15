@@ -4,14 +4,6 @@ from pydantic import BaseModel, Field
 
 
 class DeviceCreate(BaseModel):
-    """
-    Cấu trúc dữ liệu xe máy điện / thiết bị phục vụ đăng ký & dịch vụ sửa chữa:
-    - manufacturer: Thương hiệu xe (Bắt buộc)
-    - model_name: Dòng xe (Bắt buộc)
-    - id / serial_number: ID xe / Thiết bị / Biển số nhận diện (Bắt buộc nhận diện)
-    - battery_type: Loại pin (LFP, Lithium-ion, Chì-axit...) (Cần thiết cho sửa chữa điện)
-    - manufacturing_year: Năm sản xuất (Tùy chọn)
-    """
     customer_id: str | None = Field(default=None, max_length=10)
     device_type: str = Field(min_length=1, max_length=50)
     manufacturer: str = Field(min_length=1, max_length=100)
