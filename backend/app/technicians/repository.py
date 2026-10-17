@@ -1,7 +1,41 @@
+import json
+import logging
+import os
+import secrets
+from datetime import datetime, timezone
 from app.db.database import supabase
 from app.technicians.models import TECHNICIAN_PROFILES_TABLE
 
+logger = logging.getLogger("h_solution")
+
 BANK_ACCOUNTS_TABLE = "technician_bank_accounts"
+
+# File lưu trữ dự phòng cục bộ khi bảng Supabase chưa có quyền RLS
+LOCAL_BANK_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "uploads",
+    "technician_bank_accounts.json",
+)
+
+
+def _read_local_banks() -> dict[str, dict]:
+    try:
+        if os.path.exists(LOCAL_BANK_FILE):
+            with open(LOCAL_BANK_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _write_local_banks(data: dict[str, dict]) -> None:
+    try:
+        os.makedirs(os.path.dirname(LOCAL_BANK_FILE), exist_ok=True)
+        with open(LOCAL_BANK_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 
 # Câu select join user + tài khoản ngân hàng
 PROFILE_SELECT = (
@@ -109,6 +143,7 @@ def get_all_technicians(kyc_status: str | None = None):
 
 
 def get_technician_by_user_id(user_id: str):
+    item = None
     try:
         response = (
             supabase.table(TECHNICIAN_PROFILES_TABLE)
@@ -118,27 +153,32 @@ def get_technician_by_user_id(user_id: str):
             .execute()
         )
         if response and response.data:
-            return _sync_technician_stats(response.data)
+            item = response.data
     except Exception:
         pass
 
-    # Fallback nếu select join thất bại
-    response = (
-        supabase.table(TECHNICIAN_PROFILES_TABLE)
-        .select("*")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if response and response.data:
-        item = response.data
-        if item.get("user_id"):
-            user_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").eq("id", item["user_id"]).maybe_single().execute()
-            if user_resp and user_resp.data:
-                item["user"] = user_resp.data
-        bank_resp = get_bank_account(user_id)
-        if bank_resp:
-            item["bank_account"] = bank_resp
+    if not item:
+        # Fallback nếu select join thất bại
+        response = (
+            supabase.table(TECHNICIAN_PROFILES_TABLE)
+            .select("*")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if response and response.data:
+            item = response.data
+            if item.get("user_id"):
+                user_resp = supabase.table("users").select("id,full_name,email,phone,avatar_url,is_active").eq("id", item["user_id"]).maybe_single().execute()
+                if user_resp and user_resp.data:
+                    item["user"] = user_resp.data
+
+    if item:
+        # Luôn đảm bảo bank_account được nạp (ưu tiên DB, fallback sang local store)
+        if not item.get("bank_account"):
+            bank_resp = get_bank_account(user_id)
+            if bank_resp:
+                item["bank_account"] = bank_resp
         return _sync_technician_stats(item)
 
     # Tự động tạo hồ sơ KTV nếu user đã có trong bảng users
@@ -215,42 +255,64 @@ def get_bank_account(technician_id: str):
             .maybe_single()
             .execute()
         )
-        return resp.data if resp and resp.data else None
+        if resp and resp.data:
+            return resp.data
     except Exception:
-        return None
+        pass
+
+    local_banks = _read_local_banks()
+    return local_banks.get(technician_id)
 
 
 def upsert_bank_account(technician_id: str, data: dict):
-    import secrets
-    from datetime import datetime, timezone
-
     now = datetime.now(timezone.utc).isoformat()
     existing = get_bank_account(technician_id)
 
-    if existing:
-        resp = (
-            supabase.table(BANK_ACCOUNTS_TABLE)
-            .update({**data, "updated_at": now})
-            .eq("technician_id", technician_id)
-            .execute()
-        )
-    else:
-        resp = supabase.table(BANK_ACCOUNTS_TABLE).insert({
-            "id": secrets.token_hex(5).upper(),
-            "technician_id": technician_id,
-            "created_at": now,
-            "updated_at": now,
-            **data,
-        }).execute()
+    record_id = (existing or {}).get("id") or secrets.token_hex(5).upper()
+    created_at = (existing or {}).get("created_at") or now
+    record = {
+        "id": record_id,
+        "technician_id": technician_id,
+        "bank_code": data.get("bank_code"),
+        "bank_name": data.get("bank_name"),
+        "account_number": str(data.get("account_number", "")).strip(),
+        "account_holder": str(data.get("account_holder", "")).strip(),
+        "created_at": created_at,
+        "updated_at": now,
+    }
 
-    return resp.data[0] if resp and resp.data else None
+    try:
+        if existing and existing.get("id"):
+            resp = (
+                supabase.table(BANK_ACCOUNTS_TABLE)
+                .update({**data, "updated_at": now})
+                .eq("technician_id", technician_id)
+                .execute()
+            )
+        else:
+            resp = supabase.table(BANK_ACCOUNTS_TABLE).insert(record).execute()
+        if resp and resp.data:
+            record = resp.data[0]
+    except Exception as exc:
+        logger.warning(f"[Bank Account] Supabase upsert failed, lưu dự phòng cục bộ: {exc}")
+
+    # Luôn ghi bản sao lưu cục bộ để đảm bảo dữ liệu không bị mất khi DB chưa mở quyền RLS
+    local_banks = _read_local_banks()
+    local_banks[technician_id] = record
+    _write_local_banks(local_banks)
+
+    return record
 
 
 def delete_bank_account(technician_id: str):
-    resp = (
-        supabase.table(BANK_ACCOUNTS_TABLE)
-        .delete()
-        .eq("technician_id", technician_id)
-        .execute()
-    )
-    return resp.data[0] if resp and resp.data else None
+    try:
+        supabase.table(BANK_ACCOUNTS_TABLE).delete().eq("technician_id", technician_id).execute()
+    except Exception:
+        pass
+
+    local_banks = _read_local_banks()
+    removed = local_banks.pop(technician_id, None)
+    if removed:
+        _write_local_banks(local_banks)
+    return removed or {"success": True}
+

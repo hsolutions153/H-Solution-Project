@@ -11,7 +11,7 @@ const slides = [
   {
     tag: "⚡ Nền tảng chuyên biệt xe máy điện",
     icon: "electric_moped",
-    title: "Chào mừng đến với\nH-Mobility Care",
+    title: "Chào mừng đến với\nV-HCare",
     subtitle: "Hệ sinh thái cứu hộ khẩn cấp & dịch vụ chăm sóc toàn diện cho xe máy điện số 1 Việt Nam.",
     features: ["100% Xe máy điện", "KTV chuyên nghiệp", "Hỗ trợ toàn quốc"],
     gradient: "linear-gradient(135deg, #0a2540 0%, #114567 40%, #156495 100%)",
@@ -21,7 +21,7 @@ const slides = [
     tag: "🚨 Cứu hộ khẩn cấp 24/7",
     icon: "e911_emergency",
     title: "Cứu hộ SOS 24/7\nCó mặt chỉ sau vài phút",
-    subtitle: "Hết pin, thủng lốp hay hỏng động cơ giữa đường? 1 chạm duy nhất, kỹ thuật viên H-Mobility Care sẽ lập tức tiếp ứng.",
+    subtitle: "Hết pin, thủng lốp hay hỏng động cơ giữa đường? 1 chạm duy nhất, kỹ thuật viên V-HCare sẽ lập tức tiếp ứng.",
     features: ["Định vị 1 chạm", "Trực chiến 24/7", "Đến tận nơi siêu tốc"],
     gradient: "linear-gradient(135deg, #4a0000 0%, #7f1d1d 40%, #b91c1c 100%)",
     accentColor: "#ff9999",
@@ -39,7 +39,7 @@ const slides = [
     tag: "🔋 Quản lý xe & pin thông minh",
     icon: "battery_charging_full",
     title: "Chăm sóc khối pin\nAn tâm trên mọi nẻo đường",
-    subtitle: "Giám sát chu kỳ pin LFP, nhắc lịch bảo dưỡng định kỳ và bảo vệ hành trình xe máy điện cùng H-Mobility Care.",
+    subtitle: "Giám sát chu kỳ pin LFP, nhắc lịch bảo dưỡng định kỳ và bảo vệ hành trình xe máy điện cùng V-HCare.",
     features: ["Chuyên sâu pin LFP", "Nhắc lịch bảo dưỡng", "Bảo hành dài hạn"],
     gradient: "linear-gradient(135deg, #0f3a56 0%, #156495 40%, #4896c4 100%)",
     accentColor: "#b2d5ea",
@@ -137,7 +137,7 @@ export default function OnboardingPage() {
           <div className="onboarding-brand-icon-wrap">
             <span className="material-symbols-outlined onboarding-brand-icon">bolt</span>
           </div>
-          <span className="onboarding-brand-text">H-Mobility Care</span>
+          <span className="onboarding-brand-text">V-HCare</span>
         </div>
 
         {!isLast && (
@@ -240,7 +240,7 @@ export default function OnboardingPage() {
           }}
         >
           <span className="onboarding-cta-text">
-            {isLast ? "Bắt đầu cùng H-Mobility Care" : "Tiếp tục"}
+            {isLast ? "Bắt đầu cùng V-HCare" : "Tiếp tục"}
           </span>
           <span className="material-symbols-outlined onboarding-cta-arrow">
             {isLast ? "arrow_forward" : "arrow_forward"}

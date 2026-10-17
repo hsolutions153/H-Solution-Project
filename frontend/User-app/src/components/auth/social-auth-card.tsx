@@ -1,26 +1,26 @@
 "use client";
 
 import {
-digitsOnly,
-EMAIL_PATTERN,
-isStrongPassword,
-VIETNAM_PHONE_PATTERN,
+  digitsOnly,
+  EMAIL_PATTERN,
+  isStrongPassword,
+  VIETNAM_PHONE_PATTERN,
 } from "@/utils/auth-validation";
 import { BrandLockup } from "@h-mobility/ui";
 import {
-Eye,
-EyeOff,
-LockKeyhole,
-Mail,
-MapPin,
-Phone,
-ShieldCheck,
-UserRound,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter,useSearchParams } from "next/navigation";
-import { useEffect,useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type SocialAuthCardProps = {
   mode: "login" | "register";
@@ -99,7 +99,7 @@ export function SocialAuthCard({
             }
           }
         }
-      } catch {}
+      } catch { }
     }
     checkNextAuthSession();
     return () => {
@@ -478,12 +478,6 @@ export function SocialAuthCard({
             <span>Apple</span>
           </button>
         </div>
-
-        {(!availableProviders.google || !availableProviders.apple) && (
-          <p className="mt-sm text-center text-xs text-outline">
-            Phương thức bị làm mờ cần được cấu hình OAuth trên máy chủ.
-          </p>
-        )}
 
         <p className="mt-lg text-center text-sm text-on-surface-variant">
           {isLogin ? "Chưa có tài khoản?" : "Đã có tài khoản?"}{" "}

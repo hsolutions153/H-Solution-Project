@@ -103,7 +103,7 @@ export default function HomePage() {
               <div className="h-6 w-40 animate-pulse rounded-md bg-white/20" aria-hidden />
             )}
             <p className="mt-1.5 text-[13px] leading-relaxed text-brand-100">
-              Kỹ thuật viên H-Mobility Care đến tận nơi khi xe gặp sự cố.
+              Kỹ thuật viên V-HCare đến tận nơi khi xe gặp sự cố.
             </p>
             <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-brand-100">
               <ShieldCheck className="size-3.5" />

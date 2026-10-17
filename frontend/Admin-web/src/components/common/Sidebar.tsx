@@ -63,7 +63,7 @@ export const Sidebar = ({
             {!sidebarCollapsed && (
               <div className="truncate animate-in fade-in duration-200">
                 <h1 className="font-bold text-brand-950 text-base leading-tight truncate">
-                  H-Mobility Care
+                  V-HCare
                 </h1>
                 <span className="text-xs text-brand-600 font-medium block">
                   Quản trị hệ thống

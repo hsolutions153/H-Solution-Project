@@ -19,7 +19,7 @@ def send_password_reset_code(phone: str, code: str) -> None:
     try:
         response = requests.post(url, headers=headers, json={
             "phone": phone, "code": code,
-            "message": f"Ma xac minh H-Mobility Care: {code}. Ma co hieu luc trong 10 phut.",
+            "message": f"Ma xac minh V-HCare: {code}. Ma co hieu luc trong 10 phut.",
         }, timeout=10)
         response.raise_for_status()
     except requests.RequestException as error:

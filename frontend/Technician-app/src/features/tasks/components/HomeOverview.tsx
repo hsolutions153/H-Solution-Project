@@ -99,7 +99,7 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
             <div className="h-6 w-40 animate-pulse rounded-md bg-white/20" aria-hidden />
           )}
           <p className="mt-1.5 text-[13px] leading-relaxed text-brand-100">
-            Đội kỹ thuật H-Mobility Care sửa chữa và cứu hộ xe tận nơi.
+            Đội kỹ thuật V-HCare sửa chữa và cứu hộ xe tận nơi.
           </p>
           <span
             className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${

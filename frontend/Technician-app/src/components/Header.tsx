@@ -68,7 +68,7 @@ export const Header = ({ onLogout }: HeaderProps) => {
       <div className="flex min-w-0 items-center gap-2.5 select-none">
         <BrandMark size={34} />
         <span className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-base font-extrabold tracking-wide text-ink">H-Mobility Care</span>
+          <span className="truncate text-base font-extrabold tracking-wide text-ink">V-HCare</span>
           <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-600">
             Kỹ thuật viên cứu hộ 24/7
           </span>

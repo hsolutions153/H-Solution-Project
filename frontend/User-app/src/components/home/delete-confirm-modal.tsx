@@ -67,8 +67,7 @@ export function DeleteConfirmModal({
               <strong>Lưu trữ an toàn lịch sử</strong>
               <span>
                 Xe sẽ được gỡ khỏi danh sách của bạn. Mọi hồ sơ cứu hộ & bảo
-                dưỡng trước đây vẫn được lưu trữ bảo mật trên hệ thống H-Mobility
-                Care.
+                dưỡng trước đây vẫn được lưu trữ bảo mật trên hệ thống V-HCare.
               </span>
             </div>
           </div>

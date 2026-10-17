@@ -1,8 +1,11 @@
 import os
 
+from dotenv import load_dotenv
 import jwt
 
 from app.core.exceptions import AppException, ErrorCode
+
+load_dotenv()
 
 _jwks = jwt.PyJWKClient("https://www.googleapis.com/oauth2/v3/certs", cache_keys=True)
 

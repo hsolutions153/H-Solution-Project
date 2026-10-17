@@ -1,6 +1,6 @@
 import { BrandLockup, BrandMark } from "@h-mobility/ui";
 
-/** Customer-app aliases for the shared H-Mobility Care mark. */
+/** Customer-app aliases for the shared V-HCare mark. */
 export function EMobiCareLogoIcon({ size = 32, className = "" }: { size?: number; className?: string }) {
   return <BrandMark size={size} className={className} />;
 }

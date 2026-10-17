@@ -250,7 +250,7 @@ export function HistoryDetail() {
                     rating: 4.9,
                     reviews: 25,
                     avatar: "",
-                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
+                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
                     verified: true,
                   }
                 : null,
@@ -359,7 +359,7 @@ export function HistoryDetail() {
                 phone: res.technician.phone || "",
                 rating: res.technician.rating || 4.9,
                 reviews: res.technician.reviews || 25,
-                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
+                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
                 experience_years: res.technician.experience_years || 3,
                 avatar: res.technician.avatar || "",
                 verified: true,
