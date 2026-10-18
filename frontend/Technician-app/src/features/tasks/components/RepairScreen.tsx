@@ -1063,7 +1063,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
               {paymentInfo?.payment?.payment_status === "PENDING" ? (
                 <div className="flex items-center justify-between rounded-control border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
                   <span className="font-semibold">
-                    Khách đã trả: {paymentInfo?.payment?.payment_method === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                    Khách đã trả: {['CASH', 'COD'].includes(String(paymentInfo?.payment?.payment_method || '').toUpperCase()) ? "Tiền mặt" : "Chuyển khoản"}
                   </span>
                   <span className="text-[11px] font-medium text-emerald-700">Kiểm tra & gạt xác nhận</span>
                 </div>

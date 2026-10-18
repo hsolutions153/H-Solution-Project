@@ -145,11 +145,16 @@ def _settle(payment: dict, transaction_code: str, changed_by: str | None = None)
     return updated
 
 
-def fetch_qr(repair_id: str, current_user: dict, payment_method: str = 'BANK_TRANSFER'):
+def fetch_qr(repair_id: str, current_user: dict, payment_method: str | None = None):
     from app.technicians.repository import get_bank_account
 
     repair = _authorize_repair(repair_id, current_user)
-    method = 'CASH' if payment_method == 'COD' else payment_method
+    # Khi chỉ đọc thông tin thanh toán (ví dụ màn hình KTV), không được mặc định
+    # lại BANK_TRANSFER vì khách có thể đã chọn CASH. Chỉ đổi phương thức khi
+    # client truyền rõ `method` (các nút chọn phương thức của User app).
+    existing_payment = repository.get_payment_by_repair_id(repair_id)
+    requested_method = payment_method or (existing_payment or {}).get('payment_method') or 'BANK_TRANSFER'
+    method = 'CASH' if requested_method == 'COD' else requested_method
     if method not in {'CASH', 'BANK_TRANSFER'}:
         raise AppException(ErrorCode.VALIDATION_ERROR, message='Phương thức thanh toán không hợp lệ.')
     amount = _final_amount(repair)

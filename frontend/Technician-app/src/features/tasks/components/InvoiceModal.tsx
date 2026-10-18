@@ -138,10 +138,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
             note: q0.diagnosis_note || "",
           });
 
-          // Báo giá bổ sung (phát sinh)
-          const suppQuotes = sortedQuotes.slice(1);
+          // Báo giá bổ sung (phát sinh). Một số dữ liệu cũ có thể chứa nhiều
+          // quote/item trùng nhau do gửi lại báo giá; hóa đơn chỉ được tính
+          // phần phát sinh thực tế trong Final Cost.
+          const suppQuotes = sortedQuotes.slice(1).filter((q) =>
+            !q.status || q.status === "ACCEPTED" || q.status === "COMPLETED"
+          );
           const suppLabor = suppQuotes.reduce((sum, q) => sum + Number(q.labor_fee || 0), 0);
-          const suppItems: QuoteItemDetail[] = suppQuotes
+          const rawSuppItems: QuoteItemDetail[] = suppQuotes
             .flatMap((q) => q.items || [])
             .filter((it: any) => !isLabor(it))
             .map((it: any) => ({
@@ -152,14 +156,23 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
                 it.subtotal ?? it.total_price ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? it.price ?? 0))
               ),
             }));
+          const seenSupplementaryItems = new Set<string>();
+          const suppItems = rawSuppItems.filter((item) => {
+            const key = `${item.name}|${item.quantity}|${item.unitPrice}|${item.subtotal}`;
+            if (seenSupplementaryItems.has(key)) return false;
+            seenSupplementaryItems.add(key);
+            return true;
+          });
           const suppLaborFromItems = suppQuotes
             .flatMap((q) => q.items || [])
             .filter(isLabor)
             .reduce((sum: number, it: any) => sum + Number(it.subtotal ?? it.total_price ?? it.unit_price ?? 0), 0);
           const finalSuppLabor = suppLabor > 0 ? suppLabor : suppLaborFromItems;
-          const suppTotal =
+          const quoteSuppTotal =
             suppQuotes.reduce((sum, q) => sum + Number(q.estimated_price || 0), 0) ||
             finalSuppLabor + suppItems.reduce((s, i) => s + i.subtotal, 0);
+          const finalSuppTotal = totalAmount > q0Total ? totalAmount - q0Total : 0;
+          const suppTotal = finalSuppTotal > 0 ? finalSuppTotal : quoteSuppTotal;
           const suppNote =
             suppQuotes.map((q) => q.diagnosis_note).filter(Boolean).join(" · ") ||
             "Chi phí linh kiện / công việc phát sinh trong quá trình sửa chữa";

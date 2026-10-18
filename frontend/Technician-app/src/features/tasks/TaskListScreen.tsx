@@ -255,10 +255,16 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             // Tự động bật Modal tiếp nhận đơn mới cho KTV được chỉ định nếu chưa xử lý
             const incomingTask = apiTasks.find((t) => t.status === "WAITING_ACCEPT");
             if (incomingTask) {
+              // Luôn đồng bộ task đang được backend giao vào modal. Điều kiện cũ
+              // dùng `&&` khiến một task WAITING_ACCEPT cũ giữ chặt state và
+              // ngăn task SOS mới được hiển thị.
+              setIsModalOpen(true);
+              setSelectedTask(incomingTask);
+            } else {
               setSelectedTask((prev) => {
-                if (!prev || (prev.id !== incomingTask.id && prev.status !== "WAITING_ACCEPT")) {
-                  setIsModalOpen(true);
-                  return incomingTask;
+                if (prev?.status === "WAITING_ACCEPT") {
+                  setIsModalOpen(false);
+                  return null;
                 }
                 return prev;
               });
@@ -270,12 +276,18 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       }
     }
 
+    // Assignment SOS cần xuất hiện gần như ngay sau khi backend gán thợ.
+    // Polling 2.5s trước đây tạo cảm giác bị trễ; dùng chu kỳ 1s và kiểm tra
+    // ngay khi tab được focus lại để không phải chờ thêm một vòng.
     loadTechnicianTasks();
-    const interval = setInterval(loadTechnicianTasks, 2500);
+    const interval = setInterval(loadTechnicianTasks, 1000);
+    const handleFocus = () => loadTechnicianTasks();
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 

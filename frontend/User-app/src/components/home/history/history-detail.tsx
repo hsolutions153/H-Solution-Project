@@ -341,21 +341,34 @@ export function HistoryDetail() {
     return () => clearInterval(timer);
   }, [showQrModal, id, detail?.paymentStatus]);
 
-  // Khi modal mở trong trạng thái PENDING, tự động chọn đúng tab phương thức đã chọn & tải QR nếu cần
+  // Khi modal mở trong trạng thái PENDING, đọc lại payment record từ server.
+  // Không dùng paymentMethod cũ trong state vì sau khi đóng/mở modal nó có thể
+  // còn giá trị BANK_TRANSFER dù khách đã báo thanh toán tiền mặt.
   useEffect(() => {
     if (!showQrModal || detail?.paymentStatus !== "PENDING" || !detail?.id) return;
-    const isCash = String(detail.paymentMethod || "").toUpperCase() === "CASH" || String(detail.paymentMethod || "").toUpperCase() === "COD";
-    const targetTab = isCash ? "COD" : "VIETQR";
-    setActivePaymentTab(targetTab);
-    if (!isCash && !qrData && !isQrLoading) {
-      setIsQrLoading(true);
-      import("@/lib/api-client")
-        .then(({ fetchApi }) => fetchApi<any>(`/payments/repair/${detail.id}/qr?method=BANK_TRANSFER`))
-        .then((res) => setQrData(res))
-        .catch((err) => setQrError(err instanceof Error ? err.message : "Không thể tải thông tin thanh toán."))
-        .finally(() => setIsQrLoading(false));
-    }
-  }, [showQrModal, detail?.paymentStatus, detail?.paymentMethod, detail?.id, qrData, isQrLoading]);
+    let cancelled = false;
+    setQrError("");
+    setIsQrLoading(true);
+    import("@/lib/api-client")
+      .then(({ fetchApi }) => fetchApi<any>(`/payments/repair/${detail.id}/qr`))
+      .then((res) => {
+        if (cancelled) return;
+        const method = String(res?.payment?.payment_method || "BANK_TRANSFER").toUpperCase();
+        const isCash = method === "CASH" || method === "COD";
+        setDetail((prev) => (prev ? { ...prev, paymentMethod: method } : prev));
+        setActivePaymentTab(isCash ? "COD" : "VIETQR");
+        setQrData(isCash ? null : res);
+      })
+      .catch((err) => {
+        if (!cancelled) setQrError(err instanceof Error ? err.message : "Không thể tải thông tin thanh toán.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsQrLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showQrModal, detail?.paymentStatus, detail?.id]);
 
   const isFetchingRef = useRef(false);
   const refreshDetailRef = useRef<(() => Promise<void>) | null>(null);
@@ -552,13 +565,14 @@ export function HistoryDetail() {
     refreshDetailRef.current = fetchDetail;
     fetchDetail();
 
-    // Làm mới dữ liệu ngầm mỗi 8s khi đơn đang tiến hành
+    // Làm mới dữ liệu ngầm thường xuyên để báo giá mới của KTV xuất hiện sớm
+    // trên User app (không phải chờ hết một vòng 8 giây).
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       if (detail?.status === "in_progress" || (detail?.status === "completed" && detail.paymentStatus !== "PAID")) {
         fetchDetail();
       }
-    }, 8000);
+    }, 2500);
 
     return () => {
       isMounted = false;
@@ -1613,6 +1627,7 @@ export function HistoryDetail() {
           </div>
         </div>
 
+        {!['WAITING_FOR_APPROVAL', 'ESTIMATE_SUBMITTED', 'DIAGNOSED'].includes(detail.rawStatus) && (
         <div className="rd-jobs-section">
           <span className="rd-section-label">Chi phí thanh toán</span>
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-3 text-xs">
@@ -1756,6 +1771,7 @@ export function HistoryDetail() {
             </div>
           </div>
         </div>
+        )}
 
         {detail.images.length > 0 && (
           <div className="rd-images-section">

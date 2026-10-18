@@ -40,7 +40,7 @@ def sepay_webhook(
 @router.get("/repair/{repair_id}/qr", response_model=QRResponse)
 def get_payment_qr(
     repair_id: str,
-    method: str = Query(default="BANK_TRANSFER"),
+    method: str | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
     return fetch_qr(repair_id, current_user, method)

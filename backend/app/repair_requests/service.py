@@ -412,6 +412,17 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
             if current_tech_id:
                 excluded_tech_ids.add(current_tech_id)
 
+            # Ghi nhận timeout như một lần từ chối tự động trước khi phân công lại.
+            # Nhờ vậy lịch sử và cơ chế loại trừ KTV nhất quán với thao tác từ frontend.
+            if current_tech_id:
+                repository.add_status_history({
+                    "id": _request_id(),
+                    "repair_id": req_id,
+                    "status": "REJECTED",
+                    "changed_by": current_tech_id,
+                    "note": f"KTV không phản hồi trong {timeout_seconds // 60} phút; hệ thống tự động từ chối phân công.",
+                })
+
             try:
                 histories = repository.get_status_history(req_id)
                 for h in histories:
