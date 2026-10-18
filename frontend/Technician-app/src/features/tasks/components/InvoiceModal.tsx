@@ -14,7 +14,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface InvoiceModalProps {
   task: HistoryTask | null;
@@ -60,6 +60,7 @@ function formatPaymentMethod(rawPm?: string): string {
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose }) => {
+  const invoiceRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [initialSection, setInitialSection] = useState<QuoteSectionData>({
     labor: 0,
@@ -110,7 +111,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
         const totalAmount = Number(task.totalAmount || 0);
 
         if (sortedQuotes.length > 1) {
-          // ── Trường hợp 1: Có báo giá ban đầu và báo giá phát sinh riêng ──
           const q0 = sortedQuotes[0];
           const q0Labor = Number(q0.labor_fee || 0);
           const q0Items: QuoteItemDetail[] = (q0.items || [])
@@ -171,7 +171,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
             note: suppNote,
           });
         } else if (sortedQuotes.length === 1) {
-          // ── Trường hợp 2: Có 1 báo giá ──
           const q0 = sortedQuotes[0];
           const q0Labor = Number(q0.labor_fee || 0);
           const q0Items: QuoteItemDetail[] = (q0.items || [])
@@ -224,7 +223,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
             setSupplementarySection(null);
           }
         } else {
-          // ── Trường hợp 3: Đơn trọn gói không có bóc tách quote ──
           setInitialSection({
             labor: totalAmount,
             items: [],
@@ -253,7 +251,105 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
   const totalAmount = Number(task.totalAmount || 0);
 
   const handlePrint = () => {
-    window.print();
+    if (!invoiceRef.current) {
+      window.print();
+      return;
+    }
+
+    // Tạo bản sao của phần tử hóa đơn để xử lý sạch trước khi đưa vào iframe in
+    const clonedNode = invoiceRef.current.cloneNode(true) as HTMLElement;
+
+    // Loại bỏ các nút bấm (nút X đóng và 2 nút hành động ở chân modal)
+    clonedNode.querySelectorAll("button, .print\\:hidden").forEach((el) => el.remove());
+
+    // Thu thập toàn bộ style và link CSS đang hoạt động trên trang
+    const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
+      .map((el) => el.outerHTML)
+      .join("\n");
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute(
+      "style",
+      "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;visibility:hidden;"
+    );
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Hóa đơn #${task?.code || "HMOBILITY"}</title>
+        ${styles}
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 12mm 15mm;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            box-sizing: border-box !important;
+          }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            font-size: 13px !important;
+            line-height: 1.5 !important;
+          }
+          .invoice-print-container {
+            width: 100% !important;
+            max-width: 600px !important;
+            margin: 0 auto !important;
+            padding: 24px !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 16px !important;
+          }
+          section, .rounded-xl, .border {
+            page-break-inside: avoid !important;
+          }
+          button, .print\\:hidden {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-print-container">
+          ${clonedNode.innerHTML}
+        </div>
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print error:", err);
+      } finally {
+        setTimeout(() => {
+          iframe.remove();
+        }, 1500);
+      }
+    };
+
+    if (iframe.contentWindow) {
+      setTimeout(triggerPrint, 300);
+    }
   };
 
   return (
@@ -261,13 +357,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex justify-center items-start overflow-y-auto bg-slate-900/60 backdrop-blur-xs p-3 sm:py-6 font-sans [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden print:static print:bg-white print:p-0"
+      className="fixed inset-0 z-50 flex justify-center items-start overflow-y-auto bg-slate-900/60 backdrop-blur-xs p-3 sm:py-6 font-sans scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden print:static print:bg-white print:p-0"
     >
       <div
+        ref={invoiceRef}
         onClick={(e) => e.stopPropagation()}
         className="relative my-2 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xl print:max-w-none print:border-none print:shadow-none"
       >
-        {/* Nút đóng nhanh ở góc trên bên phải */}
         <button
           type="button"
           onClick={onClose}
@@ -277,7 +373,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           <X className="size-4.5" />
         </button>
 
-        {/* Header Brand */}
         <div className="border-b border-dashed border-slate-200 pb-2.5 text-center pr-6 pl-2">
           <h2 className="text-base font-black tracking-wider text-brand-900 uppercase">
             H-MOBILITY CARE
@@ -291,7 +386,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </div>
         </div>
 
-        {/* Timestamp & Status Stamp */}
         <div className="my-2.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-slate-500">
             <Calendar className="size-3.5 text-slate-400" />
@@ -312,7 +406,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           )}
         </div>
 
-        {/* Customer & Device Information */}
         <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 space-y-1 text-xs">
           <div className="flex justify-between items-start">
             <span className="text-slate-500 shrink-0">Khách hàng:</span>
@@ -347,7 +440,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </div>
         </div>
 
-        {/* Loading Indicator */}
         {loading && (
           <div className="py-3 space-y-1.5">
             <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
@@ -355,9 +447,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </div>
         )}
 
-        {/* ═════════════════════════════════════════════════════════ */}
-        {/* ── PHẦN 1: BÁO GIÁ BAN ĐẦU (ĐÃ DUYỆT) ── */}
-        {/* ═════════════════════════════════════════════════════════ */}
         {!loading && (
           <section className="mt-3 pt-1">
             <div className="flex items-center justify-between pb-1 border-b border-slate-200">
@@ -422,9 +511,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </section>
         )}
 
-        {/* ═════════════════════════════════════════════════════════ */}
-        {/* ── PHẦN 2: LINH KIỆN PHÁT SINH TRONG LÚC SỬA ── */}
-        {/* ═════════════════════════════════════════════════════════ */}
         {!loading && (
           <section className="mt-3 pt-2 border-t-2 border-dashed border-slate-200">
             {supplementarySection && supplementarySection.total > 0 ? (
@@ -505,9 +591,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </section>
         )}
 
-        {/* ═════════════════════════════════════════════════════════ */}
-        {/* ── TỔNG CỘNG THANH TOÁN (Trực quan & Nổi bật) ── */}
-        {/* ═════════════════════════════════════════════════════════ */}
         <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/70 p-3 space-y-1.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-brand-950">
@@ -549,9 +632,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
           </div>
         </div>
 
-        {/* ═════════════════════════════════════════════════════════ */}
-        {/* ── 2 NÚT THAO TÁC ĐẶT TRỰC TIẾP TRONG HÓA ĐƠN ── */}
-        {/* ═════════════════════════════════════════════════════════ */}
         <div className="mt-3.5 pt-3 border-t border-dashed border-slate-200 grid grid-cols-2 gap-2.5 print:hidden">
           <Button
             type="button"

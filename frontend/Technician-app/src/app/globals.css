@@ -75,3 +75,43 @@ body {
 .anim-sheet {
   animation: sheet-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .app-shell {
+    max-width: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    contain: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  body:has([role="dialog"]) .app-shell > *:not([role="dialog"]) {
+    display: none !important;
+  }
+
+  body:has([role="dialog"]) [role="dialog"] {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  body:has([role="dialog"]) [role="dialog"] > div {
+    max-width: 600px !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    page-break-inside: avoid;
+  }
+}

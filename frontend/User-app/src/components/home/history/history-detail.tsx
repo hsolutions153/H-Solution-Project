@@ -45,6 +45,9 @@ interface RepairDetail {
   finalCost?: number;
   isSupplementaryQuote?: boolean;
   additionalAmount?: number;
+  customerName?: string;
+  customerPhone?: string;
+  deviceInfo?: string;
   images: string[];
 }
 
@@ -129,6 +132,24 @@ function getServiceTitle(isSos: boolean, issueType?: string, description?: strin
 
 function formatCurrency(amount: number): string {
   return amount.toLocaleString("vi-VN") + " ₫";
+}
+
+function formatPaymentMethod(rawPm?: string | null): string {
+  if (!rawPm) return "Chưa thanh toán";
+  const pm = String(rawPm).toUpperCase();
+  if (pm === "CASH" || pm === "TIỀN MẶT" || pm.includes("COD")) return "Tiền mặt trực tiếp cho KTV";
+  if (
+    pm.includes("TRANSFER") ||
+    pm.includes("BANK") ||
+    pm.includes("CHUYỂN KHOẢN") ||
+    pm.includes("VIETQR") ||
+    pm.includes("SEPAY")
+  ) {
+    return "Chuyển khoản VietQR (Napas 247)";
+  }
+  if (pm.includes("MOMO")) return "Ví điện tử MoMo";
+  if (pm === "QR") return "Quét mã QR trực tuyến";
+  return rawPm;
 }
 
 const AVAILABLE_RATING_TAGS = [
@@ -262,6 +283,9 @@ export function HistoryDetail() {
               partsCost: 0,
               paymentMethod: null,
               total: found.total || 0,
+              customerName: "",
+              customerPhone: "",
+              deviceInfo: found.device || "Xe lăn / Scooter điện",
               images: [],
             };
           }
@@ -505,6 +529,11 @@ export function HistoryDetail() {
               finalCost,
               isSupplementaryQuote,
               additionalAmount,
+              customerName: res.customer?.full_name || res.customer?.name || "",
+              customerPhone: res.customer?.phone || "",
+              deviceInfo: res.device
+                ? `${res.device.manufacturer || ""} ${res.device.model_name || ""}`.trim()
+                : (res.issue_type ? `Xe lăn / Scooter điện (${res.issue_type})` : "Xe lăn / Scooter điện"),
               images: (res.images || []).map((img: any) => img.image_url),
             });
             setError("");
@@ -590,6 +619,417 @@ export function HistoryDetail() {
     } finally {
       setIsApprovingQuote(false);
     }
+  };
+
+  const handleDownloadInvoicePdf = () => {
+    if (!detail) return;
+
+    const partsRows =
+      detail.parts && detail.parts.length > 0
+        ? detail.parts
+            .map(
+              (p, idx) => `
+          <tr>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #1e293b;">${p.name}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #475569;">${p.quantity}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #475569;">${formatCurrency(p.unitPrice)}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 700; color: #0f172a;">${formatCurrency(p.subtotal)}</td>
+          </tr>`
+            )
+            .join("")
+        : `
+          <tr>
+            <td colspan="5" style="padding: 14px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b; font-style: italic;">
+              Không có linh kiện thay thế (thực hiện kiểm tra, cân chỉnh & bảo dưỡng tại chỗ)
+            </td>
+          </tr>`;
+
+    const invoiceDateStr =
+      detail.dateTime ||
+      new Date().toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+    const isPaid = detail.paymentStatus === "PAID";
+    const paymentStatusBadge = isPaid
+      ? `<span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700;">ĐÃ THANH TOÁN</span>`
+      : detail.paymentStatus === "PENDING"
+      ? `<span style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700;">CHỜ XÁC NHẬN</span>`
+      : `<span style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700;">CHƯA THANH TOÁN</span>`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Hoa_don_${detail.orderCode || detail.id}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 15mm 15mm 15mm 15mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.5;
+          }
+          .invoice-box {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 24px 28px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+          }
+          .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #0284c7;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+          }
+          .brand-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0369a1;
+            letter-spacing: -0.02em;
+            margin: 0;
+          }
+          .brand-sub {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 4px;
+          }
+          .invoice-tag {
+            text-align: right;
+          }
+          .invoice-heading {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0;
+            text-transform: uppercase;
+          }
+          .invoice-code {
+            font-size: 12px;
+            font-weight: 600;
+            color: #0284c7;
+            margin-top: 4px;
+          }
+          .info-grid {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+          }
+          .info-col {
+            flex: 1;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+          }
+          .info-col h4 {
+            margin: 0 0 10px 0;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0369a1;
+          }
+          .info-line {
+            display: flex;
+            margin-bottom: 6px;
+            font-size: 12px;
+          }
+          .info-line:last-child {
+            margin-bottom: 0;
+          }
+          .info-label {
+            width: 105px;
+            color: #64748b;
+            flex-shrink: 0;
+          }
+          .info-value {
+            font-weight: 600;
+            color: #1e293b;
+          }
+          .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 16px 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 16px;
+          }
+          th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 2px solid #cbd5e1;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.03em;
+          }
+          .summary-box {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+          }
+          .summary-table {
+            width: 320px;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+          .summary-table td {
+            padding: 6px 10px;
+          }
+          .summary-table .total-row td {
+            border-top: 2px solid #0284c7;
+            padding-top: 10px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0369a1;
+          }
+          .notes-box {
+            margin-top: 18px;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-left: 3px solid #0284c7;
+            border-radius: 4px;
+            font-size: 11.5px;
+            color: #475569;
+          }
+          .signatures-grid {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 16px;
+            page-break-inside: avoid;
+          }
+          .signature-col {
+            text-align: center;
+            width: 45%;
+          }
+          .signature-col .role {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0f172a;
+            text-transform: uppercase;
+          }
+          .signature-col .note {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 2px;
+          }
+          .signature-col .space {
+            height: 65px;
+          }
+          .signature-col .name {
+            font-weight: 700;
+            font-size: 12px;
+            color: #1e293b;
+          }
+          .footer-note {
+            text-align: center;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 36px;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-box">
+          <div class="header-row">
+            <div>
+              <h1 class="brand-title">H-MOBILITY CARE</h1>
+              <div class="brand-sub">Hệ thống Dịch vụ Sửa chữa & Cứu hộ Xe điện Chuyên nghiệp</div>
+              <div class="brand-sub">Hotline 24/7: 1900 6868 &bull; Email: hotro@h-mobility.vn</div>
+            </div>
+            <div class="invoice-tag">
+              <h2 class="invoice-heading">HÓA ĐƠN DỊCH VỤ</h2>
+              <div class="invoice-code">Mã đơn: #${detail.orderCode || detail.id}</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Ngày lập: ${invoiceDateStr}</div>
+              <div style="margin-top: 6px;">${paymentStatusBadge}</div>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-col">
+              <h4>Thông tin khách hàng</h4>
+              <div class="info-line">
+                <span class="info-label">Khách hàng:</span>
+                <span class="info-value">${detail.customerName || "Khách hàng cá nhân"}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">Điện thoại:</span>
+                <span class="info-value">${detail.customerPhone || "---"}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">Địa chỉ phục vụ:</span>
+                <span class="info-value">${detail.location || "Tại vị trí yêu cầu"}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">Phương tiện:</span>
+                <span class="info-value">${detail.deviceInfo || "Xe lăn điện / Scooter điện"}</span>
+              </div>
+            </div>
+
+            <div class="info-col">
+              <h4>Thông tin dịch vụ & KTV</h4>
+              <div class="info-line">
+                <span class="info-label">Kỹ thuật viên:</span>
+                <span class="info-value">${detail.technician?.name || "KTV H-Mobility"}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">SĐT Kỹ thuật:</span>
+                <span class="info-value">${detail.technician?.phone || "1900 6868"}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">Phương thức TT:</span>
+                <span class="info-value">${formatPaymentMethod(detail.paymentMethod)}</span>
+              </div>
+              <div class="info-line">
+                <span class="info-label">Loại dịch vụ:</span>
+                <span class="info-value">${detail.title}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">
+            <span>CHI TIẾT LINH KIỆN & VẬT TƯ SỬA CHỮA</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">STT</th>
+                <th>Tên linh kiện / Hạng mục</th>
+                <th style="width: 60px; text-align: center;">SL</th>
+                <th style="width: 130px; text-align: right;">Đơn giá</th>
+                <th style="width: 140px; text-align: right;">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${partsRows}
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <table class="summary-table">
+              <tr>
+                <td style="color: #64748b;">Tổng tiền linh kiện:</td>
+                <td style="text-align: right; font-weight: 600; color: #1e293b;">
+                  ${formatCurrency(detail.partsCost || (detail.parts || []).reduce((s, p) => s + p.subtotal, 0))}
+                </td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">Tiền công Kỹ thuật viên:</td>
+                <td style="text-align: right; font-weight: 600; color: #1e293b;">
+                  ${formatCurrency(detail.laborCost || 0)}
+                </td>
+              </tr>
+              <tr class="total-row">
+                <td>TỔNG THANH TOÁN:</td>
+                <td style="text-align: right;">
+                  ${formatCurrency(detail.total)}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          ${
+            detail.diagnosisNote || detail.repairDesc
+              ? `
+          <div class="notes-box">
+            <strong>Ghi chú xử lý / Chẩn đoán:</strong> ${detail.diagnosisNote || detail.repairDesc}
+          </div>`
+              : ""
+          }
+
+          <div class="notes-box" style="margin-top: 10px; background: #fffbeb; border-left-color: #f59e0b;">
+            <strong>Chính sách bảo hành:</strong> Linh kiện thay thế chính hãng được bảo hành từ 3 đến 6 tháng. Quý khách vui lòng xuất trình mã đơn hàng hoặc hóa đơn này để được hỗ trợ nhanh nhất.
+          </div>
+
+          <div class="signatures-grid">
+            <div class="signature-col">
+              <div class="role">Khách hàng</div>
+              <div class="note">(Ký & ghi rõ họ tên)</div>
+              <div class="space"></div>
+              <div class="name">${detail.customerName || "Khách hàng"}</div>
+            </div>
+            <div class="signature-col">
+              <div class="role">Kỹ thuật viên thực hiện</div>
+              <div class="note">(Ký & xác nhận dịch vụ)</div>
+              <div class="space"></div>
+              <div class="name">${detail.technician?.name || "H-Mobility Care"}</div>
+            </div>
+          </div>
+
+          <div class="footer-note">
+            Cảm ơn Quý khách đã sử dụng dịch vụ H-Mobility Care! Chúc Quý khách có những trải nghiệm di chuyển an toàn & tiện lợi.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute(
+      "style",
+      "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;visibility:hidden;"
+    );
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Lỗi khi mở hộp thoại in PDF:", err);
+      } finally {
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+        }, 3000);
+      }
+    }, 300);
   };
 
   if (loading) return <div className="rd-container"><div className="rd-not-found"><div className="rh-loading-spinner" /></div></div>;
@@ -1391,17 +1831,29 @@ export function HistoryDetail() {
                 : `Thanh toán ngay (${formatCurrency(detail.total)})`}
             </button>
           )}
-          <button className="rd-action-primary" id="download-invoice">
+          <button
+            type="button"
+            className="rd-action-primary"
+            id="download-invoice"
+            onClick={handleDownloadInvoicePdf}
+          >
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
               picture_as_pdf
             </span>
             Tải hóa đơn PDF
           </button>
-          <button className="rd-action-secondary" id="send-support">
+          <button
+            type="button"
+            className="rd-action-secondary"
+            id="send-support"
+            onClick={() => {
+              window.open("tel:19006868", "_self");
+            }}
+          >
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
               support_agent
             </span>
-            Gửi yêu cầu hỗ trợ
+            Gửi yêu cầu hỗ trợ (1900 6868)
           </button>
         </div>
 
