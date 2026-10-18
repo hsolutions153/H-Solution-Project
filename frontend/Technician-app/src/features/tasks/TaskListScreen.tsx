@@ -11,9 +11,110 @@ import { TaskDetailScreen } from "./TaskDetailScreen";
 
 import { HistoryTask,Task,TaskStatus } from "@/types/task";
 import { EmptyState } from "@h-mobility/ui";
-import { ClipboardList,Plus } from "lucide-react";
+import { ClipboardList, Plus, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { mapApiTask } from "./mapApiTask";
+import { mapApiTask, parseAppointment } from "./mapApiTask";
+
+export type DateFilterType = "all" | "today" | "7days" | "month";
+
+export const DATE_FILTERS: { id: DateFilterType; label: string }[] = [
+  { id: "all", label: "Tất cả" },
+  { id: "today", label: "Hôm nay" },
+  { id: "7days", label: "7 ngày" },
+  { id: "month", label: "1 tháng" },
+];
+
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
+function getTaskDate(task: Task): Date {
+  const apt = parseAppointment(task);
+  if (apt.day) return apt.day;
+
+  if (task.bookingDate) {
+    if (task.bookingDate.toLowerCase().includes("hôm nay")) {
+      return new Date();
+    }
+    const isoMatch = task.bookingDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    }
+    const vnMatch = task.bookingDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (vnMatch) {
+      return new Date(Number(vnMatch[3]), Number(vnMatch[2]) - 1, Number(vnMatch[1]));
+    }
+  }
+
+  if (task.requestedTime && task.requestedTime.toLowerCase().includes("hôm nay")) {
+    return new Date();
+  }
+
+  if (task.createdAt) {
+    const d = new Date(task.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  return new Date();
+}
+
+function matchesDateFilter(task: Task, filter: DateFilterType): boolean {
+  if (filter === "all") return true;
+
+  const taskDate = getTaskDate(task);
+  const now = new Date();
+
+  const taskMidnight = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate()).getTime();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  if (filter === "today") {
+    return taskMidnight === todayMidnight;
+  }
+
+  if (filter === "7days") {
+    const sevenDaysAgo = todayMidnight - 7 * 24 * 60 * 60 * 1000;
+    const sevenDaysLater = todayMidnight + 7 * 24 * 60 * 60 * 1000;
+    return taskMidnight >= sevenDaysAgo && taskMidnight <= sevenDaysLater;
+  }
+
+  if (filter === "month") {
+    const thirtyDaysAgo = todayMidnight - 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysLater = todayMidnight + 30 * 24 * 60 * 60 * 1000;
+    return taskMidnight >= thirtyDaysAgo && taskMidnight <= thirtyDaysLater;
+  }
+
+  return true;
+}
+
+function matchesSearchQuery(task: Task, query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return true;
+
+  const noTone = removeVietnameseTones(trimmed);
+
+  const fieldsToSearch = [
+    task.code,
+    task.customerName,
+    task.customerPhone,
+    task.serviceName,
+    task.deviceInfo,
+    task.address,
+    task.description,
+    task.statusText,
+  ];
+
+  return fieldsToSearch.some((field) => {
+    if (!field) return false;
+    const lower = field.toLowerCase();
+    if (lower.includes(trimmed)) return true;
+    return removeVietnameseTones(lower).includes(noTone);
+  });
+}
 
 const DOING_STATUSES: TaskStatus[] = [
   "IN_PROGRESS",
@@ -36,6 +137,7 @@ function filterTasksByTab(tasks: Task[], tab: string): Task[] {
       return tasks.filter((t) => DOING_STATUSES.includes(t.status));
     case "done":
       return tasks.filter((t) => t.status === "COMPLETED");
+    case "all":
     case "today":
     default:
       return tasks.filter((t) => t.status !== "CANCELLED");
@@ -53,7 +155,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   view = "tasks",
   onNavigate,
 }) => {
-  const [activeTab, setActiveTab] = useState("today");
+  const [activeTab, setActiveTab] = useState("all");
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -312,17 +416,53 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     }
   };
 
-  const filteredTasks = useMemo(() => filterTasksByTab(tasks, activeTab), [tasks, activeTab]);
-  const tabCounts = useMemo(
-    () => Object.fromEntries(["today", "new", "doing", "done"].map((tab) => [tab, filterTasksByTab(tasks, tab).length])),
-    [tasks]
-  );
+  const filteredTasks = useMemo(() => {
+    const tabFiltered = filterTasksByTab(tasks, activeTab);
+    const dateFiltered = tabFiltered.filter((task) => matchesDateFilter(task, dateFilter));
+    return dateFiltered.filter((task) => matchesSearchQuery(task, searchQuery));
+  }, [tasks, activeTab, dateFilter, searchQuery]);
+
+  const tabCounts = useMemo(() => {
+    const counts = Object.fromEntries(
+      ["all", "new", "doing", "done"].map((tab) => [
+        tab,
+        filterTasksByTab(tasks, tab).length,
+      ])
+    );
+    counts.today = counts.all;
+    return counts;
+  }, [tasks]);
 
   const TAB_TITLES: Record<string, string> = {
-    today: "Công việc hôm nay",
+    all: "Tất cả công việc",
+    today: "Tất cả công việc",
     new: "Việc mới",
     doing: "Đang làm",
     done: "Đã hoàn tất",
+  };
+
+  const getSectionTitle = () => {
+    if (searchQuery.trim()) {
+      return `Tìm kiếm: "${searchQuery.trim()}"`;
+    }
+
+    const tabLabel = TAB_TITLES[activeTab] || "Tất cả công việc";
+    if (dateFilter === "all") {
+      return tabLabel;
+    }
+
+    const dateLabels: Record<DateFilterType, string> = {
+      all: "",
+      today: "hôm nay",
+      "7days": "7 ngày",
+      month: "1 tháng",
+    };
+
+    if (activeTab === "all" || activeTab === "today") {
+      return dateFilter === "today" ? "Công việc hôm nay" : `Công việc (${dateLabels[dateFilter]})`;
+    }
+
+    return `${tabLabel} (${dateLabels[dateFilter]})`;
   };
 
   if (view === "tasks" && currentView === "create") {
@@ -425,13 +565,63 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
 
   return (
     <div className="relative pb-28">
-      <div className="px-4 pt-4">
+      {/* Title */}
+      <div className="px-4 pt-4 pb-1">
         <h1 className="text-lg font-bold text-ink">Công việc</h1>
       </div>
+
+      {/* Status Tabs */}
       <TaskTabs activeTab={activeTab} setActiveTab={setActiveTab} counts={tabCounts} />
 
+      {/* Search & Date Filter Section */}
+      <div className="px-4 pt-2 pb-1 space-y-2.5">
+        {/* Search Field */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm theo mã đơn, khách hàng, số điện thoại, sự cố..."
+            className="w-full h-10 pl-9 pr-9 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-xs"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Xóa tìm kiếm"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Date Filter Chips - Căn đều 4 cột cân đối */}
+        <div className="grid grid-cols-4 gap-1.5">
+          {DATE_FILTERS.map((f) => {
+            const isActive = dateFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setDateFilter(f.id)}
+                className={`py-1.5 text-center text-xs rounded-full font-medium transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-brand-600 text-white shadow-xs font-semibold"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800"
+                }`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section Subtitle & Counter */}
       <div className="flex items-baseline justify-between px-4 pt-3 pb-3">
-        <h2 className="text-sm font-semibold text-ink">{TAB_TITLES[activeTab] || TAB_TITLES.today}</h2>
+        <h2 className="text-sm font-semibold text-ink">{getSectionTitle()}</h2>
         <span className="text-xs font-medium text-slate-500 tabular-nums">{filteredTasks.length} công việc</span>
       </div>
 
@@ -441,9 +631,25 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             icon={<ClipboardList />}
             title="Chưa có công việc"
             description={
-              activeTab === "new"
+              searchQuery || dateFilter !== "all"
+                ? "Không tìm thấy công việc phù hợp với bộ lọc hoặc từ khóa tìm kiếm."
+                : activeTab === "new"
                 ? "Yêu cầu mới được phân công cho bạn sẽ hiện ở đây."
                 : "Không có công việc nào trong mục này."
+            }
+            action={
+              searchQuery || dateFilter !== "all" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDateFilter("all");
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-brand-50 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors cursor-pointer"
+                >
+                  Đặt lại bộ lọc
+                </button>
+              ) : undefined
             }
           />
         ) : (

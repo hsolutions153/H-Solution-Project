@@ -20,6 +20,7 @@ import { Badge, Button, Card, EmptyState } from "@h-mobility/ui";
 import { InfoRow, SkeletonList } from "@/components/ui";
 import { BankSelect } from "@/components/BankSelect";
 import { uploadTechnicianAvatar } from "@/lib/avatar";
+import { PRESENCE_UPDATED_EVENT, setCachedPresence } from "@/lib/presence";
 
 interface ProfileFormState {
   full_name: string;
@@ -73,6 +74,9 @@ export function TechnicianProfileScreen() {
       const { fetchApi } = await import("@/lib/api-client");
       const me = await fetchApi<any>("/technicians/me");
       setProfile(me);
+      if (typeof me?.is_online === "boolean") {
+        setCachedPresence(me.is_online);
+      }
     } catch (err: any) {
       console.error("Lỗi tải thông tin cá nhân KTV:", err);
       setFetchError(err?.message || "Không thể kết nối đến máy chủ.");
@@ -83,6 +87,16 @@ export function TechnicianProfileScreen() {
 
   useEffect(() => {
     fetchProfile();
+  }, []);
+
+  // Lắng nghe sự kiện cập nhật trạng thái hoạt động từ Header hoặc nơi khác
+  useEffect(() => {
+    const onPresenceUpdated = (event: Event) => {
+      const online = (event as CustomEvent<boolean>).detail;
+      setProfile((prev: any) => (prev ? { ...prev, is_online: Boolean(online) } : prev));
+    };
+    window.addEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
+    return () => window.removeEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
   }, []);
 
   useEffect(() => {
@@ -189,22 +203,34 @@ export function TechnicianProfileScreen() {
 
   const handleToggleOnline = async () => {
     if (!profile) return;
+    const nextOnline = !profile.is_online;
     setIsToggling(true);
     setPresenceError(null);
+
+    // Cập nhật ngay lập tức cho cả màn hình và Header
+    setCachedPresence(nextOnline);
+    setProfile((prev: any) => ({ ...prev, is_online: nextOnline }));
+
     try {
       const { fetchApi } = await import("@/lib/api-client");
-      const coordinates = profile.is_online ? null : await getCurrentLocation();
+      const coordinates = nextOnline ? await getCurrentLocation() : null;
       const updated = await fetchApi<any>("/technicians/me/presence", {
         method: "PATCH",
         body: JSON.stringify({
-          is_online: !profile.is_online,
+          is_online: nextOnline,
           ...(coordinates
             ? { last_latitude: coordinates.latitude, last_longitude: coordinates.longitude }
             : {}),
         }),
       });
       setProfile((prev: any) => ({ ...prev, ...updated }));
+      if (typeof updated?.is_online === "boolean") {
+        setCachedPresence(updated.is_online);
+      }
     } catch (err) {
+      // Hoàn tác nếu gặp lỗi
+      setCachedPresence(profile.is_online);
+      setProfile((prev: any) => ({ ...prev, is_online: profile.is_online }));
       setPresenceError(err instanceof Error ? err.message : "Không thể thay đổi trạng thái nhận việc.");
       console.error("Lỗi chuyển đổi trạng thái trực tuyến:", err);
     } finally {

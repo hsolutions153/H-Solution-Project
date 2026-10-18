@@ -68,6 +68,10 @@ export interface HistoryTask {
   totalAmount: string | number;
   paymentStatus?: string;
   paymentMethod?: string;
+  customerPhone?: string;
+  quote?: any;
+  quotes?: any[];
+  isSos?: boolean;
 }
 
 export type QuoteItemType = "SPARE_PART" | "LABOR" | "SERVICE";

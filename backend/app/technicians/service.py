@@ -257,4 +257,6 @@ def update_my_presence(current_user: dict, data):
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Tá»a Ä‘á»™ GPS khÃ´ng há»£p lá»‡.")
         payload["last_location_at"] = datetime.now(timezone.utc).isoformat()
     update_technician_in_db(current_user["sub"], payload)
+    from app.repair_requests.service import invalidate_technician_cache
+    invalidate_technician_cache(current_user["sub"])
     return fetch_my_technician(current_user)

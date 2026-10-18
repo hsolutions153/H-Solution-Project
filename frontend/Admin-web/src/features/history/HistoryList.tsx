@@ -143,12 +143,25 @@ export const HistoryList = () => {
                     <tr key={o.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-4 font-bold text-slate-900">
                         #{o.request_code || o.id?.substring(0, 8)}
-                        <div className="text-[11px] text-slate-400 font-normal">
-                          {o.completed_at
-                            ? new Date(o.completed_at).toLocaleDateString("vi-VN")
-                            : o.created_at
-                            ? new Date(o.created_at).toLocaleDateString("vi-VN")
-                            : "---"}
+                        <div className="text-[11px] text-slate-400 font-normal mt-0.5 flex items-center gap-1.5">
+                          {(() => {
+                            const targetDate = o.completed_at || o.created_at;
+                            if (!targetDate) return "---";
+                            const d = new Date(targetDate);
+                            if (isNaN(d.getTime())) return "---";
+                            return (
+                              <>
+                                <span>{d.toLocaleDateString("vi-VN")}</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-slate-500 font-medium">
+                                  {d.toLocaleTimeString("vi-VN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-slate-800">

@@ -626,9 +626,18 @@ export const OrdersList = () => {
                           <div className="flex items-center gap-1 text-slate-400 text-[11px] shrink-0">
                             <Calendar className="w-3 h-3" />
                             <span>
-                              {order.created_at
-                                ? new Date(order.created_at).toLocaleDateString("vi-VN")
-                                : "Vừa xong"}
+                              {order.created_at ? (
+                                (() => {
+                                  const d = new Date(order.created_at);
+                                  if (isNaN(d.getTime())) return "Vừa xong";
+                                  return `${d.toLocaleDateString("vi-VN")} ${d.toLocaleTimeString("vi-VN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}`;
+                                })()
+                              ) : (
+                                "Vừa xong"
+                              )}
                             </span>
                           </div>
                         </div>
@@ -773,10 +782,27 @@ export const OrdersList = () => {
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400">
-                            {order.created_at
-                              ? new Date(order.created_at).toLocaleDateString("vi-VN")
-                              : "Vừa xong"}
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            {order.created_at ? (
+                              (() => {
+                                const d = new Date(order.created_at);
+                                if (isNaN(d.getTime())) return <span>Vừa xong</span>;
+                                return (
+                                  <>
+                                    <span>{d.toLocaleDateString("vi-VN")}</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="font-medium text-slate-500">
+                                      {d.toLocaleTimeString("vi-VN", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              "Vừa xong"
+                            )}
                           </div>
                         </td>
 

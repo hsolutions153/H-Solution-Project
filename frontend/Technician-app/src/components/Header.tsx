@@ -5,6 +5,7 @@ import { Bell, LogOut } from 'lucide-react';
 import { BrandMark, Button } from '@h-mobility/ui';
 import { Modal } from '@/components/ui';
 import { AVATAR_UPDATED_EVENT } from '@/lib/avatar';
+import { PRESENCE_UPDATED_EVENT, getCachedPresence, setCachedPresence } from '@/lib/presence';
 
 interface HeaderProps {
   onLogout?: () => void; // Hàm nhận sự kiện đăng xuất
@@ -14,7 +15,10 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [techName, setTechName] = useState<string>("Kỹ thuật viên");
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    const cached = getCachedPresence();
+    return cached !== null ? cached : true;
+  });
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,12 +39,23 @@ export const Header = ({ onLogout }: HeaderProps) => {
         }
         if (me && typeof me.is_online === "boolean") {
           setIsOnline(me.is_online);
+          setCachedPresence(me.is_online);
         }
       } catch (err) {
         console.warn("Lỗi tải thông tin KTV trên header:", err);
       }
     }
     loadProfile();
+  }, []);
+
+  // Đồng bộ trạng thái trực tuyến/ngoại tuyến ngay lập tức từ màn Hồ sơ
+  useEffect(() => {
+    const onPresenceUpdated = (event: Event) => {
+      const online = (event as CustomEvent<boolean>).detail;
+      setIsOnline(Boolean(online));
+    };
+    window.addEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
+    return () => window.removeEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
   }, []);
 
   // Cập nhật ảnh ngay khi kỹ thuật viên đổi ảnh ở màn hồ sơ

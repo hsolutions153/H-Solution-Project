@@ -5,7 +5,7 @@ interface TaskTabsProps {
 }
 
 const TABS = [
-  { id: 'today', label: 'Hôm nay' },
+  { id: 'all', label: 'Tất cả' },
   { id: 'new', label: 'Việc mới' },
   { id: 'doing', label: 'Đang làm' },
   { id: 'done', label: 'Hoàn tất' },
@@ -13,11 +13,11 @@ const TABS = [
 
 export const TaskTabs = ({ activeTab, setActiveTab, counts }: TaskTabsProps) => {
   return (
-    <div className="sticky top-0 z-10 bg-canvas/95 px-4 pt-3 pb-2 backdrop-blur">
+    <div className="sticky top-0 z-10 bg-canvas/95 px-4 pt-2 pb-1.5 backdrop-blur">
       <div role="tablist" className="grid grid-cols-4 gap-1 rounded-control bg-slate-200/70 p-1">
         {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          const count = counts?.[tab.id];
+          const isActive = activeTab === tab.id || (tab.id === 'all' && activeTab === 'today');
+          const count = counts?.[tab.id] ?? (tab.id === 'all' ? counts?.['today'] : undefined);
           return (
             <button
               key={tab.id}

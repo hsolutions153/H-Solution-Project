@@ -5,6 +5,7 @@ import { HistoryTask } from "@/types/task";
 import { Badge, Button, Card, EmptyState, cn, inputClasses } from "@h-mobility/ui";
 import { Banknote, CheckCircle2, ChevronDown, FileText, MapPin, QrCode, RotateCw, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { InvoiceModal } from "./InvoiceModal";
 
 interface TaskHistoryScreenProps {
   newCompletedTask?: HistoryTask | null;
@@ -17,6 +18,9 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     return newCompletedTask ? [newCompletedTask] : [];
   });
   const [loading, setLoading] = useState(true);
+
+  // Quản lý xem hóa đơn
+  const [selectedInvoiceTask, setSelectedInvoiceTask] = useState<HistoryTask | null>(null);
 
   // Quản lý xác nhận thanh toán trực tiếp từ Lịch sử
   const [selectedConfirmTask, setSelectedConfirmTask] = useState<HistoryTask | null>(null);
@@ -102,6 +106,10 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                 totalAmount: effectiveTotal,
                 paymentStatus: item.payment_status || (item.payments && item.payments[0]?.payment_status) || "UNPAID",
                 paymentMethod: item.payment_method || (item.payments && item.payments[0]?.payment_method) || undefined,
+                customerPhone: cust.phone_number || cust.phone || item.customer_phone || undefined,
+                quote: item.quote,
+                quotes: item.quotes,
+                isSos: Boolean(item.is_sos),
               };
             });
 
@@ -238,7 +246,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                     <h3 className="mt-1 truncate text-base font-bold text-ink">{item.customerName}</h3>
                     <p className="mt-0.5 truncate text-[13px] text-slate-600">{item.deviceInfo}</p>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                         <Badge tone={item.type === "repair" ? "brand" : "neutral"} className="min-w-0">
                           <span className="min-w-0 truncate">{item.serviceType}</span>
                         </Badge>
@@ -252,7 +260,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                           <Badge tone="neutral">Chưa thanh toán</Badge>
                         )}
                       </div>
-                      <span className="text-sm font-bold tabular-nums text-ink">
+                      <span className="shrink-0 text-right text-sm font-bold tabular-nums text-ink whitespace-nowrap">
                         {Number(item.totalAmount).toLocaleString("vi-VN")} đ
                       </span>
                     </div>
@@ -321,12 +329,20 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-slate-500">Tổng cộng</p>
-                          <p className="text-base font-bold tabular-nums text-ink">
+                          <p className="text-base font-bold tabular-nums text-ink whitespace-nowrap">
                             {Number(item.totalAmount).toLocaleString("vi-VN")} đ
                           </p>
                         </div>
                         {item.paymentStatus === "PAID" && (
-                          <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<FileText className="size-4" />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInvoiceTask(item);
+                            }}
+                          >
                             Xem hóa đơn
                           </Button>
                         )}
@@ -346,7 +362,15 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                           >
                             Xác nhận nhận tiền
                           </Button>
-                          <Button size="sm" variant="secondary" icon={<FileText className="size-4" />}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<FileText className="size-4" />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInvoiceTask(item);
+                            }}
+                          >
                             Xem hóa đơn
                           </Button>
                         </div>
@@ -383,7 +407,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
           <div className="space-y-4">
             <div className="rounded-card border border-brand-100 bg-brand-50/70 p-4 text-center">
               <p className="text-xs font-medium text-slate-500">Số tiền cần xác nhận</p>
-              <p className="mt-1 text-2xl font-black tabular-nums text-brand-700">
+              <p className="mt-1 text-2xl font-black tabular-nums text-brand-700 whitespace-nowrap">
                 {Number(selectedConfirmTask.totalAmount).toLocaleString("vi-VN")} đ
               </p>
               <p className="mt-1 text-xs text-slate-600">
@@ -444,6 +468,14 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             )}
           </div>
         </Modal>
+      )}
+
+      {selectedInvoiceTask && (
+        <InvoiceModal
+          open={Boolean(selectedInvoiceTask)}
+          task={selectedInvoiceTask}
+          onClose={() => setSelectedInvoiceTask(null)}
+        />
       )}
     </div>
   );

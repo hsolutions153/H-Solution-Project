@@ -98,19 +98,37 @@ export interface Appointment {
 
 const APPOINTMENT_PATTERN = /\[Hẹn:\s*([^\]]*)\]/;
 
-// Đọc lịch hẹn dạng "[Hẹn: <Hôm nay|Ngày mai|YYYY-MM-DD> <HH:MM>]" từ mô tả
-export function parseAppointment(task: Pick<Task, "description" | "createdAt">): Appointment {
+// Đọc lịch hẹn dạng "[Hẹn: <Hôm nay|Ngày mai|YYYY-MM-DD> <HH:MM>]" từ mô tả hoặc fallback từ bookingDate/bookingSlot
+export function parseAppointment(
+  task: Pick<Task, "description" | "createdAt"> & { bookingDate?: string; bookingSlot?: string }
+): Appointment {
   const match = task.description?.match(APPOINTMENT_PATTERN);
-  if (!match) return { day: null, slot: null };
-  const text = match[1].trim();
-  const slot = text.match(/\b(\d{1,2}:\d{2})\b/)?.[1] ?? null;
+  if (match) {
+    const text = match[1].trim();
+    const slot = text.match(/\b(\d{1,2}:\d{2})\b/)?.[1] ?? null;
 
-  const created = task.createdAt ? new Date(task.createdAt) : new Date();
-  const base = new Date(created.getFullYear(), created.getMonth(), created.getDate());
-  let day: Date | null = null;
-  const iso = text.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) day = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
-  else if (/ngày mai/i.test(text)) day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
-  else if (/hôm nay/i.test(text)) day = base;
-  return { day, slot };
+    const created = task.createdAt ? new Date(task.createdAt) : new Date();
+    const base = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+    let day: Date | null = null;
+    const iso = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) day = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    else if (/ngày mai/i.test(text)) day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+    else if (/hôm nay/i.test(text)) day = base;
+    return { day, slot };
+  }
+
+  // Fallback to task.bookingDate if provided
+  if (task.bookingDate && task.bookingDate !== "Khẩn cấp (SOS)") {
+    const created = task.createdAt ? new Date(task.createdAt) : new Date();
+    const base = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+    let day: Date | null = null;
+    const iso = task.bookingDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) day = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    else if (/ngày mai/i.test(task.bookingDate)) day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+    else if (/hôm nay|today/i.test(task.bookingDate)) day = base;
+    const slot = task.bookingSlot && /\b(\d{1,2}:\d{2})\b/.test(task.bookingSlot) ? task.bookingSlot : null;
+    if (day) return { day, slot };
+  }
+
+  return { day: null, slot: null };
 }

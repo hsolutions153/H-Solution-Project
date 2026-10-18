@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ChevronRight, ClipboardList, Siren, Star, Wallet } from "lucide-react";
 import { Card, EmptyState, StatusBadge } from "@h-mobility/ui";
 import type { Task } from "@/types/task";
+import { PRESENCE_UPDATED_EVENT, getCachedPresence } from "@/lib/presence";
 
 interface TechnicianSummary {
   fullName: string;
@@ -61,12 +62,22 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
           jobsDone: me?.total_jobs_done != null ? Number(me.total_jobs_done) : null,
         });
       } catch {
-        if (alive) setSummary({ fullName: cachedName, isOnline: true, rating: null, jobsDone: null });
+        const cachedPresence = getCachedPresence();
+        if (alive) setSummary({ fullName: cachedName, isOnline: cachedPresence !== false, rating: null, jobsDone: null });
       }
     })();
     return () => {
       alive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const onPresenceUpdated = (event: Event) => {
+      const online = (event as CustomEvent<boolean>).detail;
+      setSummary((prev) => (prev ? { ...prev, isOnline: Boolean(online) } : prev));
+    };
+    window.addEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
+    return () => window.removeEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
   }, []);
 
   const stats = useMemo(() => {
