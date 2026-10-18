@@ -163,7 +163,7 @@ def get_technician_by_user_id(user_id: str):
                 "specialization": "Kỹ thuật viên Sửa chữa H-Solution",
                 "experience_years": 3,
                 "kyc_status": "APPROVED",
-                "is_online": True,
+                "is_online": False,
                 "rating_avg": 5.0,
                 "total_jobs_done": 0,
                 "created_by": "SYSTEM",

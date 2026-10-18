@@ -198,7 +198,8 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
       );
     };
     updatePosition();
-    const interval = window.setInterval(updatePosition, 30_000);
+    // Khi đang di chuyển, cập nhật nhanh hơn để route và khoảng cách bám sát thực tế.
+    const interval = window.setInterval(updatePosition, 15_000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);

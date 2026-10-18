@@ -56,12 +56,12 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
         if (!alive) return;
         setSummary({
           fullName: me?.user?.full_name || cachedName,
-          isOnline: me?.is_online !== false,
+          isOnline: me?.is_online === true,
           rating: me?.rating_avg != null ? Number(me.rating_avg) : null,
           jobsDone: me?.total_jobs_done != null ? Number(me.total_jobs_done) : null,
         });
       } catch {
-        if (alive) setSummary({ fullName: cachedName, isOnline: true, rating: null, jobsDone: null });
+        if (alive) setSummary({ fullName: cachedName, isOnline: false, rating: null, jobsDone: null });
       }
     })();
     return () => {

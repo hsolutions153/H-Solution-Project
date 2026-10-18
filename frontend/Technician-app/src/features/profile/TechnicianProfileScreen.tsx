@@ -113,7 +113,8 @@ export function TechnicianProfileScreen() {
     };
 
     refreshLocation();
-    const interval = window.setInterval(refreshLocation, 60_000);
+    // Cập nhật vị trí thường xuyên khi đang online để điều phối dùng tọa độ mới.
+    const interval = window.setInterval(refreshLocation, 30_000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
