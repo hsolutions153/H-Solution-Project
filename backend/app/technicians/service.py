@@ -112,7 +112,7 @@ def create_technician(data):
         "specialization": payload.get("specialization") or "Kỹ thuật viên Sửa chữa H-Solution",
         "experience_years": payload.get("experience_years", 1),
         "kyc_status": "APPROVED",
-        "is_online": True,
+        "is_online": False,
         "rating_avg": 5.0,
         "total_jobs_done": 0,
         "created_by": "ADMIN",
@@ -232,20 +232,17 @@ def update_my_presence(current_user: dict, data):
     latitude = payload.get("last_latitude")
     longitude = payload.get("last_longitude")
 
-    # A technician may only become available after the client has supplied a
-    # fresh, complete GPS position.  Do not reuse an old position here: it
-    # could make the dispatcher send an SOS request to the wrong place.
     if payload.get("is_online"):
         if latitude is None or longitude is None:
             raise AppException(
                 ErrorCode.VALIDATION_ERROR,
-                message="Báº­t vá»‹ trÃ­ GPS Ä‘á»ƒ nháº­n viá»‡c má»›i.",
+                message="Bật vị trí GPS để nhận việc mới.",
             )
 
     if (latitude is None) != (longitude is None):
         raise AppException(
             ErrorCode.VALIDATION_ERROR,
-            message="Vá»‹ trÃ­ GPS pháº£i cÃ³ Ä‘á»§ cáº£ vá»‹ Ä‘á»™ vÃ  kinh Ä‘á»™.",
+            message="Vị trí GPS phải có đủ cả vĩ độ và kinh độ.",
         )
 
     if latitude is not None and longitude is not None:
@@ -254,7 +251,7 @@ def update_my_presence(current_user: dict, data):
         except (TypeError, ValueError):
             valid_coordinates = False
         if not valid_coordinates:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tá»a Ä‘á»™ GPS khÃ´ng há»£p lá»‡.")
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tọa độ GPS không hợp lệ.")
         payload["last_location_at"] = datetime.now(timezone.utc).isoformat()
     update_technician_in_db(current_user["sub"], payload)
     from app.repair_requests.service import invalidate_technician_cache

@@ -553,13 +553,13 @@ def create_request(current_user: dict, data):
 
     if is_sos:
         if lat is None or lng is None:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="YÃªu cáº§u SOS cáº§n báº­t vá»‹ trÃ­ GPS Ä‘á»ƒ Ä‘iá»u phá»‘i KTV.")
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Yêu cầu SOS cần bật vị trí GPS để điều phối KTV.")
         try:
             valid_coordinates = -90 <= float(lat) <= 90 and -180 <= float(lng) <= 180
         except (TypeError, ValueError):
             valid_coordinates = False
         if not valid_coordinates:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tá»a Ä‘á»™ GPS khÃ´ng há»£p lá»‡.")
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Tọa độ GPS không hợp lệ.")
 
     images = payload.get("image_urls") or payload.get("inspection_images") or payload.get("images") or []
 
