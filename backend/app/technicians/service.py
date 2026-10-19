@@ -7,6 +7,8 @@ from app.auth import repository as auth_repository
 from app.auth.utils import get_current_user
 from app.core import storage
 from app.core.exceptions import AppException, ErrorCode
+from app.core.validation import validated_payload
+from app.technicians.schemas import TechnicianCreate, TechnicianUpdate, TechnicianSelfUpdate, TechnicianPresenceUpdate
 from app.customers.models import ADMIN_ROLE_CODE
 from app.db.database import supabase
 from app.technicians.models import KYC_STATUSES, SKILLS
@@ -73,16 +75,24 @@ def fetch_technician_by_user_id(user_id: str):
 
 
 def create_technician(data):
-    payload = _payload(data)
+    payload = validated_payload(TechnicianCreate, data)
     _validate_profile_values(payload)
 
-    user_id = payload.get("user_id")
-    if not user_id:
+    user_id = payload.get("user_id") or secrets.token_hex(5).upper()
+    # Keep an explicit internal placeholder when CCCD was not supplied.
+    id_card_number = payload.get("id_card_number") or f"ID-{user_id[:9]}"
+    if get_technician_by_id_card_number(id_card_number):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Số căn cước đã được sử dụng")
+
+    if not payload.get("user_id"):
         # Tạo user mới cho KTV
-        user_id = secrets.token_hex(5).upper()
         email = payload.get("email") or f"tech_{user_id.lower()}@h-solution.vn"
         full_name = payload.get("full_name") or f"Kỹ thuật viên {user_id}"
-        password = payload.get("password") or "Abc123456@"
+        password = payload["password"]
+        if auth_repository.get_user_by_email(email):
+            raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
+        if payload.get("phone") and auth_repository.get_user_by_phone(payload["phone"]):
+            raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
 
         from app.auth.utils import hash_password
         supabase.table("users").insert({
@@ -95,12 +105,11 @@ def create_technician(data):
             "is_active": True,
         }).execute()
     else:
-        if not auth_repository.get_user_by_id(user_id):
+        user = auth_repository.get_user_by_id(user_id)
+        if not user:
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Người dùng không tồn tại")
-
-    id_card_number = payload.get("id_card_number") or f"ID-{user_id}"
-    if get_technician_by_id_card_number(id_card_number):
-        id_card_number = f"ID-{user_id}-{secrets.token_hex(2).upper()}"
+        if user.get("role_id") != _role_id(TECHNICIAN_ROLE_CODE):
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Người dùng phải có vai trò kỹ thuật viên")
 
     insert_technician({
         "user_id": user_id,
@@ -123,21 +132,35 @@ def create_technician(data):
 
 def update_technician(user_id: str, data):
     existing = fetch_technician_by_user_id(user_id)
-    payload = _payload(data, partial=True)
+    schema = TechnicianSelfUpdate if isinstance(data, TechnicianSelfUpdate) else TechnicianUpdate
+    payload = validated_payload(schema, data, partial=True)
     if not payload:
         return existing
     _validate_profile_values(payload)
 
     # Tách full_name / phone sang bảng users
+    if {"is_online", "last_latitude", "last_longitude"} & payload.keys():
+        validated_payload(TechnicianPresenceUpdate, {
+            "is_online": payload.get("is_online", existing.get("is_online", False)),
+            "last_latitude": payload.get("last_latitude", existing.get("last_latitude")),
+            "last_longitude": payload.get("last_longitude", existing.get("last_longitude")),
+        })
+        if payload.get("last_latitude") is not None:
+            payload["last_location_at"] = datetime.now(timezone.utc).isoformat()
     user_update = {}
     if "full_name" in payload and payload["full_name"] is not None:
         user_update["full_name"] = payload.pop("full_name")
-    if "phone" in payload and payload["phone"] is not None:
+    if payload.get("phone"):
+        duplicate = auth_repository.get_user_by_phone(payload["phone"])
+        if duplicate and duplicate["id"] != user_id:
+            raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
+    if "phone" in payload:
         user_update["phone"] = payload.pop("phone")
     if user_update:
         supabase.table("users").update(user_update).eq("id", user_id).execute()
 
     # Tách STK sang bảng technician_bank_accounts
+    bank_supplied = "bank_account" in payload
     bank_data = payload.pop("bank_account", None)
     flat_code = payload.pop("bank_code", None)
     flat_name = payload.pop("bank_name", None)
@@ -145,23 +168,29 @@ def update_technician(user_id: str, data):
     flat_holder = payload.pop("account_holder", None)
 
     if flat_num is not None or flat_code is not None or flat_name is not None or flat_holder is not None:
+        bank_supplied = True
         if flat_num and str(flat_num).strip():
             bank_data = {
-                "bank_code": flat_code or "MB",
-                "bank_name": flat_name or "MB Bank",
+                "bank_code": flat_code,
+                "bank_name": flat_name,
                 "account_number": str(flat_num).strip(),
                 "account_holder": (flat_holder or "").strip(),
             }
         else:
             bank_data = None
 
-    if bank_data is not None:
+    if bank_supplied:
         if isinstance(bank_data, dict) and bank_data.get("account_number"):
             upsert_bank_account(user_id, bank_data)
         else:
             delete_bank_account(user_id)
 
     if payload:
+        for api_name, column in (("id_card_front_url", "id_card_front"),
+                                 ("id_card_back_url", "id_card_back"),
+                                 ("certificate_url", "certificate_img")):
+            if api_name in payload:
+                payload[column] = payload.pop(api_name)
         update_technician_in_db(user_id, payload)
     return fetch_technician_by_user_id(user_id)
 
@@ -228,7 +257,7 @@ def upload_my_avatar(current_user: dict, file: UploadFile):
 
 def update_my_presence(current_user: dict, data):
     fetch_my_technician(current_user)
-    payload = _payload(data)
+    payload = validated_payload(TechnicianPresenceUpdate, data)
     latitude = payload.get("last_latitude")
     longitude = payload.get("last_longitude")
 

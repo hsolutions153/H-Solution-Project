@@ -1,3 +1,4 @@
+from app.core.validation import Identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
@@ -54,7 +55,7 @@ def get_customers(
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def get_customer(customer_id: str):
+def get_customer(customer_id: Identifier):
     return fetch_customer(customer_id)
 
 
@@ -65,15 +66,15 @@ def add_customer(data: CustomerCreate):
 
 
 @router.patch("/{customer_id}", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def modify_customer(customer_id: str, data: CustomerUpdate):
+def modify_customer(customer_id: Identifier, data: CustomerUpdate):
     return update_customer(customer_id, data)
 
 
 @router.patch("/{customer_id}/status", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def modify_customer_status(customer_id: str, data: CustomerStatusUpdate):
+def modify_customer_status(customer_id: Identifier, data: CustomerStatusUpdate):
     return update_customer_status(customer_id, data)
 
 
 @router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def remove_customer(customer_id: str):
+def remove_customer(customer_id: Identifier):
     delete_customer(customer_id)

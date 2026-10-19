@@ -1,6 +1,6 @@
 import os
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from app.auth.schemas import (
     ForgotPasswordRequest,
@@ -83,7 +83,7 @@ def google_login(payload: GoogleAuthRequest, response: Response):
 
 
 @router.post("/refresh", response_model=RefreshResponse)
-def refresh(request: Request, response: Response, role: str):
+def refresh(request: Request, response: Response, role: str = Query(min_length=1, max_length=10, pattern=r"(?i)^(admin|technician|customer)$")):
     cookie_name = _cookie_name(role)
     raw_token = request.cookies.get(cookie_name)
     if not raw_token:
@@ -98,7 +98,7 @@ def refresh(request: Request, response: Response, role: str):
 
 
 @router.post("/logout", response_model=ResetPasswordResponse)
-def logout(request: Request, response: Response, role: str):
+def logout(request: Request, response: Response, role: str = Query(min_length=1, max_length=10, pattern=r"(?i)^(admin|technician|customer)$")):
     raw_token = request.cookies.get(_cookie_name(role))
     if raw_token:
         logout_refresh_token(raw_token)

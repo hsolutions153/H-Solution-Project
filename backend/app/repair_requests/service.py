@@ -31,15 +31,6 @@ from app.repair_requests.models import (
 
 MAX_IMAGE_SIZE_MB = 50
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
-ALLOWED_IMAGE_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/jpg",
-    "image/pjpeg",
-    "image/x-png",
-    "application/octet-stream",
-]
 VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 
@@ -478,34 +469,11 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
 
 
 def _validate_booking_schedule(booking_date: str | None, booking_slot: str | None):
-    if not booking_date:
-        return
-
-    now_vn = datetime.now(VN_TZ)
-    date_map = {
-        "TODAY": now_vn.date(),
-        "TOMORROW": now_vn.date() + timedelta(days=1),
-    }
+    from app.core.validation import validate_booking
     try:
-        booking_day = date_map.get(booking_date) or datetime.strptime(booking_date, "%Y-%m-%d").date()
-    except ValueError:
-        # Unrecognized format: leave it to be stored as a free-text note, not our job to block it here.
-        return
-
-    slot_time = None
-    if booking_slot:
-        try:
-            slot_time = datetime.strptime(booking_slot, "%H:%M").time()
-        except ValueError:
-            slot_time = None
-
-    # Without a specific slot, only reject when the whole day has already passed.
-    scheduled_at = datetime.combine(booking_day, slot_time or time(23, 59), tzinfo=VN_TZ)
-    if scheduled_at < now_vn:
-        raise AppException(
-            ErrorCode.VALIDATION_ERROR,
-            message="Thời gian đặt lịch đã ở trong quá khứ, vui lòng chọn lại ngày/giờ khác",
-        )
+        validate_booking(booking_date, booking_slot)
+    except ValueError as error:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message=str(error)) from error
 
 
 def create_request(current_user: dict, data):
@@ -520,6 +488,17 @@ def create_request(current_user: dict, data):
         if not customer or customer.get("role_id") != _role_id(CUSTOMER_ROLE_CODE):
             raise AppException(ErrorCode.USER_NOT_FOUND, message="Vui lòng chọn khách hàng hợp lệ để tạo đơn.")
 
+    device_id = payload.get("device_id")
+    device = repository.get_device_for_customer(device_id, customer_id) if device_id else None
+    if not device:
+        if is_admin:
+            raise AppException(ErrorCode.DEVICE_ACCESS_DENIED, message="Thiết bị được chọn không thuộc khách hàng này.")
+        raise AppException(ErrorCode.DEVICE_ACCESS_DENIED)
+
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import RepairRequestCreate
+    payload = validated_payload(RepairRequestCreate, data)
+
     issue_type = (payload.get("issue_type") or "").upper()
     ISSUE_TYPE_MAP = {
         "CONTROLLER": "OTHER",
@@ -531,17 +510,6 @@ def create_request(current_user: dict, data):
     if issue_type not in ISSUE_TYPES:
         issue_type = "OTHER"
 
-    device_id = payload.get("device_id")
-    device = repository.get_device_for_customer(device_id, customer_id) if device_id else None
-    if not device:
-        if is_admin:
-            raise AppException(ErrorCode.DEVICE_ACCESS_DENIED, message="Thiết bị được chọn không thuộc khách hàng này.")
-        existing_device_id = repository.get_any_device_for_customer(customer_id)
-        if existing_device_id:
-            device_id = existing_device_id
-        else:
-            device_id = repository.create_default_device_for_customer(customer_id)
-        device = repository.get_device_for_customer(device_id, customer_id)
 
     description = payload.get("description") or payload.get("issue_description") or ""
     address = payload.get("address_detail") or payload.get("location_address") or ""
@@ -574,8 +542,7 @@ def create_request(current_user: dict, data):
 
     images = payload.get("image_urls") or payload.get("inspection_images") or payload.get("images") or []
 
-    # Limit address to fit VARCHAR(255) column constraint
-    address = (address or "Địa chỉ chưa xác định")[:250]
+    address = address or "Địa chỉ chưa xác định"
 
     request_id = _request_id()
     tech_id = None
@@ -613,8 +580,6 @@ def create_request(current_user: dict, data):
         clean_url = str(img_url).strip()
         if clean_url.startswith("blob:") or clean_url.startswith("data:"):
             continue
-        if len(clean_url) > 480:
-            clean_url = clean_url[:480]
 
         try:
             repository.create_repair_image({
@@ -929,7 +894,9 @@ def update_request_status(request_id: str, current_user: dict, data):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
-    payload = _payload(data)
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import RepairRequestStatusUpdate
+    payload = validated_payload(RepairRequestStatusUpdate, data)
     new_status = (payload.get("status") or "").upper()
     if new_status not in REQUEST_STATUSES:
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái yêu cầu không hợp lệ")
@@ -1180,23 +1147,8 @@ def update_request_status(request_id: str, current_user: dict, data):
 
 
 def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict):
-    content_type = (file.content_type or "").lower()
-    file_extension = (
-        file.filename.split(".")[-1].lower()
-        if file.filename and "." in file.filename
-        else "jpg"
-    )
-    if (
-        content_type not in ALLOWED_IMAGE_TYPES
-        and file_extension not in VALID_IMAGE_EXTENSIONS
-    ):
-        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    file_extension = storage.validate_image_upload(file, max_size=MAX_IMAGE_SIZE_BYTES)
 
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    if file_size > MAX_IMAGE_SIZE_BYTES:
-        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
 
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -1227,23 +1179,8 @@ def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict
 
 
 def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
-    content_type = (file.content_type or "").lower()
-    file_extension = (
-        file.filename.split(".")[-1].lower()
-        if file.filename and "." in file.filename
-        else "jpg"
-    )
-    if (
-        content_type not in ALLOWED_IMAGE_TYPES
-        and file_extension not in VALID_IMAGE_EXTENSIONS
-    ):
-        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    file_extension = storage.validate_image_upload(file, max_size=MAX_IMAGE_SIZE_BYTES)
 
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    if file_size > MAX_IMAGE_SIZE_BYTES:
-        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
 
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -1275,23 +1212,8 @@ def add_diagnostic_image(request_id: str, file: UploadFile, current_user: dict):
 
 
 def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
-    content_type = (file.content_type or "").lower()
-    file_extension = (
-        file.filename.split(".")[-1].lower()
-        if file.filename and "." in file.filename
-        else "jpg"
-    )
-    if (
-        content_type not in ALLOWED_IMAGE_TYPES
-        and file_extension not in VALID_IMAGE_EXTENSIONS
-    ):
-        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    file_extension = storage.validate_image_upload(file, max_size=MAX_IMAGE_SIZE_BYTES)
 
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    if file_size > MAX_IMAGE_SIZE_BYTES:
-        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
 
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -1348,6 +1270,9 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         raise AppException(ErrorCode.QUOTE_ALREADY_EXISTS, message="Đã có báo giá đang chờ khách hàng duyệt. Vui lòng xử lý báo giá đó trước.")
     accepted_quotes = [quote for quote in previous_quotes if quote.get("status") == "ACCEPTED"]
     is_supplementary = bool(accepted_quotes)
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import QuoteCreateRequest
+    data = validated_payload(QuoteCreateRequest, data)
     items = data.get("items") or []
     diagnosis_note = data.get("diagnosis_note") or ("Báo giá bổ sung / Chi phí phát sinh" if is_supplementary else "Báo giá sửa chữa")
     severity = data.get("severity") or "MINOR"
@@ -1360,10 +1285,10 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
     parsed_items = []
     for it in items:
-        qty = float(it.get("quantity") or 1)
-        price = float(it.get("price") or it.get("unit_price") or 0)
-        subtotal = float(it.get("subtotal") or (qty * price))
-        if not math.isclose(subtotal, qty * price, abs_tol=0.01):
+        qty = float(it["quantity"])
+        price = float(it["price"] if it.get("price") is not None else it["unit_price"])
+        subtotal = float(it["subtotal"]) if it.get("subtotal") is not None else qty * price
+        if not math.isclose(subtotal, qty * price, rel_tol=0, abs_tol=0.01):
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Thành tiền hạng mục phải bằng số lượng nhân đơn giá.")
         total += subtotal
 
@@ -1394,14 +1319,16 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
             "item_type": it_type,
         })
 
-    labor_fee = float(data.get("labor_fee") or data.get("laborCost") or computed_labor_fee)
-    parts_cost = float(data.get("parts_cost") or data.get("partsCost") or computed_parts_cost)
+    labor_value = data["labor_fee"] if data.get("labor_fee") is not None else data.get("laborCost")
+    parts_value = data["parts_cost"] if data.get("parts_cost") is not None else data.get("partsCost")
+    labor_fee = float(labor_value) if labor_value is not None else computed_labor_fee
+    parts_cost = float(parts_value) if parts_value is not None else computed_parts_cost
 
-    if items and (not math.isclose(labor_fee, computed_labor_fee, abs_tol=0.01) or not math.isclose(parts_cost, computed_parts_cost, abs_tol=0.01)):
+    if items and (not math.isclose(labor_fee, computed_labor_fee, rel_tol=0, abs_tol=0.01) or not math.isclose(parts_cost, computed_parts_cost, rel_tol=0, abs_tol=0.01)):
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Tiền công và chi phí linh kiện phải khớp với các hạng mục báo giá.")
     supplied_total = data.get("total_amount") if data.get("total_amount") is not None else data.get("estimated_price")
     calculated_total = labor_fee + parts_cost
-    if supplied_total is not None and (items or calculated_total > 0) and not math.isclose(float(supplied_total), calculated_total, abs_tol=0.01):
+    if supplied_total is not None and (items or labor_value is not None or parts_value is not None) and not math.isclose(float(supplied_total), calculated_total, rel_tol=0, abs_tol=0.01):
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Tổng báo giá phải khớp với chi phí các hạng mục. Báo giá bổ sung chỉ gồm chi phí phát sinh.")
     total = float(supplied_total) if supplied_total is not None else calculated_total
 

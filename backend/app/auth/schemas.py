@@ -1,19 +1,19 @@
-from pydantic import BaseModel, EmailStr, Field
-
-PHONE_PATTERN = r"^$|^0(3|5|7|8|9)\d{8}$"
-
-
-class SignupRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    phone: str | None = Field(default=None, max_length=10, pattern=PHONE_PATTERN)
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
-    address: str | None = Field(default=None, max_length=255)
+from pydantic import BaseModel, Field
+from app.core.validation import Address, Email, InputModel, LoginPassword, Name, OptionalPhone, Password, Phone
 
 
-class LoginRequest(BaseModel):
-    email: str = Field(min_length=1, max_length=100)
-    password: str = Field(min_length=1, max_length=72)
+class SignupRequest(InputModel):
+    name: Name
+    phone: OptionalPhone = None
+    email: Email
+    password: Password
+    address: Address | None = None
+
+
+class LoginRequest(InputModel):
+    # The existing login accepts either email or Vietnamese mobile number.
+    email: Email | Phone
+    password: LoginPassword
 
 
 
@@ -27,7 +27,7 @@ class AuthenticatedUser(BaseModel):
     is_profile_complete: bool = True
 
 
-class GoogleAuthRequest(BaseModel):
+class GoogleAuthRequest(InputModel):
     id_token: str = Field(min_length=1, max_length=10000)
 
 
@@ -51,8 +51,8 @@ class RefreshResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class ForgotPasswordRequest(BaseModel):
-    phone: str = Field(pattern=r"^0(3|5|7|8|9)\d{8}$")
+class ForgotPasswordRequest(InputModel):
+    phone: Phone
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -61,13 +61,13 @@ class ForgotPasswordResponse(BaseModel):
     otp_code: str | None = None
 
 
-class VerifyOtpRequest(BaseModel):
-    phone: str = Field(pattern=r"^0(3|5|7|8|9)\d{8}$")
-    otp_code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+class VerifyOtpRequest(InputModel):
+    phone: Phone
+    otp_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
 
 
 class ResetPasswordRequest(VerifyOtpRequest):
-    new_password: str = Field(min_length=8, max_length=72)
+    new_password: Password
 
 
 class ResetPasswordResponse(BaseModel):

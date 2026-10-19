@@ -1,7 +1,16 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool, model_validator
+from app.core.validation import (
+    AccountNumber, BankCode, Experience, Identifier, InputModel, Latitude,
+    Longitude, Name, OptionalEmail, OptionalPhone, OptionalUrl, Password, Reason,
+    choice, validate_coordinates,
+)
+from app.technicians.models import KYC_STATUSES, SKILLS
+
+KycStatus = choice(KYC_STATUSES)
+TechnicianSkill = choice(SKILLS)
 
 
 class TechnicianUser(BaseModel):
@@ -13,26 +22,32 @@ class TechnicianUser(BaseModel):
     is_active: bool = True
 
 
-class TechnicianCreate(BaseModel):
-    user_id: str | None = None
-    full_name: str = Field(min_length=1, max_length=100)
-    phone: str | None = None
-    email: str | None = None
-    password: str | None = None
-    id_card_number: str | None = None
-    id_card_front_url: str | None = None
-    id_card_back_url: str | None = None
-    certificate_url: str | None = None
-    skills: str = "BOTH"
+class TechnicianCreate(InputModel):
+    user_id: Identifier | None = None
+    full_name: Name
+    phone: OptionalPhone = None
+    email: OptionalEmail = None
+    password: Password | None = None
+    id_card_number: str | None = Field(default=None, pattern=r"^[0-9]{12}$", max_length=12)
+    id_card_front_url: OptionalUrl = None
+    id_card_back_url: OptionalUrl = None
+    certificate_url: OptionalUrl = None
+    skills: TechnicianSkill = "BOTH"
     specialization: str | None = Field(default=None, max_length=255)
-    experience_years: int = Field(default=0, ge=0)
+    experience_years: Experience = 0
+
+    @model_validator(mode="after")
+    def valid_new_account(self):
+        if self.user_id is None and (self.phone is None or self.password is None):
+            raise ValueError("Tạo tài khoản kỹ thuật viên cần số điện thoại và mật khẩu")
+        return self
 
 
-class BankAccountUpsert(BaseModel):
-    bank_code: str = Field(default="", max_length=20)
-    bank_name: str = Field(default="", max_length=100)
-    account_number: str = Field(default="", max_length=50)
-    account_holder: str = Field(default="", max_length=100)
+class BankAccountUpsert(InputModel):
+    bank_code: BankCode
+    bank_name: Name
+    account_number: AccountNumber
+    account_holder: Name
 
 
 class BankAccountResponse(BaseModel):
@@ -49,45 +64,73 @@ class BankAccountResponse(BaseModel):
         from_attributes = True
 
 
-class TechnicianUpdate(BaseModel):
-    full_name: str | None = None
-    phone: str | None = None
-    id_card_front_url: str | None = Field(default=None, max_length=500)
-    id_card_back_url: str | None = Field(default=None, max_length=500)
-    certificate_url: str | None = Field(default=None, max_length=500)
-    skills: str | None = None
+class TechnicianUpdate(InputModel):
+    non_nullable_fields = {"full_name", "skills", "experience_years", "is_online", "id_card_front_url", "id_card_back_url", "certificate_url"}
+    full_name: Name | None = None
+    phone: OptionalPhone = None
+    id_card_front_url: OptionalUrl = None
+    id_card_back_url: OptionalUrl = None
+    certificate_url: OptionalUrl = None
+    skills: TechnicianSkill | None = None
     specialization: str | None = Field(default=None, max_length=255)
-    experience_years: int | None = Field(default=None, ge=0)
-    is_online: bool | None = None
-    last_latitude: Decimal | None = None
-    last_longitude: Decimal | None = None
+    experience_years: Experience | None = None
+    is_online: StrictBool | None = None
+    last_latitude: Latitude | None = None
+    last_longitude: Longitude | None = None
     bank_account: BankAccountUpsert | None = None
-    bank_code: str | None = None
-    bank_name: str | None = None
-    account_number: str | None = None
-    account_holder: str | None = None
+    bank_code: BankCode | None = None
+    bank_name: Name | None = None
+    account_number: AccountNumber | None = None
+    account_holder: Name | None = None
+
+    @model_validator(mode="after")
+    def valid_profile(self):
+        validate_coordinates(self.last_latitude, self.last_longitude)
+        validate_bank_fields(self)
+        return self
 
 
 # Schema cho thợ tự chỉnh sửa thông tin cá nhân (không được sửa chuyên môn và kinh nghiệm)
-class TechnicianSelfUpdate(BaseModel):
-    full_name: str | None = None
-    phone: str | None = None
+class TechnicianSelfUpdate(InputModel):
+    non_nullable_fields = {"full_name"}
+    full_name: Name | None = None
+    phone: OptionalPhone = None
     bank_account: BankAccountUpsert | None = None
-    bank_code: str | None = None
-    bank_name: str | None = None
-    account_number: str | None = None
-    account_holder: str | None = None
+    bank_code: BankCode | None = None
+    bank_name: Name | None = None
+    account_number: AccountNumber | None = None
+    account_holder: Name | None = None
+
+    @model_validator(mode="after")
+    def valid_bank(self):
+        validate_bank_fields(self)
+        return self
 
 
-class TechnicianKycReview(BaseModel):
-    kyc_status: str
-    kyc_note: str | None = None
+class TechnicianKycReview(InputModel):
+    kyc_status: KycStatus
+    kyc_note: Reason | None = None
 
 
-class TechnicianPresenceUpdate(BaseModel):
-    is_online: bool
-    last_latitude: Decimal | None = None
-    last_longitude: Decimal | None = None
+class TechnicianPresenceUpdate(InputModel):
+    is_online: StrictBool
+    last_latitude: Latitude | None = None
+    last_longitude: Longitude | None = None
+
+    @model_validator(mode="after")
+    def valid_presence(self):
+        validate_coordinates(self.last_latitude, self.last_longitude, required=self.is_online)
+        return self
+
+
+def validate_bank_fields(model):
+    fields = ("bank_code", "bank_name", "account_number", "account_holder")
+    supplied = [key for key in fields if key in model.model_fields_set]
+    if supplied:
+        if "bank_account" in model.model_fields_set:
+            raise ValueError("Chỉ dùng bank_account hoặc các trường ngân hàng riêng lẻ")
+        values = {key: getattr(model, key) for key in fields}
+        BankAccountUpsert.model_validate(values)
 
 
 class TechnicianResponse(BaseModel):

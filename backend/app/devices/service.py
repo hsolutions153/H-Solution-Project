@@ -8,6 +8,8 @@ from fastapi import UploadFile
 from app.auth import repository as auth_repository
 from app.core import storage
 from app.core.exceptions import AppException, ErrorCode
+from app.core.validation import validated_payload
+from app.devices.schemas import DeviceCreate, DeviceUpdate
 from app.customers.models import ADMIN_ROLE_CODE, CUSTOMER_ROLE_CODE
 from app.devices.models import DEVICE_TYPES
 from app.devices.repository import (
@@ -23,15 +25,6 @@ from app.devices.repository import (
 
 MAX_IMAGE_SIZE_MB = 10
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
-ALLOWED_IMAGE_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/jpg",
-    "image/pjpeg",
-    "image/x-png",
-    "application/octet-stream",
-]
 VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 
@@ -86,24 +79,8 @@ def _enrich_device_list(devices: list, include_deleted: bool = False) -> list:
 
 
 def upload_device_image(file: UploadFile, current_user: dict) -> str:
-    content_type = (file.content_type or "").lower()
-    file_extension = (
-        file.filename.split(".")[-1].lower()
-        if file.filename and "." in file.filename
-        else "jpg"
-    )
+    file_extension = storage.validate_image_upload(file, max_size=MAX_IMAGE_SIZE_BYTES)
 
-    if (
-        content_type not in ALLOWED_IMAGE_TYPES
-        and file_extension not in VALID_IMAGE_EXTENSIONS
-    ):
-        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
-
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    if file_size > MAX_IMAGE_SIZE_BYTES:
-        raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
 
     safe_ext = file_extension if file_extension in VALID_IMAGE_EXTENSIONS else "jpg"
     file_name = f"{uuid.uuid4()}.{safe_ext}"
@@ -191,15 +168,21 @@ def fetch_device_by_id(device_id: str, current_user: dict, include_deleted: bool
 
 
 def create_device(data, current_user: dict):
-    payload = _payload(data)
+    payload = validated_payload(DeviceCreate, data)
     _validate_device_values(payload)
 
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
+    if not is_admin and not _is_role(current_user, CUSTOMER_ROLE_CODE):
+        raise AppException(ErrorCode.FORBIDDEN)
     
     customer_id = payload.get("customer_id")
     if not customer_id or not is_admin:
         customer_id = current_user["sub"]
     payload["customer_id"] = customer_id
+    if is_admin:
+        customer = auth_repository.get_user_by_id(customer_id)
+        if not customer or customer.get("role_id") != _role_id(CUSTOMER_ROLE_CODE):
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Khách hàng không hợp lệ")
 
     serial_number = payload.get("serial_number")
     if serial_number and get_device_by_serial_number(serial_number):
@@ -250,8 +233,14 @@ def create_device(data, current_user: dict):
 
 def update_device(device_id: str, data, current_user: dict):
     existing = fetch_device_by_id(device_id, current_user)
-    payload = _payload(data, partial=True)
+    payload = validated_payload(DeviceUpdate, data, partial=True)
     _validate_device_values(payload)
+    # Compare a partial date update against the persisted counterpart as well.
+    if {"purchase_date", "manufacturing_year"} & payload.keys():
+        validated_payload(DeviceUpdate, {
+            "purchase_date": payload.get("purchase_date", existing.get("purchase_date")),
+            "manufacturing_year": payload.get("manufacturing_year", existing.get("manufacturing_year")),
+        })
 
     serial_number = payload.get("serial_number")
     if serial_number:

@@ -1,7 +1,18 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StrictBool, StrictInt, field_validator, model_validator, TypeAdapter
+from app.core.validation import (
+    Address, Identifier, InputModel, Latitude, Longitude, Money, Note,
+    Name, Quantity, Reason, Url, choice, validate_aliases, validate_booking, validate_coordinates,
+)
+from app.repair_requests.models import ISSUE_TYPES, ITEM_TYPES, REQUEST_STATUSES
+
+RepairStatus = choice(REQUEST_STATUSES)
+IssueType = choice(ISSUE_TYPES)
+RequestType = choice({"NORMAL", "SOS", "EMERGENCY"})
+ItemType = choice(ITEM_TYPES)
+Severity = choice({"MINOR", "MAJOR"})
 
 
 class RepairImageResponse(BaseModel):
@@ -17,33 +28,55 @@ class RepairImageResponse(BaseModel):
         from_attributes = True
 
 
-class RepairRequestCreate(BaseModel):
-    customer_id: str | None = None
-    device_id: str = Field(min_length=1, max_length=50)
-    issue_type: str
-    description: str | None = None
-    issue_description: str | None = None
-    address_detail: str | None = None
-    location_address: str | None = None
-    location_lat: Decimal | None = None
-    location_lng: Decimal | None = None
-    latitude: Decimal | None = None
-    longitude: Decimal | None = None
-    request_type: str | None = None
-    is_sos: bool = False
-    image_urls: list[str] | None = None
-    inspection_images: list[str] | None = None
-    images: list[str] | None = None
-    booking_date: str | None = None
-    booking_slot: str | None = None
+class RepairRequestCreate(InputModel):
+    customer_id: Identifier | None = None
+    device_id: Identifier
+    issue_type: IssueType
+    description: Note | None = None
+    issue_description: Note | None = None
+    address_detail: Address | None = None
+    location_address: Address | None = None
+    location_lat: Latitude | None = None
+    location_lng: Longitude | None = None
+    latitude: Latitude | None = None
+    longitude: Longitude | None = None
+    request_type: RequestType | None = None
+    is_sos: StrictBool = False
+    image_urls: list[Url] | None = Field(default=None, max_length=20)
+    inspection_images: list[Url] | None = Field(default=None, max_length=20)
+    images: list[Url] | None = Field(default=None, max_length=20)
+    booking_date: str | None = Field(default=None, max_length=10)
+    booking_slot: str | None = Field(default=None, max_length=5)
+    appointment_date: str | None = Field(default=None, max_length=10)
+    appointment_slot: str | None = Field(default=None, max_length=5)
+
+    @model_validator(mode="after")
+    def valid_request(self):
+        validate_aliases(self, ("latitude", "location_lat"), ("longitude", "location_lng"),
+                         ("description", "issue_description"), ("address_detail", "location_address"),
+                         ("booking_date", "appointment_date"), ("booking_slot", "appointment_slot"),
+                         ("image_urls", "inspection_images", "images"))
+        lat = self.location_lat if self.location_lat is not None else self.latitude
+        lng = self.location_lng if self.location_lng is not None else self.longitude
+        validate_coordinates(lat, lng, required=self.is_sos or self.request_type in {"SOS", "EMERGENCY"})
+        if self.is_sos and self.request_type == "NORMAL":
+            raise ValueError("is_sos không phù hợp với request_type NORMAL")
+        validate_booking(self.booking_date or self.appointment_date, self.booking_slot or self.appointment_slot)
+        return self
 
 
-class RepairRequestStatusUpdate(BaseModel):
-    status: str
-    cancel_reason: str | None = None
-    total_amount: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
-    totalCost: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
-    final_cost: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+class RepairRequestStatusUpdate(InputModel):
+    status: RepairStatus
+    cancel_reason: Reason | None = None
+    reject_reason: Reason | None = None
+    total_amount: Money | None = None
+    totalCost: Money | None = None
+    final_cost: Money | None = None
+
+    @model_validator(mode="after")
+    def valid_amounts(self):
+        validate_aliases(self, ("total_amount", "totalCost", "final_cost"))
+        return self
 
 
 from enum import Enum
@@ -55,27 +88,73 @@ class ItemTypeEnum(str, Enum):
     SERVICE = "SERVICE"
 
 
-class QuoteItemCreate(BaseModel):
-    name: str | None = None
-    item_name: str | None = None
-    item_type: str | None = None
-    quantity: float = Field(default=1.0, gt=0, allow_inf_nan=False)
-    price: float = Field(default=0.0, ge=0, allow_inf_nan=False)
-    unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    subtotal: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+class QuoteItemCreate(InputModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    item_name: str | None = Field(default=None, min_length=1, max_length=200)
+    item_type: ItemType | None = None
+    quantity: Quantity = Decimal("1")
+    price: Money | None = None
+    unit_price: Money | None = None
+    subtotal: Money | None = None
+
+    @model_validator(mode="after")
+    def valid_item(self):
+        validate_aliases(self, ("name", "item_name"), ("price", "unit_price"))
+        if self.name is None and self.item_name is None:
+            raise ValueError("Cần cung cấp tên hạng mục")
+        price = self.price if self.price is not None else self.unit_price
+        if price is None:
+            raise ValueError("Cần cung cấp đơn giá hạng mục")
+        subtotal = self.quantity * price
+        TypeAdapter(Money).validate_python(subtotal)
+        if self.subtotal is not None and self.subtotal != subtotal:
+            raise ValueError("Thành tiền phải bằng số lượng nhân đơn giá")
+        return self
 
 
-class QuoteCreateRequest(BaseModel):
-    items: list[QuoteItemCreate] = []
-    estimatedTime: str | None = None
-    diagnosis_note: str | None = None
-    severity: str | None = "MINOR"
-    labor_fee: float | None = None
-    parts_cost: float | None = None
-    laborCost: float | None = None
-    partsCost: float | None = None
-    estimated_price: float | None = None
-    total_amount: float | None = None
+class QuoteCreateRequest(InputModel):
+    items: list[QuoteItemCreate] = Field(default_factory=list, max_length=100)
+    estimatedTime: str | None = Field(default=None, min_length=1, max_length=100)
+    diagnosis_note: Note | None = None
+    severity: Severity | None = "MINOR"
+    labor_fee: Money | None = None
+    parts_cost: Money | None = None
+    laborCost: Money | None = None
+    partsCost: Money | None = None
+    estimated_price: Money | None = None
+    total_amount: Money | None = None
+
+    @model_validator(mode="after")
+    def valid_quote(self):
+        validate_aliases(self, ("labor_fee", "laborCost"), ("parts_cost", "partsCost"), ("estimated_price", "total_amount"))
+        # Legacy clients may send a total without individual items.
+        labor = self.labor_fee if self.labor_fee is not None else self.laborCost
+        parts = self.parts_cost if self.parts_cost is not None else self.partsCost
+        supplied_total = self.total_amount if self.total_amount is not None else self.estimated_price
+        if self.items:
+            computed_labor = Decimal(0)
+            computed_parts = Decimal(0)
+            for item in self.items:
+                price = item.price if item.price is not None else item.unit_price
+                subtotal = item.quantity * price
+                is_labor = item.item_type == "LABOR" or (item.item_type is None and any(
+                    word in (item.name or item.item_name).lower() for word in ("tiền công", "công sửa", "công kỹ thuật", "labor")
+                ))
+                if is_labor:
+                    computed_labor += subtotal
+                else:
+                    computed_parts += subtotal
+            if (labor is not None and labor != computed_labor) or (parts is not None and parts != computed_parts):
+                raise ValueError("Tiền công và linh kiện phải khớp các hạng mục")
+            total = computed_labor + computed_parts
+        else:
+            total = (labor or Decimal(0)) + (parts or Decimal(0))
+        TypeAdapter(Money).validate_python(total)
+        if supplied_total is not None and (self.items or labor is not None or parts is not None) and supplied_total != total:
+            raise ValueError("Tổng báo giá phải khớp chi phí hạng mục")
+        if not self.items and labor is None and parts is None and supplied_total is None:
+            raise ValueError("Cần cung cấp hạng mục hoặc chi phí báo giá")
+        return self
 
 
 class QuoteItemResponse(BaseModel):
@@ -248,10 +327,19 @@ class RepairRequestListResponse(BaseModel):
     limit: int
 
 
-class TechnicianRatingRequest(BaseModel):
-    rating: int = Field(..., ge=1, le=5)
-    comment: str | None = None
-    tags: list[str] | None = None
+class TechnicianRatingRequest(InputModel):
+    rating: StrictInt = Field(..., ge=1, le=5)
+    comment: Note | None = None
+    tags: list[Name] | None = Field(default=None, max_length=20)
+
+    @field_validator("tags")
+    @classmethod
+    def valid_tags(cls, value):
+        if value is not None:
+            value = [tag.strip() for tag in value]
+            if any(not tag for tag in value):
+                raise ValueError("Nhãn đánh giá không được để trống")
+        return value
 
 
 class TechnicianRatingResponse(BaseModel):

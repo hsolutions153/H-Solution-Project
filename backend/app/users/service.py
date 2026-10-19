@@ -37,7 +37,7 @@ def fetch_roles():
 
 def fetch_users(search: str | None, role_id: str | None, is_active: bool | None, page: int, limit: int):
     if role_id and not repository.get_role_by_id(role_id):
-        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vai trò không tồn tại")
     users, total = repository.get_users(
         search=search,
         role_id=role_id,
@@ -58,7 +58,7 @@ def fetch_user(user_id: str):
 def create_user(data):
     payload = _payload(data)
     if not repository.get_role_by_id(payload["role_id"]):
-        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vai trò không tồn tại")
     if repository.get_user_by_email(payload["email"]):
         raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
     if payload.get("phone") and repository.get_user_by_phone(payload["phone"]):
@@ -88,7 +88,7 @@ def update_user(user_id: str, current_user: dict, data):
         return existing
 
     if "role_id" in payload and payload["role_id"] and not repository.get_role_by_id(payload["role_id"]):
-        raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vai trò không tồn tại")
     if "email" in payload:
         duplicate = repository.get_user_by_email(payload["email"])
         if duplicate and duplicate["id"] != user_id:

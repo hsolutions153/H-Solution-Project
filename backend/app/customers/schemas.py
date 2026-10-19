@@ -1,28 +1,28 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
-
-PHONE_PATTERN = r"^$|^0(3|5|7|8|9)\d{8}$"
-
-
-class CustomerCreate(BaseModel):
-    full_name: str = Field(min_length=1, max_length=100)
-    phone: str | None = Field(default=None, max_length=10, pattern=PHONE_PATTERN)
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
-    address: str | None = Field(default=None, max_length=255)
+from pydantic import BaseModel, EmailStr, StrictBool
+from app.core.validation import Address, Email, InputModel, Name, OptionalPhone, Password, Reason
 
 
-class CustomerUpdate(BaseModel):
-    full_name: str | None = Field(default=None, min_length=1, max_length=100)
-    phone: str | None = Field(default=None, max_length=10, pattern=PHONE_PATTERN)
-    email: EmailStr | None = None
-    address: str | None = Field(default=None, max_length=255)
+class CustomerCreate(InputModel):
+    full_name: Name
+    phone: OptionalPhone = None
+    email: Email
+    password: Password
+    address: Address | None = None
 
 
-class CustomerStatusUpdate(BaseModel):
-    is_active: bool
-    locked_reason: str | None = None
+class CustomerUpdate(InputModel):
+    non_nullable_fields = {"full_name", "email"}
+    full_name: Name | None = None
+    phone: OptionalPhone = None
+    email: Email | None = None
+    address: Address | None = None
+
+
+class CustomerStatusUpdate(InputModel):
+    is_active: StrictBool
+    locked_reason: Reason | None = None
 
 
 class CustomerResponse(BaseModel):

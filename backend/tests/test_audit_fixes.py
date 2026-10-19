@@ -71,6 +71,7 @@ class GoogleIdentityTests(MockedTest):
 
     def test_database_identity_comes_from_verified_token(self):
         self.mock("app.auth.service.verify_google_id_token", return_value=self.claims)
+        self.mock("app.auth.service.repository.create_refresh_token", return_value={"id": "REFRESH001"})
         lookup = self.mock("app.auth.service.repository.get_user_by_email", return_value={"id": "CUSTOMER01", "email": self.claims["email"], "role_id": "CUSTOMER", "role": {"id": "CUSTOMER", "code": "CUSTOMER"}, "is_active": True})
         self.mock("app.auth.service.repository.get_role_by_code", return_value={"id": "CUSTOMER"})
         auth.authenticate_or_register_google_user(GoogleAuthRequest(id_token=self.token()))
@@ -86,6 +87,10 @@ class PaymentVerificationTests(MockedTest):
         self.mock("app.payments.service.repository.get_payment_by_repair_id", side_effect=lambda _: deepcopy(self.payment))
         self.mock("app.payments.service.repository.get_payment_by_code", side_effect=lambda _: deepcopy(self.payment))
         self.mock("app.payments.service.repository.get_payment_by_transaction_code", return_value=None)
+        self.mock("app.payments.service.repository.get_accepted_quote", return_value=None)
+        self.mock("app.payments.service.repository.update_payment", side_effect=self.update)
+        self.mock("app.payments.service.repository.update_repair_payment_info", return_value=self.repair)
+        self.mock("app.technicians.repository.get_bank_account", return_value=None)
         self.writes = self.mock("app.payments.service.repository.update_unpaid_payment", side_effect=self.update)
         self.begin = self.mock("app.payments.service.repository.begin_momo_payment", side_effect=self.update)
         self.history = self.mock("app.payments.service.repository.add_payment_history")

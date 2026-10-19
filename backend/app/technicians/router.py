@@ -1,3 +1,5 @@
+from app.core.validation import Identifier
+from app.technicians.schemas import KycStatus
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
@@ -81,12 +83,12 @@ def modify_my_presence(data: TechnicianPresenceUpdate, current_user: dict = Depe
 
 @router.get("", response_model=list[TechnicianResponse], dependencies=[Depends(require_admin)])
 @router.get("/", response_model=list[TechnicianResponse], dependencies=[Depends(require_admin)], include_in_schema=False)
-def get_technicians(kyc_status: str | None = Query(default=None)):
+def get_technicians(kyc_status: KycStatus | None = Query(default=None)):
     return fetch_all_technicians(kyc_status)
 
 
 @router.get("/{user_id}", response_model=TechnicianResponse, dependencies=[Depends(require_admin)])
-def get_technician(user_id: str):
+def get_technician(user_id: Identifier):
     return fetch_technician_by_user_id(user_id)
 
 
@@ -98,15 +100,15 @@ def add_technician(data: TechnicianCreate):
 
 @router.put("/{user_id}", response_model=TechnicianResponse, dependencies=[Depends(require_admin)])
 @router.patch("/{user_id}", response_model=TechnicianResponse, dependencies=[Depends(require_admin)])
-def modify_technician(user_id: str, data: TechnicianUpdate):
+def modify_technician(user_id: Identifier, data: TechnicianUpdate):
     return update_technician(user_id, data)
 
 
 @router.patch("/{user_id}/kyc", response_model=TechnicianResponse, dependencies=[Depends(require_admin)])
-def review_kyc(user_id: str, data: TechnicianKycReview, current_user: dict = Depends(get_current_user)):
+def review_kyc(user_id: Identifier, data: TechnicianKycReview, current_user: dict = Depends(get_current_user)):
     return review_technician_kyc(user_id, data, current_user["sub"])
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def remove_technician(user_id: str):
+def remove_technician(user_id: Identifier):
     delete_technician(user_id)

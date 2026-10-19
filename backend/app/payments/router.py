@@ -1,3 +1,5 @@
+from app.payments.schemas import QRMethod, MoMoRequestType
+from app.core.validation import Identifier
 from app.auth.utils import get_current_user
 from app.payments.schemas import (
     CustomerPaymentSubmitRequest,
@@ -39,8 +41,8 @@ def sepay_webhook(
 
 @router.get("/repair/{repair_id}/qr", response_model=QRResponse)
 def get_payment_qr(
-    repair_id: str,
-    method: str | None = Query(default=None),
+    repair_id: Identifier,
+    method: QRMethod | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
     return fetch_qr(repair_id, current_user, method)
@@ -48,8 +50,8 @@ def get_payment_qr(
 
 @router.post("/repair/{repair_id}/momo", response_model=MoMoPaymentResponse)
 def init_momo_payment(
-    repair_id: str,
-    request_type: str = Query(default="payWithATM"),
+    repair_id: Identifier,
+    request_type: MoMoRequestType = Query(default="payWithATM"),
     current_user: dict = Depends(get_current_user)
 ):
     return create_momo_payment(repair_id, current_user, request_type)
@@ -57,7 +59,7 @@ def init_momo_payment(
 
 @router.post("/repair/{repair_id}/momo-confirm")
 def confirm_momo(
-    repair_id: str,
+    repair_id: Identifier,
     current_user: dict = Depends(get_current_user)
 ):
     return confirm_momo_payment(repair_id, current_user)
@@ -65,7 +67,7 @@ def confirm_momo(
 
 @router.post("/repair/{repair_id}/customer-submit", response_model=PaymentActionResponse)
 def customer_submit(
-    repair_id: str,
+    repair_id: Identifier,
     payload: CustomerPaymentSubmitRequest = CustomerPaymentSubmitRequest(),
     current_user: dict = Depends(get_current_user),
 ):
@@ -74,7 +76,7 @@ def customer_submit(
 
 @router.post("/repair/{repair_id}/confirm", response_model=PaymentActionResponse)
 def technician_confirm(
-    repair_id: str,
+    repair_id: Identifier,
     payload: TechnicianPaymentConfirmRequest = TechnicianPaymentConfirmRequest(),
     current_user: dict = Depends(get_current_user),
 ):

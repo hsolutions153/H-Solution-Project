@@ -1,8 +1,15 @@
 from datetime import datetime
 from decimal import Decimal
+from app.core.validation import Identifier, InputModel, Reason, choice, validate_aliases
+from app.repair_requests.models import REQUEST_STATUSES
+from app.orders.models import ORDER_STATUSES
+
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, model_validator
+
+OrderStatusFilter = choice(ORDER_STATUSES)
+OrderStatus = choice(REQUEST_STATUSES)
 
 
 class OrderUser(BaseModel):
@@ -63,8 +70,22 @@ class OrderListResponse(BaseModel):
     limit: int
 
 
-class AssignTechnicianRequest(BaseModel):
-    technician_id: str = Field(min_length=1, max_length=10)
+class AssignTechnicianRequest(InputModel):
+    technician_id: Identifier
+
+
+class CancelOrderRequest(InputModel):
+    cancel_reason: Reason | None = None
+    reason: Reason | None = None
+
+    @model_validator(mode="after")
+    def valid_reason(self):
+        validate_aliases(self, ("cancel_reason", "reason"))
+        return self
+
+
+class OrderStatusUpdate(CancelOrderRequest):
+    status: OrderStatus
 
 
 class AssignmentResponse(BaseModel):

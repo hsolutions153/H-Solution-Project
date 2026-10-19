@@ -69,21 +69,39 @@ def upload_file_to_supabase(file: UploadFile, file_path: str) -> str:
 
 
 MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
-AVATAR_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/x-png", "image/webp"}
-AVATAR_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 
-def upload_avatar(file: UploadFile, user_id: str) -> str:
-    content_type = (file.content_type or "").lower()
-    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
-    if content_type not in AVATAR_CONTENT_TYPES and extension not in AVATAR_EXTENSIONS:
-        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
-
+def validate_image_upload(file: UploadFile, *, max_size: int) -> str:
+    """Check size and actual format rather than trusting a filename or MIME header."""
     file.file.seek(0, 2)
     size = file.file.tell()
     file.file.seek(0)
-    if size > MAX_AVATAR_SIZE_BYTES:
+    if not size:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Tệp ảnh tải lên bị trống")
+    if size > max_size:
         raise AppException(ErrorCode.IMAGE_SIZE_TOO_LARGE)
+    header = file.file.read(12)
+    file.file.seek(0)
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        actual = "png"
+    elif header.startswith(b"\xff\xd8\xff"):
+        actual = "jpg"
+    elif header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+        actual = "webp"
+    else:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
+    extension = "jpg" if extension == "jpeg" else extension
+    content_type = (file.content_type or "").lower()
+    mime_formats = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/pjpeg": "jpg",
+                    "image/png": "png", "image/x-png": "png", "image/webp": "webp"}
+    if extension and extension != actual:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    if content_type not in {"", "application/octet-stream"} and mime_formats.get(content_type) != actual:
+        raise AppException(ErrorCode.IMAGE_TYPE_UNSUPPORTED)
+    return actual
 
-    safe_ext = extension if extension in AVATAR_EXTENSIONS else "jpg"
+
+def upload_avatar(file: UploadFile, user_id: str) -> str:
+    safe_ext = validate_image_upload(file, max_size=MAX_AVATAR_SIZE_BYTES)
     return upload_file_to_supabase(file, f"public/avatars/{user_id}/{uuid.uuid4()}.{safe_ext}")

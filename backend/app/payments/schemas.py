@@ -1,7 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from app.core.validation import InputModel, Money, Note, choice
+
+PaymentMethod = choice({"CASH", "COD", "BANK_TRANSFER"})
+QRMethod = PaymentMethod
+MoMoRequestType = choice({"payWithATM", "captureWallet"}, uppercase=False)
 
 
 class PaymentResponse(BaseModel):
@@ -32,14 +37,14 @@ class QRResponse(BaseModel):
     bank_account_name: str | None = None
 
 
-class CustomerPaymentSubmitRequest(BaseModel):
-    payment_method: str = "BANK_TRANSFER"
-    note: str | None = None
+class CustomerPaymentSubmitRequest(InputModel):
+    payment_method: PaymentMethod = "BANK_TRANSFER"
+    note: Note | None = None
 
 
-class TechnicianPaymentConfirmRequest(BaseModel):
-    payment_method: str | None = None
-    note: str | None = None
+class TechnicianPaymentConfirmRequest(InputModel):
+    payment_method: PaymentMethod | None = None
+    note: Note | None = None
 
 
 class PaymentActionResponse(BaseModel):
@@ -57,18 +62,30 @@ class MoMoPaymentResponse(BaseModel):
 
 
 class SepayWebhookPayload(BaseModel):
-    id: int
-    gateway: str | None = None
-    transactionDate: str | None = None
-    accountNumber: str | None = None
-    code: str | None = None
-    content: str | None = None
-    transferType: str | None = None
-    transferAmount: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
-    referenceCode: str | None = None
-    accumulated: float | None = None
-    subAccount: str | None = None
-    description: str | None = None
+    # Providers may add fields. Do not normalize signed/provider payloads.
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
+    id: StrictInt = Field(ge=0)
+    gateway: str | None = Field(default=None, max_length=100)
+    transactionDate: str | None = Field(default=None, max_length=50)
+    accountNumber: str | None = Field(default=None, max_length=100)
+    code: str | None = Field(default=None, max_length=100)
+    content: str | None = Field(default=None, max_length=5000)
+    transferType: str | None = Field(default=None, pattern=r"^(in|out)$")
+    transferAmount: Money | None = None
+    referenceCode: str | None = Field(default=None, max_length=100)
+    accumulated: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+    subAccount: str | None = Field(default=None, max_length=100)
+    description: str | None = Field(default=None, max_length=5000)
+
+    @field_validator("transactionDate")
+    @classmethod
+    def valid_transaction_date(cls, value):
+        if value is not None:
+            try:
+                datetime.fromisoformat(value)
+            except ValueError:
+                raise ValueError("Ngày giao dịch không hợp lệ") from None
+        return value
 
 
 class WebhookResponse(BaseModel):
@@ -76,16 +93,17 @@ class WebhookResponse(BaseModel):
 
 
 class MoMoWebhookPayload(BaseModel):
-    partnerCode: str
-    orderId: str
-    requestId: str
-    amount: int = Field(ge=0)
-    orderInfo: str
-    orderType: str
-    transId: int
-    resultCode: int
-    message: str
-    payType: str
-    responseTime: int
-    extraData: str = ""
-    signature: str
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
+    partnerCode: str = Field(min_length=1, max_length=100)
+    orderId: str = Field(min_length=1, max_length=100)
+    requestId: str = Field(min_length=1, max_length=100)
+    amount: StrictInt = Field(ge=0, le=999999999999)
+    orderInfo: str = Field(max_length=5000)
+    orderType: str = Field(max_length=100)
+    transId: StrictInt = Field(ge=0)
+    resultCode: StrictInt = Field(ge=0)
+    message: str = Field(max_length=5000)
+    payType: str = Field(max_length=100)
+    responseTime: StrictInt = Field(ge=0)
+    extraData: str = Field(default="", max_length=10000)
+    signature: str = Field(min_length=64, max_length=64, pattern=r"^[a-fA-F0-9]{64}$")

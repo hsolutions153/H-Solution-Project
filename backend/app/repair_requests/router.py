@@ -1,3 +1,5 @@
+from app.repair_requests.schemas import RepairStatus
+from app.core.validation import Identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
@@ -45,7 +47,7 @@ def create_repair_request(data: RepairRequestCreate, current_user: dict = Depend
 
 @router.get("/me", response_model=RepairRequestListResponse)
 def get_my_repair_requests(
-    status: str | None = Query(default=None),
+    status: RepairStatus | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
@@ -55,7 +57,7 @@ def get_my_repair_requests(
 
 @router.get("/technician/me", response_model=RepairRequestListResponse)
 def get_my_technician_requests(
-    status: str | None = Query(default=None),
+    status: RepairStatus | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
@@ -78,16 +80,16 @@ def reverse_geocode(
 
 
 @router.get("/{request_id}/route", response_model=RepairRouteResponse)
-def get_route_for_technician(request_id: str, current_user: dict = Depends(get_current_user)):
+def get_route_for_technician(request_id: Identifier, current_user: dict = Depends(get_current_user)):
     return fetch_route_for_technician(request_id, current_user)
 
 
 @router.get("", response_model=RepairRequestListResponse)
 @router.get("/", response_model=RepairRequestListResponse, include_in_schema=False)
 def get_repair_requests(
-    status: str | None = Query(default=None),
-    customer_id: str | None = Query(default=None),
-    technician_id: str | None = Query(default=None),
+    status: RepairStatus | None = Query(default=None),
+    customer_id: Identifier | None = Query(default=None),
+    technician_id: Identifier | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=500),
     current_user: dict = Depends(get_current_user),
@@ -96,18 +98,18 @@ def get_repair_requests(
 
 
 @router.get("/{request_id}", response_model=RepairRequestResponse)
-def get_repair_request(request_id: str, current_user: dict = Depends(get_current_user)):
+def get_repair_request(request_id: Identifier, current_user: dict = Depends(get_current_user)):
     return fetch_request(request_id, current_user)
 
 
 @router.get("/{request_id}/status", response_model=RepairRequestStatusSyncResponse)
-def get_repair_request_status_sync(request_id: str, current_user: dict = Depends(get_current_user)):
+def get_repair_request_status_sync(request_id: Identifier, current_user: dict = Depends(get_current_user)):
     return fetch_request_status_sync(request_id, current_user)
 
 
 @router.patch("/{request_id}/status", response_model=RepairRequestResponse)
 def modify_repair_request_status(
-    request_id: str,
+    request_id: Identifier,
     data: RepairRequestStatusUpdate,
     current_user: dict = Depends(get_current_user),
 ):
@@ -116,7 +118,7 @@ def modify_repair_request_status(
 
 @router.post("/{request_id}/after-repair-images", response_model=RepairRequestResponse)
 def upload_after_repair_image(
-    request_id: str,
+    request_id: Identifier,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -125,7 +127,7 @@ def upload_after_repair_image(
 
 @router.post("/{request_id}/diagnostic-images", response_model=RepairRequestResponse)
 def upload_diagnostic_image(
-    request_id: str,
+    request_id: Identifier,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -135,7 +137,7 @@ def upload_diagnostic_image(
 @router.post("/{request_id}/images", response_model=RepairRequestResponse)
 @router.post("/{request_id}/customer-images", response_model=RepairRequestResponse, include_in_schema=False)
 def upload_customer_image(
-    request_id: str,
+    request_id: Identifier,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -144,7 +146,7 @@ def upload_customer_image(
 
 @router.post("/{request_id}/quotes", response_model=QuoteResponse, status_code=status.HTTP_201_CREATED)
 def create_quote(
-    request_id: str,
+    request_id: Identifier,
     data: QuoteCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -153,7 +155,7 @@ def create_quote(
 
 @router.get("/{request_id}/quotes", response_model=list[QuoteResponse])
 def get_quotes(
-    request_id: str,
+    request_id: Identifier,
     current_user: dict = Depends(get_current_user),
 ):
     return fetch_quotes_for_request(request_id, current_user)
@@ -161,7 +163,7 @@ def get_quotes(
 
 @router.post("/{request_id}/rating", response_model=TechnicianRatingResponse)
 def rate_technician(
-    request_id: str,
+    request_id: Identifier,
     data: TechnicianRatingRequest,
     current_user: dict = Depends(get_current_user),
 ):
