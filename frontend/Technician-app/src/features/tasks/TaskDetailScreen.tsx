@@ -106,6 +106,12 @@ export const TaskDetailScreen = ({
   }, [task]);
 
   const [isTravelModalOpen, setIsTravelModalOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Quản lý các bước con khi ở trạng thái IN_PROGRESS / DIAGNOSING / QUOTE
   const [subStep, setSubStep] = useState<"DIAGNOSTIC" | "QUOTE" | "QUOTE_STATUS" | "REPAIR">(() => {
@@ -271,6 +277,17 @@ export const TaskDetailScreen = ({
   const [addressLine, ...addressRest] = (task.address || "").split(",");
   const slot = task.bookingSlot || task.requestedTime || task.time || "";
   const slotText = task.bookingDate && slot.startsWith(task.bookingDate) ? slot.slice(task.bookingDate.length).trim() : slot;
+  const bookingDateText = /^\d{4}-\d{2}-\d{2}$/.test(task.bookingDate || "")
+    ? new Date(`${task.bookingDate}T00:00:00`).toLocaleDateString("vi-VN")
+    : task.bookingDate;
+  const scheduledStart = !task.isEmergency
+    && /^\d{4}-\d{2}-\d{2}$/.test(task.bookingDate || "")
+    && /^\d{1,2}:\d{2}$/.test(task.bookingSlot || "")
+    ? new Date(`${task.bookingDate}T${task.bookingSlot}:00+07:00`)
+    : null;
+  const travelStart = scheduledStart ? new Date(scheduledStart.getTime() - 30 * 60 * 1000) : null;
+  const canStartTravel = !travelStart || currentTime >= travelStart;
+  const travelStartLabel = travelStart?.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   const description = task.description?.replace(/\[Hẹn:[^\]]*\]/, "").trim();
   const hasAction = ["WAITING_ACCEPT", "PENDING", "WAITING_MOVE", "MOVING", "ARRIVED"].includes(task.status);
 
@@ -313,7 +330,7 @@ export const TaskDetailScreen = ({
         <div className="min-w-0">
           <p className="text-xs font-medium text-brand-800">Lịch hẹn</p>
           <p className="mt-0.5 text-sm font-bold text-ink tabular-nums">
-            {task.bookingDate}{" "}
+            {bookingDateText}{" "}
             <span className="text-brand-700">{slotText}</span>
           </p>
         </div>
@@ -406,12 +423,14 @@ export const TaskDetailScreen = ({
               size="lg"
               fullWidth
               icon={<Bike className="size-5" />}
+              disabled={!canStartTravel}
               onClick={() => {
+                if (!canStartTravel) return;
                 onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển", "EN_ROUTE");
                 setIsTravelModalOpen(true);
               }}
             >
-              Xác nhận di chuyển
+              {canStartTravel ? "Xác nhận di chuyển" : `Được di chuyển từ ${travelStartLabel}`}
             </Button>
           )}
 

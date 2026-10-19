@@ -191,7 +191,7 @@ export default function CompleteProfilePage() {
           <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 rounded-full">
             <EMobiCareLogoIcon size={20} />
             <span className="text-xs font-extrabold tracking-wider text-brand-900 dark:text-brand-300 uppercase">
-              H-MOBILITY CARE
+              V-HCARE
             </span>
           </div>
           <h1 className="font-headline-md text-headline-md text-on-surface">

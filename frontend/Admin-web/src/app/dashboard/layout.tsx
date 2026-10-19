@@ -40,7 +40,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const tabName = TAB_TITLES[activeTab] || "Bảng điều khiển";
-    document.title = `${tabName} | H-Mobility Care Admin`;
+    document.title = `${tabName} | V-HCare Admin`;
   }, [activeTab]);
 
   return (

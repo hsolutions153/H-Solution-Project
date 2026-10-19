@@ -3,6 +3,7 @@ import uuid
 import logging
 import math
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 
@@ -43,6 +44,27 @@ def _payload(data):
     if hasattr(data, "dict"):
         return data.dict()
     return dict(data)
+
+
+def _scheduled_start_at(request: dict) -> datetime | None:
+    """Return the scheduled start in VN time for a non-SOS appointment."""
+    if request.get("is_sos"):
+        return None
+    text = str(request.get("issue_description") or request.get("description") or "")
+    match = re.search(r"\[Hẹn:\s*([^\]]+)\]", text, re.IGNORECASE)
+    if not match:
+        return None
+    appointment = match.group(1).strip()
+    date_match = re.search(r"(\d{4}-\d{2}-\d{2})", appointment)
+    time_match = re.search(r"\b(\d{1,2}:\d{2})\b", appointment)
+    if not date_match or not time_match:
+        return None
+    try:
+        return datetime.strptime(
+            f"{date_match.group(1)} {time_match.group(1)}", "%Y-%m-%d %H:%M"
+        ).replace(tzinfo=VN_TZ)
+    except ValueError:
+        return None
 
 
 def _submitted_final_cost(payload: dict):
@@ -937,6 +959,19 @@ def update_request_status(request_id: str, current_user: dict, data):
 
     if not allowed:
         raise AppException(ErrorCode.INVALID_STATUS_TRANSITION)
+
+    # Scheduled appointments may be accepted in advance, but travelling only
+    # starts inside the 30-minute arrival window. SOS jobs have no window.
+    if new_status == "EN_ROUTE" and request.get("status") == "ACCEPTED":
+        scheduled_start = _scheduled_start_at(request)
+        if scheduled_start is not None:
+            now_vn = datetime.now(VN_TZ)
+            if now_vn < scheduled_start - timedelta(minutes=30):
+                allowed_from = (scheduled_start - timedelta(minutes=30)).strftime("%H:%M")
+                raise AppException(
+                    ErrorCode.VALIDATION_ERROR,
+                    message=f"Chưa đến giờ bắt đầu di chuyển. Bạn có thể bắt đầu từ {allowed_from}.",
+                )
 
     if new_status == "REPAIRING" and request["status"] in {
         "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED"

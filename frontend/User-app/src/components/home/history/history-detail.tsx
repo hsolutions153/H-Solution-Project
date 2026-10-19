@@ -274,7 +274,7 @@ export function HistoryDetail() {
                     rating: 4.9,
                     reviews: 25,
                     avatar: "",
-                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
+                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
                     verified: true,
                   }
                 : null,
@@ -400,7 +400,7 @@ export function HistoryDetail() {
                 phone: res.technician.phone || "",
                 rating: res.technician.rating || 4.9,
                 reviews: res.technician.reviews || 25,
-                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện H-Mobility Care",
+                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
                 experience_years: res.technician.experience_years || 3,
                 avatar: res.technician.avatar || "",
                 verified: true,
@@ -649,6 +649,10 @@ export function HistoryDetail() {
 
   const handleDownloadInvoicePdf = () => {
     if (!detail) return;
+    if (String(detail.paymentStatus || "").toUpperCase() !== "PAID") {
+      alert("Hóa đơn chỉ có thể tải sau khi thanh toán được xác nhận.");
+      return;
+    }
 
     const partsRows =
       detail.parts && detail.parts.length > 0
@@ -893,7 +897,7 @@ export function HistoryDetail() {
         <div class="invoice-box">
           <div class="header-row">
             <div>
-              <h1 class="brand-title">H-MOBILITY CARE</h1>
+              <h1 class="brand-title">V-HCARE</h1>
               <div class="brand-sub">Hệ thống Dịch vụ Sửa chữa & Cứu hộ Xe điện Chuyên nghiệp</div>
               <div class="brand-sub">Hotline 24/7: 1900 6868 &bull; Email: hotro@h-mobility.vn</div>
             </div>
@@ -1013,12 +1017,12 @@ export function HistoryDetail() {
               <div class="role">Kỹ thuật viên thực hiện</div>
               <div class="note">(Ký & xác nhận dịch vụ)</div>
               <div class="space"></div>
-              <div class="name">${detail.technician?.name || "H-Mobility Care"}</div>
+              <div class="name">${detail.technician?.name || "V-HCare"}</div>
             </div>
           </div>
 
           <div class="footer-note">
-            Cảm ơn Quý khách đã sử dụng dịch vụ H-Mobility Care! Chúc Quý khách có những trải nghiệm di chuyển an toàn & tiện lợi.
+            Cảm ơn Quý khách đã sử dụng dịch vụ V-HCare! Chúc Quý khách có những trải nghiệm di chuyển an toàn & tiện lợi.
           </div>
         </div>
       </body>
@@ -1863,12 +1867,15 @@ export function HistoryDetail() {
             type="button"
             className="rd-action-primary"
             id="download-invoice"
+            disabled={detail.paymentStatus !== "PAID"}
             onClick={handleDownloadInvoicePdf}
+            title={detail.paymentStatus === "PAID" ? "Tải hóa đơn PDF" : "Chỉ tải được sau khi thanh toán"}
+            style={detail.paymentStatus !== "PAID" ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
               picture_as_pdf
             </span>
-            Tải hóa đơn PDF
+            {detail.paymentStatus === "PAID" ? "Tải hóa đơn PDF" : "Tải hóa đơn sau khi thanh toán"}
           </button>
           <button
             type="button"

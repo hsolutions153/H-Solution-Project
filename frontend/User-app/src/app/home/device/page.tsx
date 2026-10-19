@@ -196,7 +196,7 @@ export default function DevicesPage() {
             <Link className="device-register-card" href="/home/device/new" data-reveal>
               <span className="device-register-icon"><Plus size={24} /></span>
               <strong>Đăng ký phương tiện mới</strong>
-              <span>Thêm xe máy điện để dễ dàng nhận hỗ trợ cứu hộ khẩn cấp & bảo trì từ H-Mobility Care</span>
+              <span>Thêm xe máy điện để dễ dàng nhận hỗ trợ cứu hộ khẩn cấp & bảo trì từ V-HCare</span>
             </Link>
           </div>
         )}

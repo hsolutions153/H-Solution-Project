@@ -46,12 +46,18 @@ export function mapApiTask(item: any): Task {
   const customerName = cust.full_name || item.customer_name || (item.customer_id && !isSystemId(item.customer_id) ? item.customer_id : "Khách hàng");
   const customerPhone = cust.phone || item.customer_phone || item.phone || "";
 
-  const bookingDate = item.booking_date || (item.is_sos ? "Khẩn cấp (SOS)" : "Hôm nay");
+  // Lịch đặt trước được lưu kèm trong mô tả dạng [Hẹn: YYYY-MM-DD HH:MM].
+  // Không được mặc định thành "Hôm nay" nếu API chưa trả booking_date,
+  // vì như vậy lịch ngày tương lai sẽ bị hiển thị sai trên app kỹ thuật viên.
+  const appointmentMatch = item.issue_description?.match(/\[Hẹn:\s*([^\]]+)\]/i);
+  const appointmentText = appointmentMatch?.[1]?.trim() || "";
+  const appointmentDate = appointmentText.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
+  const bookingDate = item.booking_date || appointmentDate || (item.is_sos ? "Khẩn cấp (SOS)" : "Hôm nay");
   let bookingSlot = item.booking_slot || "Ngay bây giờ";
-  if (item.issue_description && item.issue_description.includes("[Hẹn:")) {
-    const match = item.issue_description.match(/\[Hẹn:\s*([^\]]+)\]/);
-    if (match) {
-      bookingSlot = match[1];
+  if (appointmentText) {
+    const appointmentTime = appointmentText.match(/\b(\d{1,2}:\d{2})\b/)?.[1];
+    if (appointmentTime) {
+      bookingSlot = appointmentTime;
     }
   }
 

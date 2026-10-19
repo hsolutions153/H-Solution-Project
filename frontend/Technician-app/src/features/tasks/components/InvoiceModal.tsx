@@ -264,6 +264,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
   const totalAmount = Number(task.totalAmount || 0);
 
   const handlePrint = () => {
+    if (!isPaid) {
+      alert("Hóa đơn chỉ có thể in hoặc lưu sau khi thanh toán được xác nhận.");
+      return;
+    }
     if (!invoiceRef.current) {
       window.print();
       return;
@@ -388,7 +392,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
 
         <div className="border-b border-dashed border-slate-200 pb-2.5 text-center pr-6 pl-2">
           <h2 className="text-base font-black tracking-wider text-brand-900 uppercase">
-            H-MOBILITY CARE
+            V-HCARE
           </h2>
           <p className="mt-0.5 text-[11px] font-medium text-slate-500">
             Dịch vụ cứu hộ & chăm sóc xe lăn điện 24/7
@@ -650,9 +654,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
             type="button"
             variant="secondary"
             icon={<Printer className="size-4" />}
+            disabled={!isPaid}
             onClick={handlePrint}
+            title={isPaid ? "In hoặc lưu hóa đơn" : "Chỉ in hoặc lưu được sau khi thanh toán"}
           >
-            In / Lưu hóa đơn
+            {isPaid ? "In / Lưu hóa đơn" : "Chờ thanh toán để in"}
           </Button>
           <Button type="button" onClick={onClose}>
             Đóng

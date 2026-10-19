@@ -11,10 +11,10 @@ const brandFont = Be_Vietnam_Pro({
 
 export const metadata: Metadata = {
   title: {
-    default: "H-Mobility Care - Quản Trị Hệ Thống",
-    template: "%s | H-Mobility Care Admin",
+    default: "V-HCare - Quản Trị Hệ Thống",
+    template: "%s | V-HCare Admin",
   },
-  description: "Cổng điều phối & Quản trị hệ thống cứu hộ sửa chữa xe điện H-Mobility Care",
+  description: "Cổng điều phối & Quản trị hệ thống cứu hộ sửa chữa xe điện V-HCare",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

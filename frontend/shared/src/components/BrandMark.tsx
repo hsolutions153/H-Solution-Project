@@ -59,7 +59,7 @@ export function BrandLockup({ size = 36, product, tone = "dark", className }: Br
             tone === "light" ? "text-white" : "text-ink",
           )}
         >
-          H-Mobility Care
+          V-HCare
         </span>
         {product ? (
           <span

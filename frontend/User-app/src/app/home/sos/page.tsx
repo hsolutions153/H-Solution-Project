@@ -926,7 +926,7 @@ export default function SosPage() {
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate text-lg font-bold text-ink">{assignedTech.name || "Kỹ thuật viên"}</h2>
                   <p className="truncate text-[13px] text-slate-600">
-                    {assignedTech.specialization || "Kỹ thuật viên H-Mobility Care"}
+                    {assignedTech.specialization || "Kỹ thuật viên V-HCare"}
                   </p>
                   {assignedTech.rating ? (
                     <p className="mt-0.5 flex items-center gap-1 text-[13px] text-slate-600">

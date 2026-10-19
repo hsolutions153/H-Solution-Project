@@ -10,10 +10,10 @@ type GlacierHeaderProps = {
 export function GlacierHeader({ title, showProfileLink = true }: GlacierHeaderProps) {
   return (
     <header className="home-header">
-      <Link href="/home" className="home-logo" aria-label="Về trang chủ H-Mobility Care">
+      <Link href="/home" className="home-logo" aria-label="Về trang chủ V-HCare">
         <EMobiCareLogoIcon size={32} />
         <div className="home-brand-header-info">
-          <span className="home-brand-name">H-Mobility Care</span>
+          <span className="home-brand-name">V-HCare</span>
           {title ? (
             <span className="home-page-subtitle">{title}</span>
           ) : (

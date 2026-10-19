@@ -13,10 +13,10 @@ const brandFont = Be_Vietnam_Pro({
 
 export const metadata: Metadata = {
   title: {
-    default: "H-Mobility Care - Cứu Hộ & Chăm Sóc Xe Máy Điện Thông Minh",
-    template: "%s | H-Mobility Care",
+    default: "V-HCare - Cứu Hộ & Chăm Sóc Xe Máy Điện Thông Minh",
+    template: "%s | V-HCare",
   },
-  description: "H-Mobility Care - Nền tảng cứu hộ khẩn cấp SOS, sửa chữa tận nơi và chăm sóc xe máy điện thông minh.",
+  description: "V-HCare - Nền tảng cứu hộ khẩn cấp SOS, sửa chữa tận nơi và chăm sóc xe máy điện thông minh.",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "H-Mobility Care",
+    title: "V-HCare",
   },
   formatDetection: {
     telephone: false,
