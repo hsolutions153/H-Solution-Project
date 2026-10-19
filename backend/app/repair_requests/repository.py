@@ -1,4 +1,5 @@
 from app.db.database import supabase
+from app.technicians.ratings import sync_technician_rating
 from app.repair_requests.models import (
     CUSTOMER_DEVICES_TABLE,
     REPAIR_IMAGES_TABLE,
@@ -17,16 +18,7 @@ def save_review(data: dict):
         record["created_by"] = data["customer_id"]
     result = supabase.table("reviews").upsert(record, on_conflict="repair_id").execute()
     if result and result.data:
-        ratings = []
-        offset = 0
-        while True:
-            page = supabase.table("reviews").select("rating").eq("technician_id", data["technician_id"]).range(offset, offset + 999).execute()
-            ratings.extend(float(item["rating"]) for item in page.data or [])
-            if len(page.data or []) < 1000:
-                break
-            offset += 1000
-        if ratings:
-            supabase.table("technician_profiles").update({"rating_avg": round(sum(ratings) / len(ratings), 2)}).eq("user_id", data["technician_id"]).execute()
+        sync_technician_rating(data["technician_id"])
     return result.data[0] if result and result.data else None
 
 

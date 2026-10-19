@@ -240,6 +240,7 @@ export function HistoryDetail() {
       setIsRated(true);
       setIsEditingRating(false);
       setRatingSuccessMsg("Cảm ơn bạn đã gửi đánh giá kỹ thuật viên!");
+      await refreshDetailRef.current?.();
       setTimeout(() => setRatingSuccessMsg(""), 4000);
     } catch (error) {
       setRatingError(error instanceof Error ? error.message : "Không thể gửi đánh giá. Vui lòng thử lại.");
@@ -589,15 +590,23 @@ export function HistoryDetail() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("Không đồng ý");
   const [customRejectText, setCustomRejectText] = useState("");
+  const rejectReasonOptions = [
+    { value: "Không đồng ý", label: detail?.isSupplementaryQuote ? "Không đồng ý với chi phí phát sinh này" : "Không đồng ý với báo giá này" },
+    { value: "Chi phí vượt quá dự toán", label: "Chi phí vượt quá khả năng / dự toán ngân sách" },
+    { value: "Không cần thiết", label: "Chưa cần thay thế các hạng mục linh kiện này" },
+    { value: "OTHER", label: "Lý do khác (nhập bên dưới)" },
+  ];
 
-  const handleApproveQuote = async (approved: boolean, customReason?: string) => {
+  const handleApproveQuote = async (approved: boolean) => {
     setIsApprovingQuote(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const nextStatus = approved ? "ESTIMATE_APPROVED" : "ESTIMATE_REJECTED";
       const finalReason = approved
         ? null
-        : (customReason || (rejectReason === "OTHER" ? customRejectText : rejectReason) || "Không đồng ý");
+        : ((rejectReason === "OTHER"
+          ? customRejectText.trim()
+          : rejectReasonOptions.find((option) => option.value === rejectReason)?.label) || "Không đồng ý");
 
       const updatedRequest = await fetchApi<any>(`/repair-requests/${id}/status`, {
         method: "PATCH",
@@ -2200,12 +2209,7 @@ export function HistoryDetail() {
               </p>
 
               <div className="space-y-2 text-xs">
-                {[
-                  { value: "Không đồng ý", label: detail.isSupplementaryQuote ? "Không đồng ý với chi phí phát sinh này" : "Không đồng ý với báo giá này" },
-                  { value: "Chi phí vượt quá dự toán", label: "Chi phí vượt quá khả năng / dự toán ngân sách" },
-                  { value: "Không cần thiết", label: "Chưa cần thay thế các hạng mục linh kiện này" },
-                  { value: "OTHER", label: "Lý do khác (nhập bên dưới)" },
-                ].map((opt) => (
+                {rejectReasonOptions.map((opt) => (
                   <label
                     key={opt.value}
                     className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
@@ -2247,11 +2251,8 @@ export function HistoryDetail() {
                 </button>
                 <button
                   type="button"
-                  disabled={isApprovingQuote}
-                  onClick={() => {
-                    const finalReason = rejectReason === "OTHER" ? (customRejectText || "Không đồng ý") : rejectReason;
-                    handleApproveQuote(false, finalReason);
-                  }}
+                  disabled={isApprovingQuote || (rejectReason === "OTHER" && !customRejectText.trim())}
+                  onClick={() => handleApproveQuote(false)}
                   className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
                 >
                   {isApprovingQuote ? "Đang xử lý..." : "Xác nhận từ chối"}

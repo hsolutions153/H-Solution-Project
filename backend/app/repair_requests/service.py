@@ -1452,17 +1452,7 @@ def submit_technician_rating(request_id: str, data: dict, current_user: dict):
         })
         if not saved:
             raise AppException(ErrorCode.DATABASE_ERROR)
-
-        try:
-            from app.db.database import supabase
-            rev_resp = supabase.table("repair_reviews").select("rating").eq("technician_id", tech_id).execute()
-            if rev_resp and rev_resp.data:
-                ratings = [float(r["rating"]) for r in rev_resp.data if r.get("rating") is not None]
-                if ratings:
-                    avg_r = round(sum(ratings) / len(ratings), 1)
-                    supabase.table("technician_profiles").update({"rating_avg": avg_r}).eq("user_id", tech_id).execute()
-        except Exception as r_err:
-            logger.warning(f"Failed to recalculate rating_avg for tech {tech_id}: {r_err}")
+        invalidate_technician_cache(tech_id)
     except AppException:
         raise
     except Exception as error:

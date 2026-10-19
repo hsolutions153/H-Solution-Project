@@ -138,7 +138,7 @@ def scenario(browser, mode, final_amount=1200000):
                 user.get_by_role('button', name='Từ chối phát sinh', exact=True).click()
                 user.get_by_role('button', name='Xác nhận từ chối', exact=True).click()
                 expect(tech.get_by_role('heading', name='Khách hàng từ chối chi phí phát sinh', exact=True)).to_be_visible(timeout=12000)
-                assert harness.request['repair_quotes'][-1]['reject_reason'] == 'Không đồng ý'
+                assert harness.request['repair_quotes'][-1]['reject_reason'] == 'Không đồng ý với chi phí phát sinh này'
                 tech.get_by_role('button', name='Tiếp tục sửa chữa', exact=True).click()
                 final_amount = 1200000
                 expect(final_input).to_be_enabled()

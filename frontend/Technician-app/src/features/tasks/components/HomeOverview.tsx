@@ -49,7 +49,10 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    let refreshing = false;
+    const refreshSummary = async () => {
+      if (refreshing || document.hidden) return;
+      refreshing = true;
       const { fetchApi, getUserInfo } = await import("@/lib/api-client");
       const cachedName = getUserInfo()?.name || "Kỹ thuật viên";
       try {
@@ -63,11 +66,20 @@ export function HomeOverview({ tasks, onOpenTask, onViewAll }: HomeOverviewProps
         });
       } catch {
         const cachedPresence = getCachedPresence();
-        if (alive) setSummary({ fullName: cachedName, isOnline: cachedPresence !== false, rating: null, jobsDone: null });
+        if (alive) setSummary((previous) => previous ?? { fullName: cachedName, isOnline: cachedPresence !== false, rating: null, jobsDone: null });
+      } finally {
+        refreshing = false;
       }
-    })();
+    };
+    void refreshSummary();
+    const interval = window.setInterval(refreshSummary, 15000);
+    window.addEventListener("focus", refreshSummary);
+    document.addEventListener("visibilitychange", refreshSummary);
     return () => {
       alive = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshSummary);
+      document.removeEventListener("visibilitychange", refreshSummary);
     };
   }, []);
 

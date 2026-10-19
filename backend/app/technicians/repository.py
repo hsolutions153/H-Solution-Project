@@ -1,5 +1,6 @@
 from app.db.database import supabase
 from app.technicians.models import TECHNICIAN_PROFILES_TABLE
+from app.technicians.ratings import sync_technician_rating
 
 BANK_ACCOUNTS_TABLE = "technician_bank_accounts"
 
@@ -34,19 +35,9 @@ def _sync_technician_stats(item: dict) -> dict:
         pass
 
     try:
-        rev_resp = (
-            supabase.table("repair_reviews")
-            .select("rating")
-            .eq("technician_id", uid)
-            .execute()
-        )
-        if rev_resp and rev_resp.data:
-            ratings = [float(r["rating"]) for r in rev_resp.data if r.get("rating") is not None]
-            if ratings:
-                avg_r = round(sum(ratings) / len(ratings), 1)
-                if float(item.get("rating_avg") or 0) != avg_r:
-                    supabase.table(TECHNICIAN_PROFILES_TABLE).update({"rating_avg": avg_r}).eq("user_id", uid).execute()
-                    item["rating_avg"] = avg_r
+        average = sync_technician_rating(uid, item.get("rating_avg"))
+        if average is not None:
+            item["rating_avg"] = average
     except Exception:
         pass
 

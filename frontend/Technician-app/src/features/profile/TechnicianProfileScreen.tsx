@@ -88,6 +88,34 @@ export function TechnicianProfileScreen() {
 
   useEffect(() => {
     fetchProfile();
+    let alive = true;
+    let refreshing = false;
+    const refreshStats = async () => {
+      if (refreshing || document.hidden) return;
+      refreshing = true;
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const me = await fetchApi<any>("/technicians/me");
+        if (alive) setProfile((previous: any) => previous ? {
+          ...previous,
+          rating_avg: me.rating_avg,
+          total_jobs_done: me.total_jobs_done,
+        } : previous);
+      } catch {
+        // Keep the last loaded stats if a background refresh fails.
+      } finally {
+        refreshing = false;
+      }
+    };
+    const interval = window.setInterval(refreshStats, 15000);
+    window.addEventListener("focus", refreshStats);
+    document.addEventListener("visibilitychange", refreshStats);
+    return () => {
+      alive = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshStats);
+      document.removeEventListener("visibilitychange", refreshStats);
+    };
   }, []);
 
   // Lắng nghe sự kiện cập nhật trạng thái hoạt động từ Header hoặc nơi khác
@@ -291,7 +319,7 @@ export function TechnicianProfileScreen() {
   }
 
   const user = profile.user || {};
-  const rating = Number(profile.rating_avg || 5);
+  const rating = Number(profile.rating_avg ?? 5);
   const kycApproved = profile.kyc_status === "APPROVED";
 
   return (
