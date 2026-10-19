@@ -135,15 +135,18 @@ export default function HomePage() {
         <section data-reveal aria-label="Lối tắt" className="grid grid-cols-2 gap-3">
           <Link
             href="/home/booking"
-            className="row-span-2 flex min-h-[200px] flex-col justify-between rounded-card bg-brand-600 p-4 text-white shadow-card transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98]"
+            className="col-span-2 flex items-center justify-between rounded-card bg-brand-600 p-4 text-white shadow-card transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98]"
           >
-            <span className="flex size-10 items-center justify-center rounded-control bg-white/15">
-              <CalendarPlus className="size-5" />
-            </span>
-            <span>
-              <span className="block text-base font-bold leading-tight">Đặt lịch sửa chữa</span>
-              <span className="mt-1 block text-xs text-brand-100">Chọn giờ, kỹ thuật viên đến tận nhà</span>
-            </span>
+            <div className="flex items-center gap-3.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-white/15">
+                <CalendarPlus className="size-5" />
+              </span>
+              <div>
+                <span className="block text-base font-bold leading-tight">Đặt lịch sửa chữa</span>
+                <span className="mt-1 block text-xs text-brand-100">Chọn giờ, kỹ thuật viên đến tận nhà</span>
+              </div>
+            </div>
+            <ChevronRight className="size-5 shrink-0 text-white/70" />
           </Link>
 
           <ShortcutTile
@@ -236,19 +239,27 @@ function ShortcutTile({
   return (
     <Link
       href={href}
-      className="rounded-card border border-line bg-surface p-3.5 shadow-card transition-shadow hover:shadow-raised"
+      className="flex h-full flex-col justify-between rounded-card border border-line bg-surface p-3.5 shadow-card transition-[box-shadow,transform] hover:shadow-raised active:scale-[0.98]"
     >
-      <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700">{icon}</span>
-      <p className="mt-2.5 text-xs text-slate-500">{label}</p>
-      {value === null ? (
-        <div className="mt-1 h-6 w-16 animate-pulse rounded-md bg-slate-200" aria-hidden />
+      <div>
+        <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700">{icon}</span>
+        <p className="mt-2.5 text-xs text-slate-500">{label}</p>
+        {value === null ? (
+          <div className="mt-1 h-6 w-16 animate-pulse rounded-md bg-slate-200" aria-hidden />
+        ) : (
+          <p className="truncate text-base font-bold leading-tight text-ink">
+            {value}
+            {unit ? <span className="text-xs font-medium text-slate-500"> {unit}</span> : null}
+          </p>
+        )}
+      </div>
+      {note ? (
+        <p className="mt-1 truncate text-xs text-slate-500">{note}</p>
       ) : (
-        <p className="truncate text-base font-bold leading-tight text-ink">
-          {value}
-          {unit ? <span className="text-xs font-medium text-slate-500"> {unit}</span> : null}
+        <p className="mt-1 text-xs text-transparent select-none" aria-hidden>
+          &nbsp;
         </p>
       )}
-      {note ? <p className="mt-0.5 truncate text-xs text-slate-500">{note}</p> : null}
     </Link>
   );
 }

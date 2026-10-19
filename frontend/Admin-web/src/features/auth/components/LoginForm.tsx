@@ -85,7 +85,7 @@ export const LoginForm = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit} method="POST" action="#" className="space-y-4" noValidate>
           <Field
             label="Email hoặc số điện thoại"
             type="text"

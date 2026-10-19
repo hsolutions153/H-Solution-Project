@@ -14,6 +14,11 @@ export function LocationPicker({ latitude, longitude, onChange }: LocationPicker
   const markerRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
 
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -55,9 +60,9 @@ export function LocationPicker({ latitude, longitude, onChange }: LocationPicker
         const nextLng = Number(lngLat.lng);
         try {
           const address = await fetchApi<any>(`/repair-requests/reverse-geocode?latitude=${nextLat}&longitude=${nextLng}`);
-          onChange({ latitude: nextLat, longitude: nextLng, ...address });
+          onChangeRef.current({ latitude: nextLat, longitude: nextLng, ...address });
         } catch {
-          onChange({ latitude: nextLat, longitude: nextLng });
+          onChangeRef.current({ latitude: nextLat, longitude: nextLng });
         }
       };
       marker.on("dragend", () => update(marker.getLngLat()));
@@ -77,6 +82,8 @@ export function LocationPicker({ latitude, longitude, onChange }: LocationPicker
       markerRef.current = null;
       mapRef.current = null;
     };
+    // Khởi tạo bản đồ Mapbox 1 lần duy nhất khi mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

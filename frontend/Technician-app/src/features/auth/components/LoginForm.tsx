@@ -68,7 +68,7 @@ export const LoginForm = ({ onSubmit, onForgotPassword }: LoginFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} method="POST" action="#" className="space-y-4" noValidate>
       <Field
         label="Số điện thoại hoặc email"
         type="text"
