@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Task, QuoteItemType, QuoteItem, QuotePayload } from "@/types/task";
-import { Badge, Button, Card, Field, cn, inputClasses } from "@h-mobility/ui";
+import { Badge, Button, Card, Field, FieldError, MAX_MONEY, cn, inputClasses, rules, useFieldErrors } from "@h-mobility/ui";
 import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses } from "@/components/ui";
 import {
   Plus,
@@ -54,6 +54,7 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
   const existingQuoteId = task?.quote?.id;
 
   useEffect(() => {
@@ -103,6 +104,17 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
     { name: "Gói bảo dưỡng & bôi trơn toàn diện", price: 150000, type: "SERVICE" },
     { name: "Cân chỉnh khung sườn & phanh an toàn", price: 100000, type: "SERVICE" },
   ];
+
+  const handleAddCustomPart = () => {
+    const valid = validate(
+      { newPartName, newPartPrice },
+      {
+        newPartName: rules.required(newPartType === "SERVICE" ? "Tên dịch vụ" : "Tên linh kiện", 200),
+        newPartPrice: rules.money({ required: true, label: "Đơn giá" }),
+      },
+    );
+    if (valid) handleAddPart(newPartName.trim(), Number(newPartPrice.replace(/[.,\s]/g, "")), newPartType);
+  };
 
   const handleAddPart = (
     name: string,
@@ -167,7 +179,20 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
     },
   ];
 
+  // Cùng giới hạn với QuoteCreateRequest / QuoteItemCreate ở backend
+  const validateQuote = () =>
+    validate(
+      { laborCost: customLaborCost, estimatedTime, total: totalCost },
+      {
+        laborCost: rules.money({ required: true, label: "Tiền công" }),
+        estimatedTime: rules.required("Thời gian dự kiến hoàn thành", 100),
+        total: (v) =>
+          Number(v) > MAX_MONEY ? "Tổng báo giá vượt quá mức tối đa 999.999.999.999 đ. Kiểm tra lại số lượng và đơn giá." : undefined,
+      },
+    );
+
   const handleSaveDraft = () => {
+    if (!validateQuote()) return;
     onSubmitQuote({
       items: buildItems(),
       parts_cost: partsCost,
@@ -181,8 +206,9 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
 
   const handleSend = async () => {
     if (isSubmitting || isLoadingQuote) return;
-    setIsSubmitting(true);
     setSubmitError("");
+    if (!validateQuote()) return;
+    setIsSubmitting(true);
     // Định dạng items đúng chuẩn enum item_type (SPARE_PART, LABOR, SERVICE)
     const quotePayload: QuotePayload = {
       items: buildItems(),
@@ -207,7 +233,10 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
       sessionStorage.setItem("quoteData", JSON.stringify(savedQuote));
       onSubmitQuote({ ...savedQuote, status: "SENT" });
     } catch (err: any) {
-      setSubmitError(err.message || "Không thể gửi báo giá. Vui lòng thử lại.");
+      // Lỗi ở từng hạng mục (items.N.*) vẫn hiện ở banner vì không có ô nhập riêng
+      if (!fromApi(err, { labor_fee: "laborCost", estimatedTime: "estimatedTime" })) {
+        setSubmitError(err.message || "Không thể gửi báo giá. Vui lòng thử lại.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -290,13 +319,20 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
             id="quote-labor"
             type="number"
             inputMode="numeric"
+            min={0}
+            step={1000}
             value={customLaborCost}
-            onChange={(e) => setCustomLaborCost(Number(e.target.value) || 0)}
+            {...inputProps("laborCost")}
+            onChange={(e) => {
+              setCustomLaborCost(Number(e.target.value) || 0);
+              clearError("laborCost");
+            }}
             className={cn(inputClasses, "pr-8 text-right font-bold tabular-nums")}
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">đ</span>
         </div>
       </Card>
+      <FieldError id="laborCost-error" message={errors.laborCost} className="-mt-3 px-1" />
 
       <div className="space-y-1.5">
         <label htmlFor="quote-eta" className={labelClasses}>
@@ -307,13 +343,20 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
           <input
             id="quote-eta"
             type="text"
+            maxLength={100}
             value={estimatedTime}
-            onChange={(e) => setEstimatedTime(e.target.value)}
+            {...inputProps("estimatedTime")}
+            onChange={(e) => {
+              setEstimatedTime(e.target.value);
+              clearError("estimatedTime");
+            }}
             placeholder="Ví dụ: 2 giờ, 1 ngày"
             className={cn(inputClasses, "pl-10")}
           />
         </div>
+        <FieldError id="estimatedTime-error" message={errors.estimatedTime} />
       </div>
+      <FieldError id="total-error" message={errors.total} />
 
       <div className="rounded-card bg-brand-950 p-4 text-white">
         <div className="space-y-1.5 text-[13px] text-brand-100">
@@ -400,22 +443,34 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
             label={newPartType === "SERVICE" ? "Tên dịch vụ" : "Tên linh kiện"}
             type="text"
             placeholder={newPartType === "SERVICE" ? "Ví dụ: Bảo dưỡng định kỳ" : "Ví dụ: Ắc quy 12V"}
+            name="newPartName"
+            maxLength={200}
             value={newPartName}
-            onChange={(e) => setNewPartName(e.target.value)}
+            onChange={(e) => {
+              setNewPartName(e.target.value);
+              clearError("newPartName");
+            }}
+            error={errors.newPartName}
           />
           <Field
             label="Đơn giá (đ)"
-            type="number"
+            type="text"
             inputMode="numeric"
+            name="newPartPrice"
+            placeholder="Ví dụ: 150000"
             value={newPartPrice}
-            onChange={(e) => setNewPartPrice(e.target.value)}
+            onChange={(e) => {
+              setNewPartPrice(e.target.value);
+              clearError("newPartPrice");
+            }}
+            error={errors.newPartPrice}
+            hint="Số nguyên, đơn vị đồng. Có thể nhập 150.000"
           />
           <Button
             size="lg"
             fullWidth
             icon={<Plus className="size-5" />}
-            onClick={() => handleAddPart(newPartName, Number(newPartPrice) || 0, newPartType)}
-            disabled={!newPartName.trim()}
+            onClick={handleAddCustomPart}
           >
             Thêm vào báo giá
           </Button>

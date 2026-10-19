@@ -1,12 +1,7 @@
 "use client";
 
-import {
-digitsOnly,
-EMAIL_PATTERN,
-isStrongPassword,
-VIETNAM_PHONE_PATTERN,
-} from "@/utils/auth-validation";
-import { BrandLockup } from "@h-mobility/ui";
+import { digitsOnly, strongPasswordRule } from "@/utils/auth-validation";
+import { BrandLockup, FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import {
 Eye,
 EyeOff,
@@ -54,6 +49,7 @@ export function SocialAuthCard({
   const [showPassword, setShowPassword] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const errorCode = searchParams.get("error");
   const oauthError = errorCode
@@ -111,28 +107,24 @@ export function SocialAuthCard({
     event.preventDefault();
     setFormError("");
 
-    if (!VIETNAM_PHONE_PATTERN.test(phone)) {
-      setFormError("Số điện thoại phải gồm 10 chữ số và đúng đầu số Việt Nam.");
-      return;
-    }
-    if (!isLogin && !EMAIL_PATTERN.test(email)) {
-      setFormError("Email phải đúng định dạng, ví dụ: ten@example.com.");
-      return;
-    }
-    if (!isLogin && !isStrongPassword(password)) {
-      setFormError(
-        "Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.",
-      );
-      return;
-    }
-    if (!isLogin && password !== confirmPassword) {
-      setFormError("Mật khẩu xác nhận không khớp.");
-      return;
-    }
-    if (!isLogin && !acceptTerms) {
-      setFormError("Bạn cần đồng ý với điều khoản sử dụng.");
-      return;
-    }
+    const valid = isLogin
+      ? validate({ phone, password }, {
+          phone: rules.phone({ required: true }),
+          password: rules.loginPassword(),
+        })
+      : validate({ name, email, phone, address, password, confirmPassword, acceptTerms }, {
+          name: rules.name(),
+          email: rules.email(),
+          phone: rules.phone({ required: true }),
+          address: rules.maxLength("Địa chỉ", 255),
+          password: strongPasswordRule(),
+          confirmPassword: [
+            rules.required("Mật khẩu xác nhận"),
+            rules.matches(() => password, "Mật khẩu xác nhận không khớp với mật khẩu đã nhập."),
+          ],
+          acceptTerms: (checked) => (checked ? undefined : "Bạn cần đồng ý với Điều khoản sử dụng để tạo tài khoản."),
+        });
+    if (!valid) return;
 
     setLoadingProvider("credentials");
     try {
@@ -168,7 +160,10 @@ export function SocialAuthCard({
         setFormError("Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.");
       }
     } catch (err: any) {
-      setFormError(err.message || "Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
+      // Lỗi định dạng từ API hiện ngay dưới ô tương ứng; lỗi khác hiện ở đầu form
+      if (!fromApi(err, isLogin ? { email: "phone" } : {})) {
+        setFormError(err.message || "Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
+      }
     } finally {
       setLoadingProvider(null);
     }
@@ -225,7 +220,7 @@ export function SocialAuthCard({
           </div>
         )}
 
-        <form className="space-y-md" onSubmit={handleCredentials}>
+        <form className="space-y-md" onSubmit={handleCredentials} noValidate>
           {!isLogin && (
             <div className="flex flex-col gap-xs">
               <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="name">
@@ -241,14 +236,17 @@ export function SocialAuthCard({
                   type="text"
                   autoComplete="name"
                   placeholder="Nguyễn Văn A"
-                  required
-                  minLength={2}
                   maxLength={100}
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  {...inputProps("name")}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    clearError("name");
+                  }}
                   className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
+              <FieldError id="name-error" message={errors.name} />
             </div>
           )}
 
@@ -267,14 +265,17 @@ export function SocialAuthCard({
                   type="email"
                   autoComplete="email"
                   placeholder="example@gmail.com"
-                  required
-                  pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}"
-                  title="Nhập email đúng định dạng, ví dụ: ten@example.com"
+                  maxLength={100}
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  {...inputProps("email")}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    clearError("email");
+                  }}
                   className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
+              <FieldError id="email-error" message={errors.email} />
             </div>
           )}
 
@@ -292,16 +293,18 @@ export function SocialAuthCard({
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
-                required
-                pattern="0(?:3|5|7|8|9)[0-9]{8}"
                 maxLength={10}
-                title="Nhập số điện thoại Việt Nam, ví dụ 0912345678"
                 placeholder="0912345678"
                 value={phone}
-                onChange={(event) => setPhone(digitsOnly(event.target.value))}
+                {...inputProps("phone")}
+                onChange={(event) => {
+                  setPhone(digitsOnly(event.target.value));
+                  clearError("phone");
+                }}
                 className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
+            <FieldError id="phone-error" message={errors.phone} />
           </div>
 
           {!isLogin && (
@@ -321,10 +324,15 @@ export function SocialAuthCard({
                   maxLength={255}
                   placeholder="Ví dụ: 123 Nguyễn Trãi, Q.1, TP.HCM"
                   value={address}
-                  onChange={(event) => setAddress(event.target.value)}
+                  {...inputProps("address")}
+                  onChange={(event) => {
+                    setAddress(event.target.value);
+                    clearError("address");
+                  }}
                   className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
+              <FieldError id="address-error" message={errors.address} />
             </div>
           )}
 
@@ -342,17 +350,13 @@ export function SocialAuthCard({
                 type={showPassword ? "text" : "password"}
                 autoComplete={isLogin ? "current-password" : "new-password"}
                 placeholder="Abc123456@"
-                required
-                minLength={8}
-                maxLength={128}
-                pattern={isLogin ? undefined : "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\\s]).{8,128}"}
-                title={
-                  isLogin
-                    ? undefined
-                    : "Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
-                }
+                maxLength={72}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                {...inputProps("password")}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  clearError("password");
+                }}
                 className="w-full h-14 pl-12 pr-14 bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
               <button
@@ -368,7 +372,8 @@ export function SocialAuthCard({
                 )}
               </button>
             </div>
-            {!isLogin && (
+            <FieldError id="password-error" message={errors.password} />
+            {!isLogin && !errors.password && (
               <p className="text-xs leading-5 text-on-surface-variant">
                 Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
               </p>
@@ -398,26 +403,34 @@ export function SocialAuthCard({
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     placeholder="Abc123456@"
-                    required
-                    minLength={8}
-                    maxLength={128}
-                    pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
-                    title="Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+                    maxLength={72}
                     value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    {...inputProps("confirmPassword")}
+                    onChange={(event) => {
+                      setConfirmPassword(event.target.value);
+                      clearError("confirmPassword");
+                    }}
                     className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                   />
                 </div>
+                <FieldError id="confirmPassword-error" message={errors.confirmPassword} />
               </div>
-              <label className="flex items-start gap-sm text-sm text-on-surface-variant">
-                <input
-                  type="checkbox"
-                  checked={acceptTerms}
-                  onChange={(event) => setAcceptTerms(event.target.checked)}
-                  className="mt-1 accent-primary"
-                />
-                <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</span>
-              </label>
+              <div>
+                <label className="flex items-start gap-sm text-sm text-on-surface-variant">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    {...inputProps("acceptTerms")}
+                    onChange={(event) => {
+                      setAcceptTerms(event.target.checked);
+                      clearError("acceptTerms");
+                    }}
+                    className="mt-1 accent-primary"
+                  />
+                  <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</span>
+                </label>
+                <FieldError id="acceptTerms-error" message={errors.acceptTerms} />
+              </div>
             </>
           )}
 

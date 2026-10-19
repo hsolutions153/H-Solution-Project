@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { VIETNAM_PHONE_PATTERN } from "@/utils/auth-validation";
+import { digitsOnly } from "@/utils/auth-validation";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 export type UserProfile = {
   id: string;
   name: string;
@@ -108,6 +109,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const [primaryDevice, setPrimaryDevice] = useState<{
     id: string;
@@ -223,11 +225,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
     event.preventDefault();
     setNotice(null);
 
-    const phone = profile.phone.trim();
-    if (phone && !VIETNAM_PHONE_PATTERN.test(phone)) {
-      setNotice({ type: "error", message: "Số điện thoại không đúng định dạng (VD: 0912345678)." });
-      return;
-    }
+    const valid = validate(
+      { name: profile.name, phone: profile.phone, address: profile.address },
+      {
+        name: rules.name(),
+        phone: rules.phone(),
+        address: rules.maxLength("Địa chỉ", 255),
+      },
+    );
+    if (!valid) return;
 
     setIsSaving(true);
     try {
@@ -244,7 +250,9 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
         router.refresh();
       }, 500);
     } catch (error) {
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể lưu hồ sơ." });
+      if (!fromApi(error, { full_name: "name" })) {
+        setNotice({ type: "error", message: error instanceof Error ? error.message : "Không thể lưu hồ sơ." });
+      }
       setIsSaving(false);
     }
   }
@@ -257,7 +265,7 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
             <PageHeader title="Chỉnh sửa hồ sơ" backHref="/home/profile" />
           </header>
 
-          <form className="profile-edit-form" onSubmit={handleSubmit}>
+          <form className="profile-edit-form" onSubmit={handleSubmit} noValidate>
             <div className="profile-edit-avatar">
               <button
                 type="button"
@@ -293,21 +301,30 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                     value={profile.name}
                     autoComplete="name"
                     maxLength={100}
-                    required
                     placeholder="Nhập họ và tên"
-                    onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))}
+                    {...inputProps("name")}
+                    onChange={(event) => {
+                      setProfile((current) => ({ ...current, name: event.target.value }));
+                      clearError("name");
+                    }}
                   />
+                  <FieldError id="name-error" message={errors.name} className="mt-0" />
                 </label>
                 <label>
                   <span>Số điện thoại</span>
                   <input
                     value={profile.phone}
                     autoComplete="tel"
-                    inputMode="tel"
-                    maxLength={30}
+                    inputMode="numeric"
+                    maxLength={10}
                     placeholder="VD: 0912345678"
-                    onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))}
+                    {...inputProps("phone")}
+                    onChange={(event) => {
+                      setProfile((current) => ({ ...current, phone: digitsOnly(event.target.value) }));
+                      clearError("phone");
+                    }}
                   />
+                  <FieldError id="phone-error" message={errors.phone} className="mt-0" />
                 </label>
                 <label>
                   <span>Địa chỉ Email</span>
@@ -324,10 +341,15 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
                   <input
                     value={profile.address}
                     autoComplete="street-address"
-                    maxLength={200}
+                    maxLength={255}
                     placeholder="Nhập địa chỉ nơi ở của bạn"
-                    onChange={(event) => setProfile((current) => ({ ...current, address: event.target.value }))}
+                    {...inputProps("address")}
+                    onChange={(event) => {
+                      setProfile((current) => ({ ...current, address: event.target.value }));
+                      clearError("address");
+                    }}
                   />
+                  <FieldError id="address-error" message={errors.address} className="mt-0" />
                 </label>
               </div>
             </div>

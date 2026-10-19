@@ -16,7 +16,7 @@ import {
   Check,
   UserRound,
 } from "lucide-react";
-import { Badge, Button, Card, EmptyState } from "@h-mobility/ui";
+import { Badge, Button, Card, EmptyState, FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import { InfoRow, SkeletonList } from "@/components/ui";
 import { BankSelect } from "@/components/BankSelect";
 import { uploadTechnicianAvatar } from "@/lib/avatar";
@@ -58,6 +58,7 @@ export function TechnicianProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const { errors, setErrors, validate, fromApi, clearError, inputProps } = useFieldErrors();
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [form, setForm] = useState<ProfileFormState>({
     full_name: "",
@@ -146,25 +147,23 @@ export function TechnicianProfileScreen() {
       account_holder: bank.account_holder || "",
     });
     setEditError(null);
+    setErrors({});
     setIsEditing(true);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.full_name.trim()) {
-      setEditError("Vui lòng nhập họ và tên.");
-      return;
-    }
-    if (form.account_number.trim()) {
-      if (!/^\d+$/.test(form.account_number.trim())) {
-        setEditError("Số tài khoản ngân hàng chỉ gồm chữ số.");
-        return;
-      }
-      if (!form.bank_code.trim()) {
-        setEditError("Vui lòng chọn ngân hàng thụ hưởng.");
-        return;
-      }
-    }
+    setEditError(null);
+    // Thông tin ngân hàng là tùy chọn, nhưng đã nhập một phần thì phải đủ cả ngân hàng và số tài khoản
+    const hasBank = Boolean(form.account_number.trim() || form.bank_code.trim() || form.account_holder.trim());
+    const valid = validate(form, {
+      full_name: rules.name(),
+      phone: rules.phone(),
+      bank_code: rules.bankCode({ required: hasBank, label: "Ngân hàng thụ hưởng" }),
+      account_number: rules.accountNumber({ required: hasBank }),
+      account_holder: rules.name({ required: false, label: "Chủ tài khoản" }),
+    });
+    if (!valid) return;
 
     setIsSaving(true);
     setEditError(null);
@@ -194,7 +193,7 @@ export function TechnicianProfileScreen() {
       setProfile(updated);
       setIsEditing(false);
     } catch (err: any) {
-      setEditError(err?.message ?? "Không thể cập nhật thông tin.");
+      if (!fromApi(err)) setEditError(err?.message ?? "Không thể cập nhật thông tin.");
     } finally {
       setIsSaving(false);
     }
@@ -398,7 +397,7 @@ export function TechnicianProfileScreen() {
 
       <Card className="py-1">
         {isEditing ? (
-          <form onSubmit={handleSaveProfile} className="space-y-4 px-1 py-3">
+          <form onSubmit={handleSaveProfile} className="space-y-4 px-1 py-3" noValidate>
             <div className="border-b border-line pb-2.5">
               <h3 className="text-sm font-bold text-ink">Chỉnh sửa thông tin thợ</h3>
             </div>
@@ -410,23 +409,35 @@ export function TechnicianProfileScreen() {
                 </label>
                 <input
                   type="text"
-                  required
+                  maxLength={100}
                   value={form.full_name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                  {...inputProps("full_name")}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, full_name: e.target.value }));
+                    clearError("full_name");
+                  }}
                   placeholder="VD: Nguyễn Văn A"
                   className="w-full rounded-control border border-line bg-white px-3 py-2 text-xs text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
                 />
+                <FieldError id="full_name-error" message={errors.full_name} />
               </div>
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">Số điện thoại</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  {...inputProps("phone")}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, "") }));
+                    clearError("phone");
+                  }}
                   placeholder="VD: 0987654321"
                   className="w-full rounded-control border border-line bg-white px-3 py-2 text-xs text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
                 />
+                <FieldError id="phone-error" message={errors.phone} />
               </div>
             </div>
 
@@ -442,8 +453,13 @@ export function TechnicianProfileScreen() {
                   <BankSelect
                     valueCode={form.bank_code}
                     valueName={form.bank_name}
-                    onChange={(code, name) => setForm((prev) => ({ ...prev, bank_code: code, bank_name: name }))}
+                    {...inputProps("bank_code")}
+                    onChange={(code, name) => {
+                      setForm((prev) => ({ ...prev, bank_code: code, bank_name: name }));
+                      clearError("bank_code");
+                    }}
                   />
+                  <FieldError id="bank_code-error" message={errors.bank_code} />
                 </div>
 
                 <div>
@@ -451,14 +467,18 @@ export function TechnicianProfileScreen() {
                   <input
                     type="text"
                     value={form.account_number}
+                    {...inputProps("account_number")}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
                       setForm((prev) => ({ ...prev, account_number: val }));
+                      clearError("account_number");
                     }}
+                    maxLength={50}
                     placeholder="Chỉ nhập số tài khoản"
                     inputMode="numeric"
                     className="w-full rounded-control border border-line bg-white px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
                   />
+                  <FieldError id="account_number-error" message={errors.account_number} />
                 </div>
 
                 <div>
@@ -466,10 +486,16 @@ export function TechnicianProfileScreen() {
                   <input
                     type="text"
                     value={form.account_holder}
-                    onChange={(e) => setForm((prev) => ({ ...prev, account_holder: e.target.value.toUpperCase() }))}
+                    maxLength={100}
+                    {...inputProps("account_holder")}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, account_holder: e.target.value.toUpperCase() }));
+                      clearError("account_holder");
+                    }}
                     placeholder="Họ tên chủ tài khoản"
                     className="w-full rounded-control border border-line bg-white px-2.5 py-1.5 text-xs uppercase text-ink placeholder:text-slate-400 focus:border-brand-500 focus:outline-none"
                   />
+                  <FieldError id="account_holder-error" message={errors.account_holder} />
                 </div>
               </div>
             </div>
@@ -490,7 +516,10 @@ export function TechnicianProfileScreen() {
 
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setErrors({});
+                  setIsEditing(false);
+                }}
                 className="rounded-control border border-line px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Hủy

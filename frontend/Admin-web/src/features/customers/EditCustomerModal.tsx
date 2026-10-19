@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import { X, Edit3, Phone, Mail, MapPin, Lock, RefreshCw, Save } from "lucide-react";
 
 export interface EditCustomerModalProps {
@@ -29,13 +30,18 @@ export const EditCustomerModal = ({
   const [address, setAddress] = useState(customer.address || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      setError("Vui lòng nhập họ và tên khách hàng.");
-      return;
-    }
+    setError("");
+    const valid = validate({ fullName, phone, email, address }, {
+        fullName: rules.name(),
+        phone: rules.phone(),
+        email: rules.email(),
+        address: rules.maxLength("Địa chỉ", 255),
+      });
+    if (!valid) return;
 
     setLoading(true);
     setError("");
@@ -55,6 +61,7 @@ export const EditCustomerModal = ({
       onSuccess(`Cập nhật thông tin khách hàng ${fullName.trim()} thành công!`);
       onClose();
     } catch (err: unknown) {
+      if (fromApi(err, { full_name: "fullName" })) return;
       if (err instanceof Error) {
         setError(err.message || "Lỗi khi cập nhật thông tin khách hàng.");
       } else {
@@ -89,7 +96,7 @@ export const EditCustomerModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
@@ -119,12 +126,16 @@ export const EditCustomerModal = ({
             </label>
             <input
               type="text"
-              required
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              {...inputProps("fullName")}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearError("fullName");
+              }}
               placeholder="VD: Nguyễn Văn A"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="fullName-error" message={errors.fullName} />
           </div>
 
           <div>
@@ -135,10 +146,15 @@ export const EditCustomerModal = ({
             <input
               type="text"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              {...inputProps("phone")}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                clearError("phone");
+              }}
               placeholder="VD: 0987654321"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="phone-error" message={errors.phone} />
           </div>
 
           <div>
@@ -148,12 +164,16 @@ export const EditCustomerModal = ({
             </label>
             <input
               type="email"
-              required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...inputProps("email")}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearError("email");
+              }}
               placeholder="VD: user@example.com"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="email-error" message={errors.email} />
           </div>
 
           <div>
@@ -164,10 +184,15 @@ export const EditCustomerModal = ({
             <textarea
               rows={2}
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              {...inputProps("address")}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                clearError("address");
+              }}
               placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none resize-none"
             />
+            <FieldError id="address-error" message={errors.address} />
           </div>
 
           <div className="pt-2 flex justify-end gap-3 border-t border-slate-100">

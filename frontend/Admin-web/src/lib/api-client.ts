@@ -1,4 +1,4 @@
-import { fetchAllPages } from "@h-mobility/ui";
+import { fetchAllPages, describeApiIssues } from "@h-mobility/ui";
 
 function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL || "";
@@ -84,12 +84,15 @@ export function getUserInfo(): UserSession | null {
 export class ApiError extends Error {
   status: number;
   code?: string;
+  /** 422 issues from the API: [{ field, message, type }]. Forms map them onto inputs. */
+  details?: unknown;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -135,7 +138,12 @@ export async function fetchApi<T>(
   }
 
   const contentType = response.headers.get("content-type");
-  let data: { detail?: { message?: string; code?: string } | string; message?: string; code?: string } | null = null;
+  let data: {
+    detail?: { message?: string; code?: string; details?: unknown } | string;
+    message?: string;
+    code?: string;
+    details?: unknown;
+  } | null = null;
   try {
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
@@ -153,6 +161,7 @@ export async function fetchApi<T>(
       data?.message ||
       `Yêu cầu thất bại (${response.status})`;
     const errorCode = (typeof data?.detail === "object" ? data.detail?.code : undefined) || data?.code;
+    const errorDetails = data?.details ?? (typeof data?.detail === "object" ? data.detail?.details : undefined);
 
     const canRefresh =
       response.status === 401 &&
@@ -174,7 +183,8 @@ export async function fetchApi<T>(
       removeAuthToken();
     }
 
-    throw new ApiError(errorMsg, response.status, errorCode);
+    // Lỗi 422: nêu rõ trường nào sai và sai thế nào thay vì câu chung chung
+    throw new ApiError(describeApiIssues(errorDetails) || errorMsg, response.status, errorCode, errorDetails);
   }
 
   return data as T;

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { VerifyOtpFormData } from '@/types/auth';
+import { FieldError } from '@h-mobility/ui';
 
 interface VerifyOtpFormProps {
   loading?: boolean;
@@ -16,6 +17,7 @@ export interface VerifyOtpFormRef {
 export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
   ({ onSubmit, onResendOtp, loading }, ref) => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+    const [otpError, setOtpError] = useState('');
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     // Cung cấp hàm resetOtp ra bên ngoài thông qua ref
@@ -32,6 +34,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
       const newOtp = [...otp];
       newOtp[index] = value.slice(-1);
       setOtp(newOtp);
+      setOtpError('');
 
       if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
@@ -65,7 +68,13 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
       e.preventDefault();
       const fullOtp = otp.join('');
       if (fullOtp.length < 6) {
-        alert('Vui lòng nhập đủ 6 chữ số OTP!');
+        const missing = 6 - fullOtp.length;
+        setOtpError(
+          fullOtp.length === 0
+            ? 'Vui lòng nhập mã OTP gồm 6 chữ số.'
+            : `Mã OTP gồm 6 chữ số, bạn còn thiếu ${missing} số.`,
+        );
+        inputRefs.current[otp.findIndex((d) => !d)]?.focus();
         return;
       }
       onSubmit({ otp: fullOtp });
@@ -99,10 +108,14 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
                 onChange={(e) => handleChange(e.target.value, index)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 onPaste={handlePaste}
+                aria-label={`Chữ số OTP thứ ${index + 1}`}
+                aria-invalid={otpError && !digit ? true : undefined}
+                aria-describedby={otpError ? 'otp-error' : undefined}
                 className="w-10 h-12 text-center text-base font-bold bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all shadow-sm"
               />
             ))}
           </div>
+          <FieldError id="otp-error" message={otpError} className="text-center" />
 
           
           <div>

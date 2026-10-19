@@ -3,6 +3,7 @@ import type { Technician } from "@/types/api";
 
 import { Award, CreditCard, Edit3, Lock, Phone, RefreshCw, Save, X } from "lucide-react";
 import React,{ useState } from "react";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 export interface EditTechnicianModalProps {
   technician: Technician;
@@ -36,13 +37,24 @@ export const EditTechnicianModal = ({
   const [accountHolder, setAccountHolder] = useState(technician.bank_account?.account_holder || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      setError("Vui lòng nhập họ và tên kỹ thuật viên.");
-      return;
-    }
+    setError("");
+    // Tài khoản ngân hàng là tùy chọn; đã nhập số tài khoản hoặc chủ tài khoản thì phải có số tài khoản hợp lệ
+    const hasBank = Boolean(accountNumber.trim() || accountHolder.trim());
+    const valid = validate({ fullName, phone, specialization, experienceYears, bankCode, bankName, accountNumber, accountHolder }, {
+        fullName: rules.name(),
+        phone: rules.phone(),
+        specialization: rules.maxLength("Chuyên môn", 255),
+        experienceYears: rules.integerRange("Số năm kinh nghiệm", 0, 60, true),
+        bankCode: rules.bankCode({ required: false, label: "Mã ngân hàng" }),
+        bankName: rules.name({ required: false, label: "Tên ngân hàng" }),
+        accountNumber: rules.accountNumber({ required: hasBank }),
+        accountHolder: rules.name({ required: false, label: "Chủ tài khoản" }),
+      });
+    if (!valid) return;
 
     setLoading(true);
     setError("");
@@ -74,6 +86,7 @@ export const EditTechnicianModal = ({
       onSuccess(`Cập nhật thông tin kỹ thuật viên ${fullName.trim()} thành công!`);
       onClose();
     } catch (err: unknown) {
+      if (fromApi(err, { full_name: "fullName", experience_years: "experienceYears", bank_code: "bankCode", bank_name: "bankName", account_number: "accountNumber", account_holder: "accountHolder" })) return;
       if (err instanceof Error) {
         setError(err.message || "Lỗi khi cập nhật kỹ thuật viên.");
       } else {
@@ -108,7 +121,7 @@ export const EditTechnicianModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
@@ -135,12 +148,16 @@ export const EditTechnicianModal = ({
             </label>
             <input
               type="text"
-              required
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              {...inputProps("fullName")}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearError("fullName");
+              }}
               placeholder="VD: Nguyễn Văn A"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="fullName-error" message={errors.fullName} />
           </div>
 
           <div>
@@ -151,10 +168,15 @@ export const EditTechnicianModal = ({
             <input
               type="text"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              {...inputProps("phone")}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                clearError("phone");
+              }}
               placeholder="VD: 0987654321"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="phone-error" message={errors.phone} />
           </div>
 
           <div>
@@ -165,10 +187,15 @@ export const EditTechnicianModal = ({
             <input
               type="text"
               value={specialization}
-              onChange={(e) => setSpecialization(e.target.value)}
+              {...inputProps("specialization")}
+              onChange={(e) => {
+                setSpecialization(e.target.value);
+                clearError("specialization");
+              }}
               placeholder="VD: Sửa chữa xe Scooter điện & Bo mạch điều khiển"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="specialization-error" message={errors.specialization} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -181,9 +208,14 @@ export const EditTechnicianModal = ({
                 min={0}
                 max={50}
                 value={experienceYears}
-                onChange={(e) => setExperienceYears(Number(e.target.value))}
+                {...inputProps("experienceYears")}
+                onChange={(e) => {
+                  setExperienceYears(Number(e.target.value));
+                  clearError("experienceYears");
+                }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
+              <FieldError id="experienceYears-error" message={errors.experienceYears} />
             </div>
 
             <div>
@@ -237,20 +269,30 @@ export const EditTechnicianModal = ({
                 <input
                   type="text"
                   value={bankCode}
-                  onChange={(e) => setBankCode(e.target.value)}
+                  {...inputProps("bankCode")}
+                  onChange={(e) => {
+                    setBankCode(e.target.value);
+                    clearError("bankCode");
+                  }}
                   placeholder="VD: MB, VCB"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
                 />
+                <FieldError id="bankCode-error" message={errors.bankCode} />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tên ngân hàng</label>
                 <input
                   type="text"
                   value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
+                  {...inputProps("bankName")}
+                  onChange={(e) => {
+                    setBankName(e.target.value);
+                    clearError("bankName");
+                  }}
                   placeholder="VD: MB Bank, Vietcombank"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
                 />
+                <FieldError id="bankName-error" message={errors.bankName} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -259,20 +301,30 @@ export const EditTechnicianModal = ({
                 <input
                   type="text"
                   value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
+                  {...inputProps("accountNumber")}
+                  onChange={(e) => {
+                    setAccountNumber(e.target.value);
+                    clearError("accountNumber");
+                  }}
                   placeholder="Chỉ gồm chữ số"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
                 />
+                <FieldError id="accountNumber-error" message={errors.accountNumber} />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">Chủ tài khoản (IN HOA)</label>
                 <input
                   type="text"
                   value={accountHolder}
-                  onChange={(e) => setAccountHolder(e.target.value)}
+                  {...inputProps("accountHolder")}
+                  onChange={(e) => {
+                    setAccountHolder(e.target.value);
+                    clearError("accountHolder");
+                  }}
                   placeholder="Họ tên chủ thẻ"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
                 />
+                <FieldError id="accountHolder-error" message={errors.accountHolder} />
               </div>
             </div>
           </div>

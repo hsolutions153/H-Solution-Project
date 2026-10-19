@@ -11,3 +11,16 @@ export { BottomNav } from "./components/BottomNav";
 export type { BottomNavItem } from "./components/BottomNav";
 export { EmptyState } from "./components/EmptyState";
 export { fetchAllPages } from "./pagination";
+export { FieldError } from "./components/FieldError";
+export { useFieldErrors } from "./useFieldErrors";
+export {
+  rules,
+  validateForm,
+  apiFieldErrors,
+  describeApiIssues,
+  explainApiIssue,
+  PHONE_PATTERN,
+  EMAIL_PATTERN,
+  MAX_MONEY,
+} from "./validation";
+export type { FieldErrors, Rule, FormSchema, ApiFieldIssue } from "./validation";

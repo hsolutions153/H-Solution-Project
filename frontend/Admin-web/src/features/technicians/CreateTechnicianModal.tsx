@@ -2,6 +2,7 @@
 
 import { Award,Lock,Mail,Phone,RefreshCw,UserPlus,X } from "lucide-react";
 import React,{ useState } from "react";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 export interface CreateTechnicianModalProps {
   onClose: () => void;
@@ -24,13 +25,21 @@ export const CreateTechnicianModal = ({
   const [skills, setSkills] = useState("SCOOTER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !phone.trim()) {
-      setError("Vui lòng nhập họ tên và số điện thoại kỹ thuật viên.");
-      return;
-    }
+    setError("");
+    const valid = validate({ fullName, phone, email, password, idCardNumber, specialization, experienceYears }, {
+        fullName: rules.name(),
+        phone: rules.phone({ required: true }),
+        email: rules.email({ required: false }),
+        password: rules.password({ label: "Mật khẩu khởi tạo" }),
+        idCardNumber: rules.idCard(),
+        specialization: rules.maxLength("Chuyên môn", 255),
+        experienceYears: rules.integerRange("Số năm kinh nghiệm", 0, 60, true),
+      });
+    if (!valid) return;
 
     setLoading(true);
     setError("");
@@ -54,6 +63,7 @@ export const CreateTechnicianModal = ({
       onSuccess(`Thêm kỹ thuật viên ${fullName.trim()} thành công!`);
       onClose();
     } catch (err: unknown) {
+      if (fromApi(err, { full_name: "fullName", id_card_number: "idCardNumber", experience_years: "experienceYears" })) return;
       if (err instanceof Error) {
         setError(err.message || "Lỗi khi tạo kỹ thuật viên.");
       } else {
@@ -88,7 +98,7 @@ export const CreateTechnicianModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
@@ -101,12 +111,16 @@ export const CreateTechnicianModal = ({
             </label>
             <input
               type="text"
-              required
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              {...inputProps("fullName")}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearError("fullName");
+              }}
               placeholder="VD: Nguyễn Văn Cường"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="fullName-error" message={errors.fullName} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -117,12 +131,16 @@ export const CreateTechnicianModal = ({
               </label>
               <input
                 type="text"
-                required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                {...inputProps("phone")}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  clearError("phone");
+                }}
                 placeholder="VD: 0987654321"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
+              <FieldError id="phone-error" message={errors.phone} />
             </div>
 
             <div>
@@ -133,10 +151,15 @@ export const CreateTechnicianModal = ({
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...inputProps("email")}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearError("email");
+                }}
                 placeholder="VD: tech@example.com"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
+              <FieldError id="email-error" message={errors.email} />
             </div>
           </div>
 
@@ -149,10 +172,15 @@ export const CreateTechnicianModal = ({
               <input
                 type="text"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...inputProps("password")}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearError("password");
+                }}
                 placeholder="Mặc định: Abc123456@"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none font-mono"
               />
+              <FieldError id="password-error" message={errors.password} />
             </div>
 
             <div>
@@ -162,10 +190,15 @@ export const CreateTechnicianModal = ({
               <input
                 type="text"
                 value={idCardNumber}
-                onChange={(e) => setIdCardNumber(e.target.value)}
+                {...inputProps("idCardNumber")}
+                onChange={(e) => {
+                  setIdCardNumber(e.target.value);
+                  clearError("idCardNumber");
+                }}
                 placeholder="VD: 001201012345"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
+              <FieldError id="idCardNumber-error" message={errors.idCardNumber} />
             </div>
           </div>
 
@@ -177,10 +210,15 @@ export const CreateTechnicianModal = ({
             <input
               type="text"
               value={specialization}
-              onChange={(e) => setSpecialization(e.target.value)}
+              {...inputProps("specialization")}
+              onChange={(e) => {
+                setSpecialization(e.target.value);
+                clearError("specialization");
+              }}
               placeholder="VD: Sửa chữa xe máy điện, động cơ & bo mạch điều khiển"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="specialization-error" message={errors.specialization} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -193,9 +231,14 @@ export const CreateTechnicianModal = ({
                 min={0}
                 max={50}
                 value={experienceYears}
-                onChange={(e) => setExperienceYears(Number(e.target.value))}
+                {...inputProps("experienceYears")}
+                onChange={(e) => {
+                  setExperienceYears(Number(e.target.value));
+                  clearError("experienceYears");
+                }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
               />
+              <FieldError id="experienceYears-error" message={errors.experienceYears} />
             </div>
 
             <div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
-import { Badge, Button, Card, Field, cn, inputClasses } from "@h-mobility/ui";
+import { Badge, Button, Card, Field, FieldError, cn, inputClasses, rules, useFieldErrors } from "@h-mobility/ui";
 import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses, selectClasses, textareaClasses } from "@/components/ui";
 import { SlideToConfirm } from "./SlideToConfirm";
 import {
@@ -111,6 +111,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newPartName, setNewPartName] = useState("");
   const [newPartPrice, setNewPartPrice] = useState("150000");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
   const [newPartType, setNewPartType] = useState<"SPARE_PART" | "SERVICE">("SPARE_PART");
   const [customLaborCost, setCustomLaborCost] = useState<number>(0);
 
@@ -432,6 +433,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
   const handleCreateSupplementaryQuote = async () => {
     if (!task?.id || isSubmittingSupplementary || isLoadingQuotes || quoteLoadError || !hasApprovedQuote || hasPendingQuote || additionalAmount <= 0) return;
+    if (!validate({ supplementaryNote }, { supplementaryNote: rules.maxLength("Lý do phát sinh", 5000) })) return;
     setIsSubmittingSupplementary(true);
     try {
       let formattedItems: QuoteItem[] = components.flatMap((item) => {
@@ -493,7 +495,9 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         onBack();
       }
     } catch (err: any) {
-      alert(err.message || "Lỗi khi tạo báo giá bổ sung");
+      if (!fromApi(err, { diagnosis_note: "supplementaryNote" })) {
+        alert(err.message || "Lỗi khi tạo báo giá bổ sung");
+      }
     } finally {
       setIsSubmittingSupplementary(false);
     }
@@ -934,22 +938,43 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             label="Tên hạng mục"
             type="text"
             placeholder="Ví dụ: Ắc quy 12V"
+            name="newPartName"
+            maxLength={200}
             value={newPartName}
-            onChange={(e) => setNewPartName(e.target.value)}
+            onChange={(e) => {
+              setNewPartName(e.target.value);
+              clearError("newPartName");
+            }}
+            error={errors.newPartName}
           />
           <Field
             label="Đơn giá (đ)"
-            type="number"
+            type="text"
             inputMode="numeric"
+            name="newPartPrice"
+            placeholder="Ví dụ: 150000"
             value={newPartPrice}
-            onChange={(e) => setNewPartPrice(e.target.value)}
+            onChange={(e) => {
+              setNewPartPrice(e.target.value);
+              clearError("newPartPrice");
+            }}
+            error={errors.newPartPrice}
+            hint="Số nguyên, đơn vị đồng. Có thể nhập 150.000"
           />
           <Button
             size="lg"
             fullWidth
             icon={<Plus className="size-5" />}
-            onClick={() => handleAddPart(newPartName, Math.max(0, Number(newPartPrice) || 0), newPartType)}
-            disabled={!newPartName.trim()}
+            onClick={() => {
+              const valid = validate(
+                { newPartName, newPartPrice },
+                {
+                  newPartName: rules.required("Tên hạng mục", 200),
+                  newPartPrice: rules.money({ required: true, label: "Đơn giá" }),
+                },
+              );
+              if (valid) handleAddPart(newPartName.trim(), Number(newPartPrice.replace(/[.,\s]/g, "")), newPartType);
+            }}
           >
             Thêm hạng mục
           </Button>
@@ -1010,11 +1035,17 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           <textarea
             id="supplementary-note"
             rows={3}
+            maxLength={5000}
             value={supplementaryNote}
-            onChange={(e) => setSupplementaryNote(e.target.value)}
+            {...inputProps("supplementaryNote")}
+            onChange={(e) => {
+              setSupplementaryNote(e.target.value);
+              clearError("supplementaryNote");
+            }}
             placeholder="Mô tả lý do phát sinh thêm linh kiện hoặc công việc"
             className={textareaClasses}
           />
+          <FieldError id="supplementaryNote-error" message={errors.supplementaryNote} />
         </div>
 
         <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">

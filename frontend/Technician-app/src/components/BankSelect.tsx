@@ -29,9 +29,13 @@ interface BankSelectProps {
   valueName: string;
   onChange: (code: string, name: string) => void;
   disabled?: boolean;
+  /** Validation wiring from useFieldErrors().inputProps, applied to the trigger button. */
+  name?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }
 
-export function BankSelect({ valueCode, valueName, onChange, disabled }: BankSelectProps) {
+export function BankSelect({ valueCode, valueName, onChange, disabled, ...fieldProps }: BankSelectProps) {
   const [banks, setBanks] = useState<VietQRBank[]>(cachedBanks || []);
   const [loading, setLoading] = useState<boolean>(!cachedBanks);
   const [isOpen, setIsOpen] = useState(false);
@@ -125,6 +129,7 @@ export function BankSelect({ valueCode, valueName, onChange, disabled }: BankSel
       <button
         type="button"
         disabled={disabled}
+        {...fieldProps}
         onClick={() => setIsOpen((prev) => !prev)}
         className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-white px-3 py-2 text-left text-xs text-ink transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none cursor-pointer disabled:bg-slate-50 disabled:cursor-not-allowed"
       >

@@ -3,6 +3,8 @@
 import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
 import { HomeShell } from "@/components/home/home-shell";
 import { PageHeader } from "@/components/home/page-header";
+import { DeviceDetailSkeleton } from "@/components/motion/skeleton";
+import { useReveal } from "@/components/motion/use-reveal";
 import { Badge } from "@h-mobility/ui";
 import { BatteryCharging,CalendarDays,ChevronRight,CircleDollarSign,Pencil,RotateCw,Star,Trash2,Wrench } from "lucide-react";
 import Image from "next/image";
@@ -18,6 +20,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isSettingDefault, setIsSettingDefault] = useState(false);
+  const revealRef = useReveal([loading], ":scope > *");
 
   const handleMakeDefault = async () => {
     setIsSettingDefault(true);
@@ -113,8 +116,8 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <HomeShell activeNav="device" title="Chi tiết xe" mainClassName="device-page-content">
-        <div className="device-loading">Đang tải thông tin xe...</div>
+      <HomeShell activeNav="device" hideHeader mainClassName="device-page-content">
+        <DeviceDetailSkeleton />
       </HomeShell>
     );
   }
@@ -129,7 +132,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <HomeShell activeNav="device" hideHeader mainClassName="device-page-content">
-      <div className="device-detail-page">
+      <div className="device-detail-page" ref={revealRef}>
         <div className="device-detail-heading">
           <PageHeader
             title={device.nickname}

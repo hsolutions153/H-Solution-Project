@@ -404,3 +404,61 @@ body {
 .dark body {
   background: #0b0c0e;
 }
+
+/* Loading states: skeleton shimmer + session splash (animated by GSAP in components/motion). */
+.skeleton {
+  background: linear-gradient(90deg, #e9eff4 25%, #dbe5ed 50%, #e9eff4 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.dark .skeleton {
+  background-image: linear-gradient(90deg, #1f2328 25%, #2a3038 50%, #1f2328 75%);
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--background);
+  visibility: hidden;
+  opacity: 0;
+}
+
+.page-loader-track {
+  position: relative;
+  width: 120px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-brand-500) 15%, transparent);
+}
+
+.page-loader-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--color-brand-500);
+}
+
+.page-loader-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .page-loader { visibility: visible; opacity: 1; }
+}

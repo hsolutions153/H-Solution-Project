@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { LoginFormData } from "@/types/auth";
 import { User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { Button, Field } from "@h-mobility/ui";
+import { Button, Field, rules, useFieldErrors } from "@h-mobility/ui";
 
 interface LoginFormProps {
   onSubmit: (data: LoginFormData) => void;
@@ -17,10 +17,16 @@ export const LoginForm = ({ onSubmit, onForgotPassword }: LoginFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, validate, fromApi, clearError } = useFieldErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const valid = validate(
+      { identity, password },
+      { identity: rules.phoneOrEmail("Số điện thoại hoặc email"), password: rules.loginPassword() },
+    );
+    if (!valid) return;
     setLoading(true);
 
     try {
@@ -50,6 +56,7 @@ export const LoginForm = ({ onSubmit, onForgotPassword }: LoginFormProps) => {
       );
       onSubmit({ identity, password, rememberMe });
     } catch (err: unknown) {
+      if (fromApi(err, { email: "identity" })) return;
       const message =
         err instanceof Error
           ? err.message
@@ -61,28 +68,36 @@ export const LoginForm = ({ onSubmit, onForgotPassword }: LoginFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       <Field
         label="Số điện thoại hoặc email"
         type="text"
-        required
+        name="identity"
         autoComplete="username"
         value={identity}
-        onChange={(e) => setIdentity(e.target.value)}
-        placeholder="tech1@h-solution.local"
+        onChange={(e) => {
+          setIdentity(e.target.value);
+          clearError("identity");
+        }}
+        placeholder="0912345678 hoặc ten@gmail.com"
         icon={<User />}
+        error={errors.identity}
       />
 
       <Field
         label="Mật khẩu"
         type={showPassword ? "text" : "password"}
-        required
+        name="password"
         autoComplete="current-password"
+        maxLength={72}
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => {
+          setPassword(e.target.value);
+          clearError("password");
+        }}
         placeholder="Nhập mật khẩu"
         icon={<Lock />}
-        error={error || undefined}
+        error={errors.password || error || undefined}
         trailing={
           <button
             type="button"

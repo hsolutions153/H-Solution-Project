@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { HomeShell } from "@/components/home/home-shell";
 import { DeviceForm } from "@/components/home/device-form";
 import type { Device } from "@/types/device";
+import { DeviceDetailSkeleton } from "@/components/motion/skeleton";
 
 export default function EditDevicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -62,7 +63,7 @@ export default function EditDevicePage({ params }: { params: Promise<{ id: strin
   return (
     <HomeShell activeNav="device" hideHeader mainClassName="device-page-content">
       {loading ? (
-        <div className="device-loading">Đang tải thông tin thiết bị...</div>
+        <DeviceDetailSkeleton label="Đang tải thông tin thiết bị..." />
       ) : (
         <DeviceForm device={device || undefined} />
       )}

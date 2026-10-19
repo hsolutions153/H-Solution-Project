@@ -2,6 +2,8 @@
 
 import { DeleteConfirmModal } from "@/components/home/delete-confirm-modal";
 import { HomeShell } from "@/components/home/home-shell";
+import { DeviceListSkeleton } from "@/components/motion/skeleton";
+import { useReveal } from "@/components/motion/use-reveal";
 import type { Device } from "@/types/device";
 import { Bike,LoaderCircle,Plus,Star,Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -15,6 +17,7 @@ export default function DevicesPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
+  const revealRef = useReveal([loading, devices.length]);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -106,7 +109,7 @@ export default function DevicesPage() {
 
   return (
     <HomeShell activeNav="device" mainClassName="device-page-content">
-      <div className="device-list-page">
+      <div className="device-list-page" ref={revealRef}>
         <div className="device-heading-row">
           <div>
             <h1>Xe của tôi</h1>
@@ -116,9 +119,9 @@ export default function DevicesPage() {
         </div>
 
         {loading ? (
-          <div className="device-loading">Đang tải phương tiện…</div>
+          <DeviceListSkeleton />
         ) : devices.length === 0 ? (
-          <div className="device-empty-state">
+          <div className="device-empty-state" data-reveal>
             <div className="device-empty-icon">
               <Bike size={44} />
             </div>
@@ -133,7 +136,7 @@ export default function DevicesPage() {
         ) : (
           <div className="device-grid">
             {devices.map((device) => (
-              <article className="device-card" key={device.id}>
+              <article className="device-card" key={device.id} data-reveal>
                 <Link href={`/home/device/${device.id}`} className="device-image-wrap">
                   {device.isDefault && <span className="device-badge">Mặc định</span>}
                   <Image src={device.image} alt={device.nickname} fill sizes="(max-width: 720px) 100vw, 380px" className="device-image" unoptimized />
@@ -190,7 +193,7 @@ export default function DevicesPage() {
               </article>
             ))}
 
-            <Link className="device-register-card" href="/home/device/new">
+            <Link className="device-register-card" href="/home/device/new" data-reveal>
               <span className="device-register-icon"><Plus size={24} /></span>
               <strong>Đăng ký phương tiện mới</strong>
               <span>Thêm xe máy điện để dễ dàng nhận hỗ trợ cứu hộ khẩn cấp & bảo trì từ H-Mobility Care</span>

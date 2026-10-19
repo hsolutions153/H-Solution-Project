@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ResetPasswordFormData } from '@/types/auth';
 import { Eye, EyeOff, Info, LogIn } from 'lucide-react';
+import { FieldError, rules, useFieldErrors } from '@h-mobility/ui';
 
 interface ResetPasswordFormProps {
   loading?: boolean;
@@ -15,32 +16,28 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const { errors, validate, clearError, inputProps } = useFieldErrors();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage('');
-
-    // Kiểm tra độ dài tối thiểu 8 ký tự
-    if (newPassword.length < 8 || newPassword.length > 72) {
-      setErrorMessage('Mật khẩu phải từ 8 đến 72 ký tự.');
-      return;
-    }
-
-    // Kiểm tra bao gồm cả chữ và số
-    const hasLetter = /[a-zA-Z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    if (!hasLetter || !hasNumber) {
-      setErrorMessage('Mật khẩu phải bao gồm cả chữ cái và chữ số.');
-      return;
-    }
-
-    // Kiểm tra khớp mật khẩu
-    if (newPassword !== confirmPassword) {
-      setErrorMessage('Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
+    const valid = validate(
+      { newPassword, confirmPassword },
+      {
+        newPassword: [
+          rules.password({ label: 'Mật khẩu mới' }),
+          (v) => {
+            const s = String(v);
+            const missing = [!/[a-zA-Z]/.test(s) && 'chữ cái', !/\d/.test(s) && 'chữ số'].filter(Boolean);
+            return missing.length ? `Mật khẩu mới còn thiếu: ${missing.join(', ')}.` : undefined;
+          },
+        ],
+        confirmPassword: [
+          rules.required('Mật khẩu xác nhận'),
+          rules.matches(() => newPassword, 'Mật khẩu xác nhận không khớp với mật khẩu mới.'),
+        ],
+      },
+    );
+    if (!valid) return;
     onSubmit({ newPassword, confirmPassword });
   };
 
@@ -56,7 +53,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 text-left">
+      <form onSubmit={handleSubmit} className="space-y-4 text-left" noValidate>
         
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -66,10 +63,14 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
             <input
               type={showNewPassword ? 'text' : 'password'}
               placeholder="Nhập mật khẩu mới"
+              maxLength={72}
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              {...inputProps('newPassword')}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                clearError('newPassword');
+              }}
               className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-brand-700 focus:ring-1 focus:ring-brand-700 pr-10 transition-all"
-              required
             />
             <button
               type="button"
@@ -79,6 +80,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
               {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          <FieldError id="newPassword-error" message={errors.newPassword} />
         </div>
 
         
@@ -90,10 +92,14 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
             <input
               type={showConfirmPassword ? 'text' : 'password'}
               placeholder="Xác nhận mật khẩu"
+              maxLength={72}
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              {...inputProps('confirmPassword')}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                clearError('confirmPassword');
+              }}
               className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-brand-700 focus:ring-1 focus:ring-brand-700 pr-10 transition-all"
-              required
             />
             <button
               type="button"
@@ -103,6 +109,7 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
               {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          <FieldError id="confirmPassword-error" message={errors.confirmPassword} />
         </div>
 
         
@@ -112,10 +119,6 @@ export const ResetPasswordForm = ({ onSubmit, onBackToLogin, loading }: ResetPas
         </div>
 
         
-        {errorMessage && (
-          <p className="text-xs text-rose-500 font-medium text-center">{errorMessage}</p>
-        )}
-
         
         <button
           type="submit"

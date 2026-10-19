@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Bike, CalendarPlus, ChevronRight, Clock3, Plus, ShieldCheck, Siren, Wrench } from "lucide-react";
 import { Card, EmptyState, StatusBadge } from "@h-mobility/ui";
 import { HomeShell } from "@/components/home/home-shell";
+import { useReveal } from "@/components/motion/use-reveal";
 import { getServiceTitle } from "@/components/home/history/history-list";
 
 interface PrimaryDevice {
@@ -43,6 +44,7 @@ export default function HomePage() {
   const [name, setName] = useState<string | null>(null);
   const [device, setDevice] = useState<PrimaryDevice | null | undefined>(undefined);
   const [requests, setRequests] = useState<RecentRequest[] | null>(null);
+  const revealRef = useReveal([requests]);
 
   useEffect(() => {
     let alive = true;
@@ -90,8 +92,8 @@ export default function HomePage() {
 
   return (
     <HomeShell activeNav="home">
-      <div className="mx-auto w-full max-w-[480px] space-y-4 pb-4">
-        <section className="relative isolate overflow-hidden rounded-card bg-brand-950 text-white shadow-card">
+      <div ref={revealRef} className="mx-auto w-full max-w-[480px] space-y-4 pb-4">
+        <section data-reveal className="relative isolate overflow-hidden rounded-card bg-brand-950 text-white shadow-card">
           <Image src="/repair-photo-1.png" alt="" fill priority sizes="480px" className="-z-10 object-cover object-right opacity-80" />
           <div className="absolute inset-0 -z-10 bg-linear-to-r from-brand-950 via-brand-950/85 to-brand-950/10" aria-hidden />
           <div className="max-w-[70%] px-4 py-5">
@@ -112,7 +114,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="sos-section">
+        <section data-reveal className="sos-section">
           <div className="sos-outer">
             <Link href="/home/sos" className="sos-button" aria-label="Nút gọi trợ giúp khẩn cấp SOS">
               <div className="sos-icon">
@@ -130,7 +132,7 @@ export default function HomePage() {
           <p className="sos-hint">Chạm để nhận trợ giúp khẩn cấp</p>
         </section>
 
-        <section aria-label="Lối tắt" className="grid grid-cols-2 gap-3">
+        <section data-reveal aria-label="Lối tắt" className="grid grid-cols-2 gap-3">
           <Link
             href="/home/booking"
             className="row-span-2 flex min-h-[200px] flex-col justify-between rounded-card bg-brand-600 p-4 text-white shadow-card transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98]"
@@ -161,7 +163,7 @@ export default function HomePage() {
           />
         </section>
 
-        <section className="space-y-2.5">
+        <section data-reveal className="space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">Yêu cầu gần đây</h2>
             {requests?.length ? (
@@ -178,16 +180,19 @@ export default function HomePage() {
               ))}
             </div>
           ) : requests.length === 0 ? (
-            <EmptyState
-              icon={<Wrench />}
-              title="Chưa có yêu cầu nào"
-              description="Khi bạn đặt lịch hoặc gọi cứu hộ, yêu cầu sẽ hiện ở đây."
-            />
+            <div data-reveal>
+              <EmptyState
+                icon={<Wrench />}
+                title="Chưa có yêu cầu nào"
+                description="Khi bạn đặt lịch hoặc gọi cứu hộ, yêu cầu sẽ hiện ở đây."
+              />
+            </div>
           ) : (
             <Card padded={false} className="divide-y divide-line">
               {requests.slice(0, 3).map((r) => (
                 <Link
                   key={r.id}
+                  data-reveal
                   href={`/home/history/${r.id}`}
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
                 >

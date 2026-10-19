@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import { X, UserPlus, Phone, Mail, MapPin, Lock } from "lucide-react";
 
 export interface CreateCustomerModalProps {
@@ -19,13 +20,19 @@ export const CreateCustomerModal = ({
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !phone.trim()) {
-      setError("Vui lòng nhập họ tên và số điện thoại.");
-      return;
-    }
+    setError("");
+    const valid = validate({ fullName, phone, email, password, address }, {
+        fullName: rules.name(),
+        phone: rules.phone({ required: true }),
+        email: rules.email(),
+        password: rules.password({ label: "Mật khẩu khởi tạo" }),
+        address: rules.maxLength("Địa chỉ", 255),
+      });
+    if (!valid) return;
 
     setLoading(true);
     setError("");
@@ -45,6 +52,7 @@ export const CreateCustomerModal = ({
       onSuccess("Thêm khách hàng mới thành công!");
       onClose();
     } catch (err: unknown) {
+      if (fromApi(err, { full_name: "fullName" })) return;
       setError(err instanceof Error ? err.message : "Lỗi khi tạo tài khoản khách hàng.");
     } finally {
       setLoading(false);
@@ -69,7 +77,7 @@ export const CreateCustomerModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
@@ -82,12 +90,16 @@ export const CreateCustomerModal = ({
             </label>
             <input
               type="text"
-              required
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              {...inputProps("fullName")}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearError("fullName");
+              }}
               placeholder="VD: Nguyễn Văn A"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="fullName-error" message={errors.fullName} />
           </div>
 
           <div>
@@ -97,12 +109,16 @@ export const CreateCustomerModal = ({
             </label>
             <input
               type="text"
-              required
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              {...inputProps("phone")}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                clearError("phone");
+              }}
               placeholder="VD: 0912345678"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="phone-error" message={errors.phone} />
           </div>
 
           <div>
@@ -113,10 +129,15 @@ export const CreateCustomerModal = ({
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...inputProps("email")}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearError("email");
+              }}
               placeholder="khachhang@example.com"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="email-error" message={errors.email} />
           </div>
 
           <div>
@@ -127,10 +148,15 @@ export const CreateCustomerModal = ({
             <input
               type="text"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...inputProps("password")}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearError("password");
+              }}
               placeholder="Mật khẩu"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="password-error" message={errors.password} />
           </div>
 
           <div>
@@ -141,10 +167,15 @@ export const CreateCustomerModal = ({
             <input
               type="text"
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              {...inputProps("address")}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                clearError("address");
+              }}
               placeholder="VD: 45 Lê Duẩn, Quận 1, TP.HCM"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="address-error" message={errors.address} />
           </div>
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">

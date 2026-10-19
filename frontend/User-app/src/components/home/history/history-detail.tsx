@@ -2,6 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/home/page-header";
+import { HistoryDetailSkeleton } from "@/components/motion/skeleton";
+import { useReveal } from "@/components/motion/use-reveal";
 import { useState, useEffect, useRef } from "react";
 
 interface JobItem {
@@ -308,6 +310,7 @@ export function HistoryDetail() {
     }
     return true;
   });
+  const revealRef = useReveal([loading], ":scope > *");
 
   const [quoteData, setQuoteData] = useState<any>(null);
   const [error, setError] = useState("");
@@ -1046,7 +1049,7 @@ export function HistoryDetail() {
     }, 300);
   };
 
-  if (loading) return <div className="rd-container"><div className="rd-not-found"><div className="rh-loading-spinner" /></div></div>;
+  if (loading) return <HistoryDetailSkeleton />;
 
   if (error || !detail) return <div className="rd-container"><div className="rd-not-found">{error || "Không tìm thấy lịch sử"}</div></div>;
 
@@ -1072,7 +1075,7 @@ export function HistoryDetail() {
   ];
 
   return (
-    <div className="rd-container">
+    <div className="rd-container" ref={revealRef}>
       <div className="rd-header">
         <PageHeader title="Chi tiết sửa chữa" subtitle={`Mã đơn #${detail.orderCode}`} backHref="/home/history" />
       </div>

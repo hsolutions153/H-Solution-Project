@@ -17,6 +17,7 @@ Wrench,
 X
 } from "lucide-react";
 import React,{ useEffect,useRef,useState } from "react";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 export interface CreateOrderModalProps {
   onClose: () => void;
@@ -43,6 +44,7 @@ export const CreateOrderModal = ({
   const [isSos, setIsSos] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   // Đóng dropdown khách hàng khi bấm ra ngoài
   useEffect(() => {
@@ -112,10 +114,14 @@ export const CreateOrderModal = ({
       setError("Vui lòng chọn thiết bị sửa chữa.");
       return;
     }
-    if (!locationAddress.trim()) {
-      setError("Vui lòng nhập địa chỉ sự cố.");
-      return;
-    }
+    const valid = validate(
+      { locationAddress, issueDescription },
+      {
+        locationAddress: rules.required("Địa chỉ sự cố", 255),
+        issueDescription: rules.maxLength("Mô tả sự cố", 5000),
+      },
+    );
+    if (!valid) return;
 
     setSubmitting(true);
     setError("");
@@ -138,6 +144,7 @@ export const CreateOrderModal = ({
       onSuccess("Tạo đơn sửa chữa thành công!");
       onClose();
     } catch (err: unknown) {
+      if (fromApi(err, { location_address: "locationAddress", issue_description: "issueDescription" })) return;
       setError(errorMessage(err, "Lỗi khi tạo đơn sửa chữa."));
     } finally {
       setSubmitting(false);
@@ -162,7 +169,7 @@ export const CreateOrderModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto" noValidate>
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
               {error}
@@ -354,12 +361,17 @@ export const CreateOrderModal = ({
             </label>
             <input
               type="text"
-              required
+              maxLength={255}
               value={locationAddress}
-              onChange={(e) => setLocationAddress(e.target.value)}
+              {...inputProps("locationAddress")}
+              onChange={(e) => {
+                setLocationAddress(e.target.value);
+                clearError("locationAddress");
+              }}
               placeholder="VD: 123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="locationAddress-error" message={errors.locationAddress} />
           </div>
 
           <div>
@@ -369,11 +381,17 @@ export const CreateOrderModal = ({
             </label>
             <textarea
               rows={3}
+              maxLength={5000}
               value={issueDescription}
-              onChange={(e) => setIssueDescription(e.target.value)}
+              {...inputProps("issueDescription")}
+              onChange={(e) => {
+                setIssueDescription(e.target.value);
+                clearError("issueDescription");
+              }}
               placeholder="Mô tả hiện tượng: xe không lên nguồn, bánh bị kẹt, có mùi khét..."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none"
             />
+            <FieldError id="issueDescription-error" message={errors.issueDescription} />
           </div>
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">

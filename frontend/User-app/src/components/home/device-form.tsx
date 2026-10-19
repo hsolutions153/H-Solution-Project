@@ -7,6 +7,7 @@ type SelectedVehicleResult,
 } from "@/components/home/vehicle-picker-modal";
 import { BATTERY_TYPE_OPTIONS } from "@/constants/vehicle-data";
 import type { Device } from "@/types/device";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import {
 ArrowLeft,
 Bike,
@@ -23,6 +24,12 @@ import { useRouter } from "next/navigation";
 import { ChangeEvent,FormEvent,useRef,useState } from "react";
 
 type Props = { device?: Device };
+
+/** YYYY-MM-DD in the device's local time zone (toISOString would give the UTC date). */
+const localToday = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
 
 export function DeviceForm({ device }: Props) {
   const router = useRouter();
@@ -56,9 +63,12 @@ export function DeviceForm({ device }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
-  const update = (key: keyof typeof form, value: string | boolean) =>
+  const update = (key: keyof typeof form, value: string | boolean) => {
     setForm((current) => ({ ...current, [key]: value }));
+    clearError(key);
+  };
 
   // Xử lý khi chọn xe từ Modal chọn dòng xe (Thương hiệu -> Dòng xe / Khác)
   const handleVehicleSelected = (result: SelectedVehicleResult) => {
@@ -70,6 +80,8 @@ export function DeviceForm({ device }: Props) {
         batteryType: result.batteryType,
         deviceType: result.deviceType,
       };
+      clearError("manufacturer");
+      clearError("model");
       // Tự động gợi ý tên xe nếu chưa đặt
       if (!current.nickname.trim() || current.nickname.startsWith("Xe ")) {
         updated.nickname = `Xe ${result.manufacturer} ${result.model}`;
@@ -128,10 +140,25 @@ export function DeviceForm({ device }: Props) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!form.manufacturer.trim() || !form.model.trim()) {
-      setError("Vui lòng chọn hoặc nhập Thương hiệu và Dòng xe.");
-      return;
-    }
+    setError("");
+    const today = localToday();
+    const valid = validate(form, {
+      manufacturer: rules.name({ label: "Thương hiệu" }),
+      model: rules.name({ label: "Dòng xe" }),
+      serialNumber: rules.required("Biển số hoặc số sê-ri", 100),
+      nickname: [
+        rules.maxLength("Tên gợi nhớ", 49),
+        // Tên gợi nhớ lưu trong notes; chuỗi có dấu ":" bị coi là ghi chú kỹ thuật và không hiển thị
+        (v) => (String(v).includes(":") ? "Tên gợi nhớ không được chứa dấu hai chấm (:)." : undefined),
+      ],
+      purchaseDate: (v) => {
+        const s = String(v ?? "");
+        if (!s) return undefined;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Ngày mua xe không đúng định dạng ngày.";
+        if (s > today) return "Ngày mua xe không được ở tương lai.";
+      },
+    });
+    if (!valid) return;
 
     setSaving(true);
     setError("");
@@ -184,7 +211,16 @@ export function DeviceForm({ device }: Props) {
       router.push("/home/device");
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "Không thể lưu thông tin xe.");
+      const mapped = fromApi(err, {
+        model_name: "model",
+        serial_number: "serialNumber",
+        notes: "nickname",
+        purchase_date: "purchaseDate",
+        manufacturing_year: "manufacturingYear",
+        battery_type: "batteryType",
+        device_type: "deviceType",
+      });
+      if (!mapped) setError(err.message || "Không thể lưu thông tin xe.");
     } finally {
       setSaving(false);
     }
@@ -224,7 +260,7 @@ export function DeviceForm({ device }: Props) {
         <span />
       </div>
 
-      <form onSubmit={submit} className="device-form">
+      <form onSubmit={submit} className="device-form" noValidate>
         <div className="device-upload-container">
           <label className="device-upload-label">
             <span>Ảnh chụp phương tiện / xe</span>
@@ -303,12 +339,13 @@ export function DeviceForm({ device }: Props) {
               1. Thương hiệu (Hãng xe) <b style={{ color: "#d13b4c" }}>*</b>
             </span>
             <input
-              required
               maxLength={100}
               value={form.manufacturer}
+              {...inputProps("manufacturer")}
               onChange={(e) => update("manufacturer", e.target.value)}
               placeholder="VD: VinFast, Dat Bike, Yadea..."
             />
+            <FieldError id="manufacturer-error" message={errors.manufacturer} className="mt-0" />
           </label>
 
           <label>
@@ -317,9 +354,9 @@ export function DeviceForm({ device }: Props) {
             </span>
             <div className="device-picker-trigger-row">
               <input
-                required
                 maxLength={100}
                 value={form.model}
+                {...inputProps("model")}
                 onChange={(e) => update("model", e.target.value)}
                 placeholder="VD: Evo 200, Feliz S, Quantum..."
               />
@@ -332,6 +369,7 @@ export function DeviceForm({ device }: Props) {
                 <Bike size={14} /> Chọn
               </button>
             </div>
+            <FieldError id="model-error" message={errors.model} className="mt-0" />
           </label>
         </div>
 
@@ -341,12 +379,17 @@ export function DeviceForm({ device }: Props) {
               3. ID xe / Số sê-ri / Biển số <b style={{ color: "#d13b4c" }}>*</b>
             </span>
             <input
-              required
+              maxLength={100}
               value={form.serialNumber}
+              {...inputProps("serialNumber")}
               onChange={(e) => update("serialNumber", e.target.value)}
               placeholder="VD: 29MD-12345 hoặc VF-88910"
             />
-            <small>Số khung/máy hoặc biển số để kỹ thuật viên nhận diện khi sửa chữa.</small>
+            {errors.serialNumber ? (
+              <FieldError id="serialNumber-error" message={errors.serialNumber} className="mt-0" />
+            ) : (
+              <small>Số khung/máy hoặc biển số để kỹ thuật viên nhận diện khi sửa chữa.</small>
+            )}
           </label>
 
           <label>
@@ -400,19 +443,25 @@ export function DeviceForm({ device }: Props) {
           <label>
             <span>Tên gợi nhớ</span>
             <input
+              maxLength={49}
               value={form.nickname}
+              {...inputProps("nickname")}
               onChange={(e) => update("nickname", e.target.value)}
               placeholder="Ví dụ: Xe đi làm, Xe của Ba..."
             />
+            <FieldError id="nickname-error" message={errors.nickname} className="mt-0" />
           </label>
 
           <label>
             <span>Ngày mua xe (nếu có)</span>
             <input
               type="date"
+              max={localToday()}
               value={form.purchaseDate}
+              {...inputProps("purchaseDate")}
               onChange={(e) => update("purchaseDate", e.target.value)}
             />
+            <FieldError id="purchaseDate-error" message={errors.purchaseDate} className="mt-0" />
           </label>
         </div>
 

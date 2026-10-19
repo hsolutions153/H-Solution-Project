@@ -5,10 +5,8 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Phone } from "lucide-react";
 import { PasswordResetShell } from "@/components/auth/password-reset-shell";
-import {
-  digitsOnly,
-  VIETNAM_PHONE_PATTERN,
-} from "@/utils/auth-validation";
+import { digitsOnly } from "@/utils/auth-validation";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 
 export default function ForgotPasswordPage() {
@@ -16,14 +14,12 @@ export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    if (!VIETNAM_PHONE_PATTERN.test(phone)) {
-      setError("Số điện thoại phải gồm 10 chữ số và đúng đầu số Việt Nam.");
-      return;
-    }
+    if (!validate({ phone }, { phone: rules.phone({ required: true }) })) return;
     setLoading(true);
     try {
       const { fetchApi } = await import("@/lib/api-client");
@@ -45,7 +41,7 @@ export default function ForgotPasswordPage() {
       );
       router.push(`/forgot-password/verify?phone=${encodeURIComponent(phone)}`);
     } catch (err: any) {
-      setError(err.message || "Không thể kết nối tới máy chủ.");
+      if (!fromApi(err)) setError(err.message || "Không thể kết nối tới máy chủ.");
     } finally {
       setLoading(false);
     }
@@ -56,7 +52,7 @@ export default function ForgotPasswordPage() {
       <section className="reset-card reset-card--request">
         <h1>Quên mật khẩu?</h1>
         <p>Nhập số điện thoại để nhận mã xác minh khôi phục mật khẩu.</p>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} noValidate>
           <label htmlFor="reset-phone">SỐ ĐIỆN THOẠI</label>
           <div className="reset-input-wrap">
             <Phone aria-hidden="true" />
@@ -65,15 +61,17 @@ export default function ForgotPasswordPage() {
               type="tel"
               inputMode="numeric"
               autoComplete="tel"
-              required
-              pattern="0(?:3|5|7|8|9)[0-9]{8}"
               maxLength={10}
-              title="Nhập số điện thoại Việt Nam gồm 10 chữ số, ví dụ 0912345678"
               placeholder="0912345678"
               value={phone}
-              onChange={(event) => setPhone(digitsOnly(event.target.value))}
+              {...inputProps("phone")}
+              onChange={(event) => {
+                setPhone(digitsOnly(event.target.value));
+                clearError("phone");
+              }}
             />
           </div>
+          <FieldError id="phone-error" message={errors.phone} />
           {error && <p className="reset-error">{error}</p>}
           <button className="reset-primary" disabled={loading}>
             {loading ? "Đang gửi..." : "Gửi mã xác minh"}

@@ -15,17 +15,23 @@ async function createAppleClientSecret() {
     return null;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  const signingKey = await importPKCS8(privateKey, "ES256");
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const signingKey = await importPKCS8(privateKey, "ES256");
 
-  return new SignJWT({})
-    .setProtectedHeader({ alg: "ES256", kid: keyId })
-    .setIssuer(teamId)
-    .setIssuedAt(now)
-    .setExpirationTime(now + 5 * 60)
-    .setAudience("https://appleid.apple.com")
-    .setSubject(clientId)
-    .sign(signingKey);
+    return await new SignJWT({})
+      .setProtectedHeader({ alg: "ES256", kid: keyId })
+      .setIssuer(teamId)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 5 * 60)
+      .setAudience("https://appleid.apple.com")
+      .setSubject(clientId)
+      .sign(signingKey);
+  } catch (error) {
+    // Khóa Apple sai không được làm hỏng toàn bộ NextAuth, chỉ bỏ qua provider Apple.
+    console.error("APPLE_PRIVATE_KEY không hợp lệ, bỏ qua đăng nhập Apple:", error);
+    return null;
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {

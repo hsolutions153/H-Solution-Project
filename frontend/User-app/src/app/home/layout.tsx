@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/api-client";
+import { PageLoader } from "@/components/motion/page-loader";
 import "./home.css";
 import "./device/device.css";
 
@@ -93,9 +94,9 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
     };
   }, [router]);
 
-  // Show nothing while checking auth to prevent flash
+  // Splash thay cho màn hình trắng trong lúc xác minh phiên đăng nhập
   if (isAuthenticated === null) {
-    return null;
+    return <PageLoader label="Đang kiểm tra phiên đăng nhập..." />;
   }
 
   return children;

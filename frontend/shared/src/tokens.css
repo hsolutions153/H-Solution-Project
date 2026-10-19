@@ -52,3 +52,29 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Field-level validation (see useFieldErrors / FieldError): any input marked invalid gets
+   the same red border and focus ring, whichever app or CSS class styles it. */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"],
+button[aria-invalid="true"],
+[role="combobox"][aria-invalid="true"] {
+  border-color: #e11d48 !important;
+  background-color: #fff7f8;
+}
+
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus,
+[role="combobox"][aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 4px rgb(225 29 72 / 0.15) !important;
+  outline: none;
+}
+
+.dark input[aria-invalid="true"],
+.dark select[aria-invalid="true"],
+.dark textarea[aria-invalid="true"] {
+  border-color: #fb7185 !important;
+  background-color: rgb(225 29 72 / 0.08);
+}

@@ -21,7 +21,9 @@ import {
   removeAuthToken,
   updateUserInfo,
 } from "@/lib/api-client";
-import { digitsOnly, VIETNAM_PHONE_PATTERN } from "@/utils/auth-validation";
+import { digitsOnly } from "@/utils/auth-validation";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
+import { PageLoader } from "@/components/motion/page-loader";
 
 export default function CompleteProfilePage() {
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function CompleteProfilePage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [success, setSuccess] = useState(false);
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   useEffect(() => {
     let isMounted = true;
@@ -120,24 +123,24 @@ export default function CompleteProfilePage() {
     const cleanPhone = digitsOnly(phone.trim());
     const trimmedAddress = address.trim();
 
-    if (!trimmedName || trimmedName.length < 2) {
-      setErrorMessage("Vui lòng nhập họ và tên hợp lệ (tối thiểu 2 ký tự).");
-      return;
-    }
-
-    if (!VIETNAM_PHONE_PATTERN.test(cleanPhone)) {
-      setErrorMessage(
-        "Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số đúng định dạng Việt Nam (ví dụ: 0912345678)."
-      );
-      return;
-    }
-
-    if (!trimmedAddress || trimmedAddress.length < 5) {
-      setErrorMessage(
-        "Vui lòng nhập địa chỉ cụ thể (tối thiểu 5 ký tự) để kỹ thuật viên có thể đến hỗ trợ."
-      );
-      return;
-    }
+    const valid = validate(
+      { name: trimmedName, phone: cleanPhone, address: trimmedAddress },
+      {
+        name: [
+          rules.name(),
+          (v) => (String(v).length < 2 ? "Họ và tên cần ít nhất 2 ký tự." : undefined),
+        ],
+        phone: rules.phone({ required: true }),
+        address: [
+          rules.required("Địa chỉ", 255),
+          (v) =>
+            String(v).length < 5
+              ? "Địa chỉ quá ngắn. Nhập cụ thể số nhà, tên đường, phường/xã để kỹ thuật viên tìm đến."
+              : undefined,
+        ],
+      },
+    );
+    if (!valid) return;
 
     setSubmitting(true);
     try {
@@ -163,7 +166,9 @@ export default function CompleteProfilePage() {
         router.replace("/home");
       }, 1000);
     } catch (err: any) {
-      setErrorMessage(err.message || "Không thể cập nhật thông tin. Vui lòng thử lại sau.");
+      if (!fromApi(err, { full_name: "name" })) {
+        setErrorMessage(err.message || "Không thể cập nhật thông tin. Vui lòng thử lại sau.");
+      }
       setSubmitting(false);
     }
   }
@@ -175,14 +180,7 @@ export default function CompleteProfilePage() {
 
   if (loading) {
     return (
-      <div className="responsive-container bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <LoaderCircle className="size-8 animate-spin text-brand-500" />
-          <p className="text-sm font-medium text-on-surface-variant">
-            Đang tải thông tin tài khoản...
-          </p>
-        </div>
-      </div>
+      <PageLoader label="Đang tải thông tin tài khoản..." />
     );
   }
 
@@ -220,7 +218,7 @@ export default function CompleteProfilePage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-md w-full">
+        <form onSubmit={handleSubmit} className="space-y-md w-full" noValidate>
           <div className="flex flex-col gap-xs w-full">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="name">
               Họ và tên <span className="text-rose-500">*</span>
@@ -233,14 +231,18 @@ export default function CompleteProfilePage() {
               <input
                 id="name"
                 type="text"
-                required
                 maxLength={100}
                 placeholder="Ví dụ: Nguyễn Văn A"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                {...inputProps("name")}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearError("name");
+                }}
                 className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
+            <FieldError id="name-error" message={errors.name} />
           </div>
 
           {email && (
@@ -280,17 +282,23 @@ export default function CompleteProfilePage() {
                 id="phone"
                 type="tel"
                 inputMode="numeric"
-                required
                 maxLength={10}
                 placeholder="0912345678"
                 value={phone}
-                onChange={(e) => setPhone(digitsOnly(e.target.value))}
+                {...inputProps("phone")}
+                onChange={(e) => {
+                  setPhone(digitsOnly(e.target.value));
+                  clearError("phone");
+                }}
                 className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
-            <p className="text-[11px] text-on-surface-variant">
-              Kỹ thuật viên sẽ liên hệ số này khi bạn bấm gọi cứu hộ khẩn cấp SOS.
-            </p>
+            <FieldError id="phone-error" message={errors.phone} />
+            {!errors.phone && (
+              <p className="text-[11px] text-on-surface-variant">
+                Kỹ thuật viên sẽ liên hệ số này khi bạn bấm gọi cứu hộ khẩn cấp SOS.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-xs w-full">
@@ -305,17 +313,23 @@ export default function CompleteProfilePage() {
               <input
                 id="address"
                 type="text"
-                required
                 maxLength={255}
                 placeholder="Số nhà, tên đường, phường/xã, quận/huyện, TP"
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                {...inputProps("address")}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  clearError("address");
+                }}
                 className="w-full h-13.5 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-on-surface placeholder:text-outline"
               />
             </div>
-            <p className="text-[11px] text-on-surface-variant">
-              Địa chỉ để kỹ thuật viên đến bảo dưỡng hoặc sửa chữa xe tận nơi.
-            </p>
+            <FieldError id="address-error" message={errors.address} />
+            {!errors.address && (
+              <p className="text-[11px] text-on-surface-variant">
+                Địa chỉ để kỹ thuật viên đến bảo dưỡng hoặc sửa chữa xe tận nơi.
+              </p>
+            )}
           </div>
 
           <div className="pt-2 flex flex-col items-center gap-3 w-full">
