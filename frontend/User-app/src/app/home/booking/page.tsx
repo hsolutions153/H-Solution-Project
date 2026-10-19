@@ -7,6 +7,7 @@ import { fileToStoredImage } from "@/utils/image-data";
 import { HomeShell } from "@/components/home/home-shell";
 import { PageHeader } from "@/components/home/page-header";
 import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
+import { LocationPicker } from "@/components/home/location-picker";
 
 type BookingStep = "PROBLEM" | "CAMERA" | "DETAILS" | "LOCATION" | "SCHEDULE" | "SUCCESS";
 type Issue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -342,7 +343,11 @@ export default function BookingPage() {
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const devices = await fetchApi<any[]>("/devices");
-      const deviceId = devices && devices.length > 0 ? devices[0].id : "DEV0000001";
+      const defaultDevice = (devices || []).find((item: any) => item.is_default === true || item.isDefault === true) || devices?.[0];
+      if (!defaultDevice?.id) {
+        throw new Error("Bạn chưa có thiết bị nào. Vui lòng thêm thiết bị trước khi đặt lịch.");
+      }
+      const deviceId = defaultDevice.id;
 
       const payload = {
         device_id: deviceId,
@@ -606,6 +611,18 @@ export default function BookingPage() {
                     <p>{fullAddress}</p>
                   </div>
                 </div>
+              )}
+              {location && (
+                <LocationPicker
+                  latitude={location.latitude}
+                  longitude={location.longitude}
+                  onChange={(next) => {
+                    setLocation((current) => current ? { ...current, ...next } : current);
+                    if (next.address) setStreetAddress(next.address);
+                    if (next.ward) setWard(next.ward);
+                    if (next.province) setProvince(next.province);
+                  }}
+                />
               )}
               {error && <p className="sos-form-error">{error}</p>}
               <div className="sos-inline-actions">

@@ -608,7 +608,11 @@ def fetch_technician_requests(current_user: dict, request_status: str | None, pa
 
 
 def fetch_mapbox_public_token(current_user: dict):
-    if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
+    if not (
+        _is_role(current_user, TECHNICIAN_ROLE_CODE)
+        or _is_role(current_user, CUSTOMER_ROLE_CODE)
+        or _is_role(current_user, ADMIN_ROLE_CODE)
+    ):
         raise AppException(ErrorCode.FORBIDDEN)
     token = os.getenv("MAPBOX_ACCESS_TOKEN")
     if not token or not token.startswith("pk."):

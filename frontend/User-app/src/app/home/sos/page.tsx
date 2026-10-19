@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/home/page-header";
 import { Badge, Card, StatusBadge, buttonClasses } from "@h-mobility/ui";
 import { Activity, Phone, RefreshCw, Star, UserRound, Wrench, XCircle } from "lucide-react";
 import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
+import { LocationPicker } from "@/components/home/location-picker";
 
 /** Header subtitle on the technician step, by request status. */
 const TECH_SUBTITLE: Record<string, string> = {
@@ -40,6 +41,8 @@ export default function SosPage() {
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [location, setLocation] = useState<CurrentLocation | null>(null);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [isLocating, setIsLocating] = useState(false);
   const locationLoadedRef = useRef(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
@@ -93,6 +96,18 @@ export default function SosPage() {
       if (dotsTimerRef.current) clearInterval(dotsTimerRef.current);
     };
   }, [step]);
+
+  useEffect(() => {
+    if (step !== "LOCATION" || devices.length > 0) return;
+    import("@/lib/api-client").then(({ fetchApi }) =>
+      fetchApi<any[]>("/devices").then((items) => {
+        const list = Array.isArray(items) ? items : [];
+        setDevices(list);
+        const defaultDevice = list.find((item) => item.is_default === true || item.isDefault === true) || list[0];
+        if (defaultDevice?.id) setSelectedDeviceId(defaultDevice.id);
+      }).catch(() => undefined)
+    );
+  }, [step, devices.length]);
 
   const fillCurrentLocation = async () => {
     setIsLocating(true);
@@ -404,14 +419,16 @@ export default function SosPage() {
         return;
       }
 
-      let deviceId = "DEV-DEFAULT";
-      try {
-        const devices = await fetchApi<any[]>("/devices");
-        if (devices && Array.isArray(devices) && devices.length > 0) {
-          deviceId = devices[0].id;
-        }
-      } catch (devErr) {
-        console.warn("Lỗi tải danh sách thiết bị, sử dụng deviceId mặc định:", devErr);
+      // Ưu tiên xe người dùng đánh dấu mặc định, không phụ thuộc thứ tự API.
+      let deviceId = selectedDeviceId;
+      if (!deviceId) {
+        const latestDevices = await fetchApi<any[]>("/devices");
+        const defaultDevice = (latestDevices || []).find((item: any) => item.is_default === true || item.isDefault === true) || latestDevices?.[0];
+        deviceId = defaultDevice?.id || "";
+      }
+      if (!deviceId) {
+        setFormError("Bạn chưa có thiết bị nào. Vui lòng thêm thiết bị trước khi gửi yêu cầu SOS.");
+        return;
       }
 
       const payload = {
@@ -682,6 +699,18 @@ export default function SosPage() {
             </button>
 
             <div className="booking-address-form">
+                {devices.length > 0 && (
+                  <label htmlFor="sos-device">
+                    <span>Thiết bị cần sửa <b>*</b></span>
+                    <select id="sos-device" value={selectedDeviceId} onChange={(event) => setSelectedDeviceId(event.target.value)}>
+                      {devices.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.nickname || device.name || device.model_name || device.model || "Thiết bị"}{device.is_default ? " (Mặc định)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               <label htmlFor="sos-province">
                 <span>Tỉnh / Thành phố <b>*</b></span>
                 <div className="booking-address-input">
@@ -744,6 +773,19 @@ export default function SosPage() {
                   <p>{fullAddress}</p>
                 </div>
               </div>
+            )}
+
+            {location && (
+              <LocationPicker
+                latitude={location.latitude}
+                longitude={location.longitude}
+                onChange={(next) => {
+                  setLocation((current) => current ? { ...current, ...next } : current);
+                  if (next.address) setStreetAddress(next.address);
+                  if (next.ward) setWard(next.ward);
+                  if (next.province) setProvince(next.province);
+                }}
+              />
             )}
 
             {formError && <p className="sos-form-error">{formError}</p>}
