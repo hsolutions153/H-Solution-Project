@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
 from app.repair_requests.schemas import (
+    FinalCostRequest,
     QuoteCreateRequest,
     MapboxPublicTokenResponse,
     ReverseGeocodeResponse,
@@ -32,6 +33,7 @@ from app.repair_requests.service import (
     fetch_request,
     fetch_request_status_sync,
     fetch_technician_requests,
+    submit_final_cost,
     submit_technician_rating,
     update_quote_for_request,
     update_request_status,
@@ -170,6 +172,15 @@ def get_quotes(
     current_user: dict = Depends(get_current_user),
 ):
     return fetch_quotes_for_request(request_id, current_user)
+
+
+@router.post("/{request_id}/final-cost", response_model=RepairRequestResponse)
+def set_final_cost(
+    request_id: Identifier,
+    data: FinalCostRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return submit_final_cost(request_id, data.model_dump(), current_user)
 
 
 @router.post("/{request_id}/rating", response_model=TechnicianRatingResponse)
