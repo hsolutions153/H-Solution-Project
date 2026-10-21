@@ -1,34 +1,51 @@
-export type RepairStatus = 
-  | 'PENDING' 
-  | 'AWAITING_RECEIPT' 
-  | 'EN_ROUTE' 
-  | 'ARRIVED' 
-  | 'DIAGNOSING' 
-  | 'ESTIMATE_SUBMITTED' 
-  | 'WAITING_FOR_APPROVAL' 
-  | 'ESTIMATE_APPROVED' 
-  | 'ESTIMATE_REJECTED' 
-  | 'IN_PROGRESS' 
-  | 'COMPLETED' 
-  | 'CANCELLED';
+export type RepairPriority = "SOS" | "NORMAL";
 
-export type RepairPriority = 'SOS' | 'NORMAL';
+export type RepairStatus =
+  | "REQUESTED"
+  | "CONFIRMED"
+  | "ASSIGNED"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "EN_ROUTE"
+  | "ARRIVED"
+  | "DIAGNOSING"
+  | "ESTIMATE_SUBMITTED"
+  | "WAITING_FOR_APPROVAL"
+  | "ESTIMATE_APPROVED"
+  | "ESTIMATE_REJECTED"
+  | "REPAIRING"
+  | "COMPLETED"
+  | "CANCELLED"
+  | (string & {});
+
+export interface RepairImage {
+  id: string;
+  repairId: string;
+  imageUrl: string;
+  imageType: string;
+  description?: string;
+  createdAt: string;
+}
 
 export interface RepairRequest {
   id: string;
   code: string;
   customerName: string;
-  address: string; // Đã bổ sung trường địa chỉ
+  customerPhone?: string;
+  customerEmail?: string;
+  address: string;
+  deviceId: string;
+  deviceType?: string;
   device: string;
-  issueDescription?: string;
+  serialNumber?: string;
+  issueType: string;
+  issueDescription: string;
   status: RepairStatus;
+  technicianId?: string;
   technician?: string;
   priority: RepairPriority;
+  totalAmount?: number;
+  images: RepairImage[];
   createdAt: string;
-}
-
-export interface RepairFilterParams {
-  search?: string;
-  priority?: string;
-  status?: string;
+  updatedAt: string;
 }

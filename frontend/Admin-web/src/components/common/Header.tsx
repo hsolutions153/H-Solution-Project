@@ -1,71 +1,56 @@
-'use client';
+import { useAdmin } from "@/context/AdminContext";
+import { useUserInfo } from "@/lib/use-user-info";
+import { Bell, HelpCircle, User } from "lucide-react";
 
-import React from 'react';
-import { usePathname } from 'next/navigation';
-import { Search, Bell, HelpCircle } from 'lucide-react';
+export interface HeaderProps {
+  title?: string;
+}
 
-// Bảng ánh xạ tiền tố đường dẫn sang tiêu đề
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Bảng điều khiển',
-  '/repair-requests': 'Yêu cầu sửa chữa',
-  '/customers': 'Khách hàng',
-  '/devices': 'Thiết bị',
-  '/technicians': 'Kỹ thuật viên',
-  '/history': 'Lịch sử',
-};
-
-export const Header = () => {
-  const pathname = usePathname();
-
-  // Khớp chính xác hoặc tìm tiền tố khớp dài nhất (hỗ trợ cả route con/chi tiết)
-  const getTitle = () => {
-    if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-
-    const matchedKey = Object.keys(PAGE_TITLES).find((key) =>
-      pathname.startsWith(`${key}/`)
-    );
-
-    return matchedKey ? PAGE_TITLES[matchedKey] : 'Bảng điều khiển';
-  };
-
-  const title = getTitle();
+export const Header = ({ title = "Bảng điều khiển" }: HeaderProps) => {
+  const user = useUserInfo();
+  const { showToast } = useAdmin();
 
   return (
-    <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between">
-      <h2 className="text-2xl font-bold text-sky-950">{title}</h2>
+    <header className="h-20 border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-30 shrink-0">
+      <div>
+        <h2 className="text-2xl font-black text-brand-950">{title}</h2>
+        <p className="text-xs text-slate-400 font-medium">Hệ thống Quản trị & Điều phối H-Solution</p>
+      </div>
 
       <div className="flex items-center gap-5">
-        {/* Search Bar */}
-        <div className="relative w-96">
-          <input
-            type="text"
-            placeholder="Tìm kiếm mã đơn, khách hàng..."
-            className="w-full bg-slate-100 text-sm pl-10 pr-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-800 text-slate-700 placeholder:text-slate-400"
-          />
-          <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => showToast("Hệ thống thông báo đang hoạt động bình thường.")}
+            className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full relative cursor-pointer"
+            title="Thông báo"
+          >
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              showToast("Tài liệu hướng dẫn quản trị: Quản lý đơn, điều phối KTV và xét duyệt hồ sơ KYC.")
+            }
+            className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer"
+            title="Hướng dẫn sử dụng"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Icons */}
-        <button className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full relative cursor-pointer">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
-        <button className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">
-          <HelpCircle className="w-5 h-5" />
-        </button>
-
-        {/* User Info */}
         <div className="flex items-center gap-3.5 border-l border-slate-200 pl-5">
-          <div className="w-10 h-10 bg-slate-300 rounded-full overflow-hidden border border-slate-200 flex-shrink-0">
-            <img
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+          <div className="w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+            {user?.name ? user.name.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
           </div>
           <div className="text-left">
-            <div className="text-sm font-bold text-slate-900 leading-tight">Admin User</div>
-            <div className="text-[11px] text-slate-400 font-bold tracking-wider">QUẢN TRỊ VIÊN</div>
+            <div className="text-sm font-bold text-slate-900 leading-tight">
+              {user?.name || "Quản trị viên"}
+            </div>
+            <div className="text-[11px] text-brand-800 font-bold tracking-wider uppercase">
+              {user?.role || "ADMINISTRATOR"}
+            </div>
           </div>
         </div>
       </div>

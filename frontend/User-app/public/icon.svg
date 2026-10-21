@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="hMobilityBg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2479AD"/>
+      <stop offset="0.55" stop-color="#114567"/>
+      <stop offset="1" stop-color="#0A2540"/>
+    </linearGradient>
+    <linearGradient id="hMobilityBolt" x1="28" y1="20" x2="36" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#7FB8DA"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Squircle -->
+  <rect width="64" height="64" rx="15" fill="url(#hMobilityBg)"/>
+  <rect x="2" y="2" width="60" height="60" rx="13" stroke="#7FB8DA" stroke-opacity="0.3" stroke-width="2" fill="none"/>
+  
+  <!-- H Left Pillar -->
+  <rect x="12" y="13" width="9.5" height="38" rx="4.75" fill="white"/>
+  <!-- H Right Pillar -->
+  <rect x="42.5" y="13" width="9.5" height="38" rx="4.75" fill="white"/>
+  <!-- Connecting Crossbar -->
+  <rect x="18" y="27" width="28" height="10" rx="5" fill="white"/>
+  <!-- Electric Mobility Bolt -->
+  <path d="M34.5 20.5L27 31.5H32.5L29.5 41.5L38 29.5H32.5L34.5 20.5Z" fill="url(#hMobilityBolt)"/>
+</svg>

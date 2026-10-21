@@ -1,17 +1,22 @@
 import os
-from pathlib import Path
-
+import httpx
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BACKEND_DIR / ".env")
+load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Khởi tạo Supabase client dùng chung
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_KEY in backend/.env")
+# Cấu hình httpx Client với HTTP/1.1 (http2=False) để khắc phục triệt để lỗi Server disconnected
+# do Cloudflare/Supabase ngắt kết nối idle HTTP/2
+custom_http_client = httpx.Client(
+    http2=False,
+    timeout=httpx.Timeout(60.0, connect=10.0),
+    limits=httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=20.0),
+)
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+client_options = ClientOptions(httpx_client=custom_http_client)
+
+# Khởi tạo Supabase client dùng chung
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=client_options)

@@ -1,29 +1,73 @@
-import React from 'react';
+"use client";
 
-export const TechStaffStatus = () => {
+import type { Technician } from "@/types/api";
+
+import { Users } from "lucide-react";
+import { useEffect,useState } from "react";
+
+export interface TechStaffStatusProps {
+  onNavigateToTechs?: () => void;
+}
+
+export const TechStaffStatus = ({ onNavigateToTechs }: TechStaffStatusProps) => {
+  const [techs, setTechs] = useState<Technician[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTechs = async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const res = await fetchApi<Technician[]>("/technicians");
+        setTechs(Array.isArray(res) ? res : []);
+      } catch (err) {
+        console.warn("Lỗi tải danh sách kỹ thuật viên:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTechs();
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchTechs();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const onlineCount = techs.filter((t) => t.is_online).length;
+  const offlineCount = techs.length - onlineCount;
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm text-sm">
-      <h4 className="font-bold text-slate-700 mb-2.5 tracking-wider uppercase text-xs">
-        Nhân sự hiện tại
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs text-sm">
+      <h4 className="font-bold text-slate-700 mb-3 tracking-wider uppercase text-xs flex items-center justify-between">
+        <span>Nhân sự hiện tại</span>
+        <Users className="w-4 h-4 text-brand-800" />
       </h4>
-      <div className="space-y-2.5 mb-3">
+      <div className="space-y-3 mb-4">
         <div className="flex justify-between items-center">
-          <span className="flex items-center gap-2 text-slate-700">
+          <span className="flex items-center gap-2 text-slate-700 font-medium">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <b>12</b> Kỹ thuật viên online
+            <b>{loading ? "..." : onlineCount}</b> Kỹ thuật viên online
           </span>
-          <span className="text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded text-xs">Sẵn sàng</span>
+          <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md text-xs">
+            Sẵn sàng
+          </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="flex items-center gap-2 text-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
-            <b>04</b> Đang nghỉ phép
+          <span className="flex items-center gap-2 text-slate-700 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            <b>{loading ? "..." : offlineCount}</b> Ngoại tuyến / Vắng
           </span>
-          <span className="text-slate-400 font-medium text-xs">Vắng mặt</span>
+          <span className="text-slate-500 font-bold bg-slate-100 px-2.5 py-0.5 rounded-md text-xs">
+            Ngoại tuyến
+          </span>
         </div>
       </div>
-      <button className="w-full text-center text-blue-600 font-semibold hover:underline border-t border-slate-100 pt-2.5 block text-sm">
-        Quản lý đội ngũ
+      <button
+        type="button"
+        onClick={onNavigateToTechs}
+        className="w-full text-center text-brand-900 font-bold hover:underline border-t border-slate-100 pt-3 block text-xs cursor-pointer"
+      >
+        Xem danh sách đội ngũ kỹ thuật viên &rarr;
       </button>
     </div>
   );

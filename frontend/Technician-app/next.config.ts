@@ -1,8 +1,7 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Bỏ qua cảnh báo root directory nếu cần hoặc để trống, 
-  // hoặc cấu hình turbopack đúng chuẩn định dạng TypeScript:
+  transpilePackages: ["@h-mobility/ui"],
 };
 
 export default nextConfig;

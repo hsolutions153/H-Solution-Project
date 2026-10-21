@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from postgrest.exceptions import APIError
+from postgrest import APIError
 
 from app.core.exceptions import AppException, ErrorCode
 
@@ -68,6 +68,26 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(APIError)
     async def postgrest_exception_handler(request: Request, exc: APIError):
         logger.error(f"[Database Error] PostgREST APIError: {exc}")
+        # Constraints remain authoritative for concurrent writes. Treat rejected
+        # input as a client error rather than leaking database internals in a 500.
+        input_errors = {
+            "23505": (409, "Dữ liệu đã tồn tại trong hệ thống"),
+            "23503": (422, "Dữ liệu tham chiếu không hợp lệ hoặc đang được sử dụng"),
+            "23502": (422, "Thiếu trường dữ liệu bắt buộc"),
+            "23514": (422, "Dữ liệu không đáp ứng điều kiện hợp lệ"),
+            "22001": (422, "Dữ liệu vượt quá độ dài cho phép"),
+            "22003": (422, "Giá trị số vượt quá phạm vi cho phép"),
+            "22P02": (422, "Dữ liệu không đúng kiểu yêu cầu"),
+            "22007": (422, "Ngày giờ không hợp lệ"),
+            "22008": (422, "Ngày giờ vượt quá phạm vi cho phép"),
+        }
+        if exc.code in input_errors:
+            status_code, message = input_errors[exc.code]
+            return JSONResponse(status_code=status_code, content={
+                "code": ErrorCode.VALIDATION_ERROR.value,
+                "message": message,
+                "details": [{"field": "root", "message": message, "type": "database_constraint"}],
+            })
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

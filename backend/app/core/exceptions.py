@@ -41,6 +41,7 @@ class ErrorCode(str, Enum):
     QUOTE_NOT_ACCEPTED = "QUOTE_NOT_ACCEPTED"
     QUOTE_ALREADY_DECIDED = "QUOTE_ALREADY_DECIDED"
     INVALID_QUOTE_STATUS = "INVALID_QUOTE_STATUS"
+    INVALID_ITEM_TYPE = "INVALID_ITEM_TYPE"
 
     PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND"
     PAYMENT_ALREADY_PAID = "PAYMENT_ALREADY_PAID"
@@ -56,6 +57,7 @@ class ErrorCode(str, Enum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
     DATABASE_ERROR = "DATABASE_ERROR"
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+    SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
 
 
 ERROR_METADATA: dict[ErrorCode, tuple[int, str]] = {
@@ -97,11 +99,12 @@ ERROR_METADATA: dict[ErrorCode, tuple[int, str]] = {
     ErrorCode.QUOTE_NOT_ACCEPTED: (status.HTTP_409_CONFLICT, "Cần khách hàng duyệt báo giá trước khi tiến hành sửa chữa"),
     ErrorCode.QUOTE_ALREADY_DECIDED: (status.HTTP_409_CONFLICT, "Báo giá này đã được phản hồi trước đó"),
     ErrorCode.INVALID_QUOTE_STATUS: (422, "Trạng thái báo giá không hợp lệ"),
+    ErrorCode.INVALID_ITEM_TYPE: (422, "Loại mục báo giá không hợp lệ (chỉ chấp nhận SPARE_PART, LABOR hoặc SERVICE)"),
 
     ErrorCode.PAYMENT_NOT_FOUND: (status.HTTP_404_NOT_FOUND, "Không tìm thấy thông tin thanh toán"),
     ErrorCode.PAYMENT_ALREADY_PAID: (status.HTTP_409_CONFLICT, "Khoản thanh toán này đã được hoàn tất trước đó"),
     ErrorCode.PAYMENT_AMOUNT_UNDETERMINED: (status.HTTP_409_CONFLICT, "Chưa xác định được số tiền cần thanh toán, vui lòng chờ duyệt báo giá"),
-    ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED: (status.HTTP_401_UNAUTHORIZED, "Khóa xác thực Webhook SePay không hợp lệ"),
+    ErrorCode.PAYMENT_WEBHOOK_UNAUTHORIZED: (status.HTTP_401_UNAUTHORIZED, "Thông tin xác thực giao dịch thanh toán không hợp lệ"),
 
     ErrorCode.REVIEW_ALREADY_EXISTS: (status.HTTP_409_CONFLICT, "Đơn sửa chữa này đã được đánh giá trước đó"),
     ErrorCode.INVALID_RATING_VALUE: (422, "Số sao đánh giá phải từ 1 đến 5"),
@@ -112,6 +115,7 @@ ERROR_METADATA: dict[ErrorCode, tuple[int, str]] = {
     ErrorCode.VALIDATION_ERROR: (422, "Dữ liệu gửi lên không đúng định dạng"),
     ErrorCode.DATABASE_ERROR: (status.HTTP_500_INTERNAL_SERVER_ERROR, "Lỗi truy vấn cơ sở dữ liệu"),
     ErrorCode.INTERNAL_SERVER_ERROR: (status.HTTP_500_INTERNAL_SERVER_ERROR, "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"),
+    ErrorCode.SERVICE_UNAVAILABLE: (status.HTTP_503_SERVICE_UNAVAILABLE, "Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau"),
 }
 
 

@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import { Modal, SkeletonList } from "@/components/ui";
 import { HistoryTask } from "@/types/task";
-import { initialHistoryTasks } from "@/constants/mockHistory";
-import {
-  Search,
-  SlidersHorizontal,
-  ChevronUp,
-  ChevronDown,
-  FileText,
-  RotateCw,
-} from "lucide-react";
+import { Badge, Button, Card, EmptyState, cn, inputClasses } from "@h-mobility/ui";
+import { Banknote, CheckCircle2, ChevronDown, FileText, MapPin, QrCode, RotateCw, Search } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { InvoiceModal } from "./InvoiceModal";
 
 interface TaskHistoryScreenProps {
   newCompletedTask?: HistoryTask | null;
@@ -19,17 +14,130 @@ interface TaskHistoryScreenProps {
 export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
   newCompletedTask,
 }) => {
-  // State lưu tạm thời trong bộ nhớ (Tải lại trang sẽ khôi phục về initialHistoryTasks)
   const [historyList, setHistoryList] = useState<HistoryTask[]>(() => {
-    if (newCompletedTask) {
-      return [newCompletedTask, ...initialHistoryTasks];
-    }
-    return initialHistoryTasks;
+    return newCompletedTask ? [newCompletedTask] : [];
   });
+  const [loading, setLoading] = useState(true);
+
+  // Quản lý xem hóa đơn
+  const [selectedInvoiceTask, setSelectedInvoiceTask] = useState<HistoryTask | null>(null);
+
+  // Quản lý xác nhận thanh toán trực tiếp từ Lịch sử
+  const [selectedConfirmTask, setSelectedConfirmTask] = useState<HistoryTask | null>(null);
+  const [confirmMethod, setConfirmMethod] = useState<"BANK_TRANSFER" | "CASH">("BANK_TRANSFER");
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
+
+  const handleConfirmHistoryPayment = async () => {
+    if (!selectedConfirmTask) return;
+    setIsConfirming(true);
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi<any>(`/payments/repair/${selectedConfirmTask.id}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ payment_method: confirmMethod }),
+      });
+      setConfirmSuccess(
+        confirmMethod === "CASH"
+          ? "Đã xác nhận thu đủ tiền mặt thành công!"
+          : "Đã xác nhận nhận tiền chuyển khoản thành công!"
+      );
+      setHistoryList((prev) =>
+        prev.map((t) =>
+          t.id === selectedConfirmTask.id
+            ? { ...t, paymentStatus: "PAID", paymentMethod: confirmMethod }
+            : t
+        )
+      );
+      setTimeout(() => {
+        setSelectedConfirmTask(null);
+        setConfirmSuccess(null);
+      }, 1200);
+    } catch (err: any) {
+      alert(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCompletedTasks() {
+      try {
+        setLoading(true);
+        const { fetchApiPages } = await import("@/lib/api-client");
+        const res = await fetchApiPages<any>("/repair-requests/technician/me?page=1&limit=50");
+        if (res && Array.isArray(res.items)) {
+          const completedFromApi: HistoryTask[] = res.items
+            .filter((item: any) => item.status === "COMPLETED" || item.status === "completed")
+            .map((item: any) => {
+              const effectiveTotal = Number(item.total_amount ?? item.quote?.estimated_price ?? item.quote?.total_amount ?? 0);
+
+              const cust = item.customer || {};
+              const dev = item.device || {};
+              const d = item.completed_at || item.created_at ? new Date(item.completed_at || item.created_at) : new Date();
+
+              return {
+                id: item.id,
+                code: item.request_code || item.id,
+                date: d.toLocaleDateString("vi-VN"),
+                time: d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+                serviceType: item.is_sos ? "Cứu hộ khẩn cấp (SOS)" : `Sửa chữa ${item.issue_type || "thiết bị"}`,
+                customerName: cust.full_name || item.customer_name || "Khách hàng",
+                deviceInfo: dev.model_name ? `${dev.manufacturer || ""} ${dev.model_name}` : `Xe lăn điện ${dev.device_type || ""}`,
+                address: item.location_address || cust.address || "Địa chỉ không xác định",
+                type: item.is_sos ? "repair" : "maintenance",
+                diagnosis: item.issue_description || "Kiểm tra và xử lý theo yêu cầu khách hàng.",
+                solution: item.quote?.diagnosis_note || "Đã hoàn thành sửa chữa & kiểm tra thiết bị.",
+                images: {
+                  before: (() => {
+                    if (!Array.isArray(item.images)) return "";
+                    const found = item.images.find((img: any) => img.image_type === "BEFORE_REPAIR" || img.type === "BEFORE_REPAIR");
+                    if (found) return found.image_url || found.url || "";
+                    return typeof item.images[0] === "string" ? item.images[0] : item.images[0]?.image_url || "";
+                  })(),
+                  after: (() => {
+                    if (!Array.isArray(item.images)) return "";
+                    const found = item.images.find((img: any) => img.image_type === "AFTER_REPAIR" || img.type === "AFTER_REPAIR");
+                    if (found) return found.image_url || found.url || "";
+                    return typeof item.images[1] === "string" ? item.images[1] : item.images[1]?.image_url || "";
+                  })(),
+                },
+                totalAmount: effectiveTotal,
+                paymentStatus: item.payment_status || (item.payments && item.payments[0]?.payment_status) || "UNPAID",
+                paymentMethod: item.payment_method || (item.payments && item.payments[0]?.payment_method) || undefined,
+                customerPhone: cust.phone_number || cust.phone || item.customer_phone || undefined,
+                quote: item.quote,
+                quotes: item.quotes,
+                isSos: Boolean(item.is_sos),
+              };
+            });
+
+          if (isMounted) {
+            if (newCompletedTask) {
+              const filtered = completedFromApi.filter((t) => t.id !== newCompletedTask.id && t.code !== newCompletedTask.code);
+              setHistoryList([newCompletedTask, ...filtered]);
+            } else {
+              setHistoryList(completedFromApi);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi tải lịch sử công việc KTV:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadCompletedTasks();
+    return () => {
+      isMounted = false;
+    };
+  }, [newCompletedTask]);
 
   const [activeTab, setActiveTab] = useState<"all" | "this_month" | "maintenance" | "repair">("all");
   const [expandedId, setExpandedId] = useState<string | null>(
-    newCompletedTask ? newCompletedTask.id : "hist-1"
+    newCompletedTask ? newCompletedTask.id : null
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
 
@@ -50,213 +158,306 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     return true;
   });
 
+  const FILTERS: { id: typeof activeTab; label: string }[] = [
+    { id: "all", label: "Tất cả" },
+    { id: "this_month", label: "Tháng này" },
+    { id: "maintenance", label: "Bảo trì" },
+    { id: "repair", label: "Sửa chữa" },
+  ];
+
   return (
-    <div className="max-w-md mx-auto bg-slate-50 min-h-screen pb-20 font-sans border-x border-slate-100">
-      <div className="p-4 space-y-4">
-        {/* Tiêu đề */}
-        <h1 className="text-lg font-bold text-slate-800">Lịch sử công việc</h1>
+    <div className="space-y-4 px-4 pt-4 pb-8">
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-lg font-bold text-ink">Lịch sử công việc</h1>
+        {!loading ? (
+          <span className="text-xs font-medium text-slate-500 tabular-nums">{filteredList.length} công việc</span>
+        ) : null}
+      </div>
 
-        {/* Thanh tìm kiếm & Lọc */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Tìm theo Mã công việc hoặc Tên khách hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full text-xs bg-transparent focus:outline-none text-slate-700"
-            />
-          </div>
-          <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer shadow-sm">
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          aria-label="Tìm công việc"
+          placeholder="Mã công việc hoặc tên khách hàng"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={cn(inputClasses, "pl-10")}
+        />
+      </div>
 
-        {/* Các Tab lọc */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "all"
-                ? "bg-sky-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Tất cả
-          </button>
-          <button
-            onClick={() => setActiveTab("this_month")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "this_month"
-                ? "bg-sky-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Tháng này
-          </button>
-          <button
-            onClick={() => setActiveTab("maintenance")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "maintenance"
-                ? "bg-sky-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Bảo trì
-          </button>
-          <button
-            onClick={() => setActiveTab("repair")}
-            className={`px-3.5 py-1.5 rounded-xl font-medium transition-colors shrink-0 ${
-              activeTab === "repair"
-                ? "bg-sky-400 text-white font-semibold"
-                : "bg-slate-200/60 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            Sửa chữa
-          </button>
-        </div>
+      <div className="scroll-area -mx-4 flex gap-2 overflow-x-auto px-4" role="tablist">
+        {FILTERS.map((f) => {
+          const active = activeTab === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(f.id)}
+              className={cn(
+                "shrink-0 rounded-full border px-4 py-1.5 text-[13px] transition-colors cursor-pointer",
+                active
+                  ? "border-brand-600 bg-brand-600 font-semibold text-white"
+                  : "border-line bg-white font-medium text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Danh sách thẻ lịch sử */}
+      {loading ? (
+        <SkeletonList count={4} className="h-24" />
+      ) : filteredList.length === 0 ? (
+        <EmptyState
+          icon={<FileText />}
+          title={searchTerm ? "Không tìm thấy công việc" : "Chưa có công việc hoàn thành"}
+          description={
+            searchTerm
+              ? "Thử tìm bằng mã công việc hoặc tên khách hàng khác."
+              : "Đơn sửa chữa sau khi hoàn tất và nghiệm thu sẽ hiện ở đây."
+          }
+        />
+      ) : (
         <div className="space-y-3">
           {filteredList.map((item) => {
             const isExpanded = expandedId === item.id;
 
             return (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all"
-              >
-                {/* Phần Header thẻ */}
-                <div
+              <Card key={item.id} padded={false} className="overflow-hidden">
+                <button
+                  type="button"
                   onClick={() => toggleExpand(item.id)}
-                  className="p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                  aria-expanded={isExpanded}
+                  className="flex w-full p-4 text-left transition-colors hover:bg-slate-50/60 cursor-pointer"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-sky-600">
-                      #{item.code}{" "}
-                      <span className="text-slate-400 font-normal">
-                        • {item.date} • {item.time}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold tabular-nums text-slate-500">
+                        #{item.code} · {item.date} {item.time}
                       </span>
-                    </span>
-                    <span className="px-2.5 py-0.5 bg-sky-100 text-sky-700 font-semibold text-[11px] rounded-full">
-                      {item.serviceType}
-                    </span>
-                  </div>
-
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-sm">
-                        {item.customerName}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {item.deviceInfo}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {item.address}
-                      </p>
+                      <ChevronDown
+                        className={cn("size-5 shrink-0 text-slate-400 transition-transform", isExpanded && "rotate-180")}
+                      />
                     </div>
-                    <button className="text-slate-400 p-1">
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </button>
+                    <h3 className="mt-1 truncate text-base font-bold text-ink">{item.customerName}</h3>
+                    <p className="mt-0.5 truncate text-[13px] text-slate-600">{item.deviceInfo}</p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                        <Badge tone={item.type === "repair" ? "brand" : "neutral"} className="min-w-0">
+                          <span className="min-w-0 truncate">{item.serviceType}</span>
+                        </Badge>
+                        {item.paymentStatus === "PAID" ? (
+                          <Badge tone="success">
+                            ✓ {item.paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                          </Badge>
+                        ) : item.paymentStatus === "PENDING" ? (
+                          <Badge tone="warning">Khách đã nộp - Chờ duyệt</Badge>
+                        ) : (
+                          <Badge tone="neutral">Chưa thanh toán</Badge>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-right text-sm font-bold tabular-nums text-ink whitespace-nowrap">
+                        {Number(item.totalAmount).toLocaleString("vi-VN")} đ
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </button>
 
-                {/* Phần Chi tiết mở rộng */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/30 space-y-3 text-xs">
-                    {/* Chẩn đoán */}
+                  <div className="space-y-4 border-t border-line bg-slate-50/60 p-4">
+                    <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                      {item.address}
+                    </p>
+
                     {item.diagnosis && (
                       <div>
-                        <p className="font-bold text-sky-900 mb-0.5">
-                          Chẩn đoán
-                        </p>
-                        <p className="text-slate-600 leading-relaxed">
-                          {item.diagnosis}
+                        <p className="text-sm font-semibold text-ink">Chẩn đoán</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
+                          {item.diagnosis.replace(/\[Hẹn:[^\]]*\]/, "").trim()}
                         </p>
                       </div>
                     )}
 
-                    {/* Nội dung xử lý */}
                     {item.solution && (
                       <div>
-                        <p className="font-bold text-sky-900 mb-0.5">
-                          Nội dung xử lý
-                        </p>
-                        <p className="text-slate-600 leading-relaxed">
-                          {item.solution}
-                        </p>
+                        <p className="text-sm font-semibold text-ink">Nội dung xử lý</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{item.solution}</p>
                       </div>
                     )}
 
-                    {/* Hình ảnh thực tế */}
                     {(item.images?.before || item.images?.after) && (
-                      <div>
-                        <p className="font-bold text-sky-900 mb-1.5">
-                          Hình ảnh thực tế
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {item.images.before && (
-                            <div className="relative rounded-xl overflow-hidden h-24 bg-slate-200 border border-slate-200">
+                      <div className="grid grid-cols-2 gap-2">
+                        {item.images.before && (
+                          <figure>
+                            <div className="aspect-4/3 overflow-hidden rounded-control border border-line bg-slate-100">
                               <img
-                                src="/images/s4.jpg"
-                                alt="Trước khi làm"
-                                className="w-full h-full object-cover"
+                                src={item.images.before}
+                                alt="Trước khi sửa"
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
                               />
-                              <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
-                                Trước khi làm
-                              </span>
                             </div>
-                          )}
-                          {item.images.after && (
-                            <div className="relative rounded-xl overflow-hidden h-24 bg-slate-200 border border-slate-200">
+                            <figcaption className="mt-1 text-xs text-slate-500">Trước khi sửa</figcaption>
+                          </figure>
+                        )}
+                        {item.images.after && (
+                          <figure>
+                            <div className="aspect-4/3 overflow-hidden rounded-control border border-line bg-slate-100">
                               <img
-                                src="/images/s5.jpg"
-                                alt="Sau khi làm"
-                                className="w-full h-full object-cover"
+                                src={item.images.after}
+                                alt="Sau khi sửa"
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/images/s1.jpg";
+                                }}
                               />
-                              <span className="absolute bottom-1 left-1 bg-sky-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
-                                Sau khi làm
-                              </span>
                             </div>
-                          )}
-                        </div>
+                            <figcaption className="mt-1 text-xs text-slate-500">Sau khi sửa</figcaption>
+                          </figure>
+                        )}
                       </div>
                     )}
 
-                    {/* Tổng cộng & Xem hóa đơn */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-semibold uppercase">
-                          Tổng cộng
-                        </p>
-                        <p className="text-sm font-bold text-slate-900">
-                          {item.totalAmount.toLocaleString("vi-VN")} VND
-                        </p>
+                    <div className="border-t border-line pt-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-500">Tổng cộng</p>
+                          <p className="text-base font-bold tabular-nums text-ink whitespace-nowrap">
+                            {Number(item.totalAmount).toLocaleString("vi-VN")} đ
+                          </p>
+                        </div>
+                        {item.paymentStatus === "PAID" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<FileText className="size-4" />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInvoiceTask(item);
+                            }}
+                          >
+                            Xem hóa đơn
+                          </Button>
+                        )}
                       </div>
 
-                      <button className="flex items-center gap-1 text-sky-700 font-semibold text-xs hover:underline">
-                        <FileText className="w-3.5 h-3.5" /> Xem hóa đơn
-                      </button>
+                      {item.paymentStatus !== "PAID" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<CheckCircle2 className="size-4" />}
+                            // Chỉ xác nhận được khi khách đã báo thanh toán trên app
+                            disabled={item.paymentStatus !== "PENDING"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedConfirmTask(item);
+                              setConfirmMethod(item.paymentMethod === "CASH" ? "CASH" : "BANK_TRANSFER");
+                            }}
+                          >
+                            {item.paymentStatus === "PENDING" ? "Xác nhận nhận tiền" : "Chờ khách thanh toán"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<FileText className="size-4" />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInvoiceTask(item);
+                            }}
+                          >
+                            Xem hóa đơn
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>
+      )}
 
-        {/* Nút Tải thêm công việc */}
-        <div className="pt-2 flex justify-center">
-          <button className="py-2.5 px-6 bg-slate-200/70 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition-colors">
-            <RotateCw className="w-3.5 h-3.5" /> Tải thêm công việc
-          </button>
+      {!loading && filteredList.length > 0 && (
+        <div className="flex justify-center pt-1">
+          <Button variant="ghost" icon={<RotateCw className="size-4" />}>
+            Tải thêm
+          </Button>
         </div>
-      </div>
+      )}
+
+      {selectedConfirmTask && (
+        <Modal
+          open={!!selectedConfirmTask}
+          onClose={() => {
+            if (!isConfirming) {
+              setSelectedConfirmTask(null);
+              setConfirmSuccess(null);
+            }
+          }}
+          variant="sheet"
+          title="Xác nhận nhận tiền"
+        >
+          <div className="space-y-4">
+            <div className="rounded-card border border-brand-100 bg-brand-50/70 p-4 text-center">
+              <p className="text-xs font-medium text-slate-500">Số tiền cần xác nhận</p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-brand-700 whitespace-nowrap">
+                {Number(selectedConfirmTask.totalAmount).toLocaleString("vi-VN")} đ
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Mã đơn: <span className="font-semibold text-ink">#{selectedConfirmTask.code}</span> · Khách: {selectedConfirmTask.customerName}
+              </p>
+            </div>
+
+            {confirmSuccess ? (
+              <div className="flex items-center gap-3 rounded-control border border-emerald-200 bg-emerald-50 p-3.5 text-emerald-800">
+                <CheckCircle2 className="size-5 shrink-0 text-emerald-600" />
+                <div className="text-sm font-semibold">{confirmSuccess}</div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between rounded-control border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    {confirmMethod === "CASH" ? <Banknote className="size-4" /> : <QrCode className="size-4" />}
+                    Khách đã báo trả: {confirmMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                  </span>
+                  <span className="text-[11px] font-medium text-emerald-700">Kiểm tra trước khi xác nhận</span>
+                </div>
+
+                <Button
+                  size="lg"
+                  fullWidth
+                  disabled={isConfirming}
+                  icon={<CheckCircle2 className="size-5" />}
+                  onClick={handleConfirmHistoryPayment}
+                >
+                  {isConfirming
+                    ? "Đang xác nhận..."
+                    : confirmMethod === "CASH"
+                    ? "Xác nhận đã thu đủ tiền mặt"
+                    : "Xác nhận đã nhận chuyển khoản"}
+                </Button>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {selectedInvoiceTask && (
+        <InvoiceModal
+          open={Boolean(selectedInvoiceTask)}
+          task={selectedInvoiceTask}
+          onClose={() => setSelectedInvoiceTask(null)}
+        />
+      )}
     </div>
   );
 };

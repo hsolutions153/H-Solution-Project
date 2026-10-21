@@ -3,7 +3,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { fileToStoredImage } from "@/utils/image-data";
+import { PageHeader } from "@/components/home/page-header";
+import { Badge, Card, StatusBadge, buttonClasses } from "@h-mobility/ui";
+import { Activity, Phone, RefreshCw, Star, UserRound, Wrench, XCircle } from "lucide-react";
+import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
+import { LocationPicker } from "@/components/home/location-picker";
+
+/** Header subtitle on the technician step, by request status. */
+const TECH_SUBTITLE: Record<string, string> = {
+  ASSIGNED: "Đang chờ kỹ thuật viên nhận đơn",
+  ACCEPTED: "Kỹ thuật viên đã nhận đơn",
+  EN_ROUTE: "Kỹ thuật viên đang đến",
+  ARRIVED: "Kỹ thuật viên đã đến nơi",
+  DIAGNOSING: "Đang kiểm tra xe",
+  CANCELLED: "Yêu cầu đã hủy",
+};
 
 type SosStep = "PROBLEM" | "DETAILS" | "CAMERA" | "LOCATION" | "CALLING" | "TECHNICIAN";
 type SosIssue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -26,6 +40,11 @@ export default function SosPage() {
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
+  const [location, setLocation] = useState<CurrentLocation | null>(null);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [isLocating, setIsLocating] = useState(false);
+  const locationLoadedRef = useRef(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState("");
   const [cameraFlash, setCameraFlash] = useState(false);
@@ -33,7 +52,14 @@ export default function SosPage() {
   const [connectingDots, setConnectingDots] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected">("connecting");
   const [smsStatus, setSmsStatus] = useState<"pending" | "sending" | "sent">("pending");
-  const [technicianEta, setTechnicianEta] = useState("~8 phút");
+  const [assignedTech, setAssignedTech] = useState<any>(null);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("activeSosId") || null;
+    }
+    return null;
+  });
+  const [techStatusText, setTechStatusText] = useState<string>("Đang tìm KTV gần nhất...");
 
   const dotsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,6 +96,144 @@ export default function SosPage() {
       if (dotsTimerRef.current) clearInterval(dotsTimerRef.current);
     };
   }, [step]);
+
+  useEffect(() => {
+    if (step !== "LOCATION" || devices.length > 0) return;
+    import("@/lib/api-client").then(({ fetchApi }) =>
+      fetchApi<any[]>("/devices").then((items) => {
+        const list = Array.isArray(items) ? items : [];
+        setDevices(list);
+        const defaultDevice = list.find((item) => item.is_default === true || item.isDefault === true) || list[0];
+        if (defaultDevice?.id) setSelectedDeviceId(defaultDevice.id);
+      }).catch(() => undefined)
+    );
+  }, [step, devices.length]);
+
+  const fillCurrentLocation = async () => {
+    setIsLocating(true);
+    setFormError("");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const nextLocation = await getCurrentLocation(fetchApi);
+      setLocation(nextLocation);
+      setStreetAddress(nextLocation.address);
+      setWard(nextLocation.ward);
+      setProvince(nextLocation.province);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể lấy vị trí hiện tại.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== "LOCATION" || locationLoadedRef.current) return;
+    locationLoadedRef.current = true;
+    fillCurrentLocation();
+  }, [step]);
+
+  const [reassignedNotice, setReassignedNotice] = useState<string | null>(null);
+  const [currentRequestStatus, setCurrentRequestStatus] = useState<string>("ASSIGNED");
+  const previousTechIdRef = useRef<string | null>(null);
+
+  // Thăm dò trạng thái KTV thời gian thực (chu kỳ 1.5s)
+  useEffect(() => {
+    if (step !== "TECHNICIAN") return;
+
+    let isMounted = true;
+    let pollTimer: any = null;
+
+    const checkRequestStatus = async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        let reqId = activeRequestId;
+        let reqData: any = null;
+
+        if (reqId) {
+          try {
+            reqData = await fetchApi<any>(`/repair-requests/${reqId}`);
+          } catch {
+          }
+        }
+
+        if (!reqData) {
+          const myRequests = await fetchApi<any>("/repair-requests/me?page=1&limit=5");
+          if (myRequests && myRequests.items && myRequests.items.length > 0) {
+            reqData = myRequests.items.find((i: any) => i.is_sos) || myRequests.items[0];
+            if (reqData && reqData.id) {
+              reqId = reqData.id;
+              setActiveRequestId(reqId);
+              if (reqId) sessionStorage.setItem("activeSosId", reqId);
+            }
+          }
+        }
+
+        if (isMounted && reqData) {
+          const status = reqData.status || "REQUESTED";
+          setCurrentRequestStatus(status);
+
+          const currentTech = reqData.technician;
+          const currentTechId = currentTech?.id || reqData.technician_id;
+
+          // Phát hiện hệ thống vừa tự động chuyển sang KTV mới
+          if (
+            previousTechIdRef.current &&
+            currentTechId &&
+            previousTechIdRef.current !== currentTechId
+          ) {
+            const newName = currentTech?.name || "KTV mới";
+            setReassignedNotice(`KTV trước bận. Hệ thống đã tự động kết nối với KTV mới: ${newName}!`);
+            setTimeout(() => {
+              if (isMounted) setReassignedNotice(null);
+            }, 6000);
+          }
+
+          if (currentTechId) {
+            previousTechIdRef.current = currentTechId;
+          }
+
+          if (currentTech) {
+            setAssignedTech(currentTech);
+          }
+
+          if (status === "ASSIGNED") {
+            setTechStatusText(
+              currentTech?.name
+                ? `Đã chỉ định ${currentTech.name}. Đang chờ KTV tiếp nhận (tối đa 2 phút)...`
+                : "Hệ thống đang tự động điều phối KTV gần nhất..."
+            );
+          } else if (status === "ACCEPTED") {
+            setTechStatusText(`${currentTech?.name || "Kỹ thuật viên"} đã chấp nhận đơn và đang chuẩn bị xuất phát!`);
+          } else if (status === "EN_ROUTE") {
+            setTechStatusText(`${currentTech?.name || "Kỹ thuật viên"} đang trên đường di chuyển đến bạn.`);
+          } else if (status === "ARRIVED") {
+            setTechStatusText(`${currentTech?.name || "Kỹ thuật viên"} đã có mặt tại vị trí sự cố.`);
+          } else if (status === "DIAGNOSING" || status === "DIAGNOSED") {
+            setTechStatusText("Kỹ thuật viên đang kiểm tra và chẩn đoán thiết bị.");
+          } else if (["WAITING_FOR_APPROVAL", "ESTIMATE_SUBMITTED", "ESTIMATE_APPROVED", "REPAIRING"].includes(status)) {
+            if (reqId) {
+              router.push(`/home/history/${reqId}`);
+              return;
+            }
+          } else if (status === "CANCELLED") {
+            setTechStatusText("Yêu cầu cứu hộ đã bị hủy.");
+          } else if (status === "REQUESTED") {
+            setTechStatusText("Hệ thống đang tự động quét tìm kỹ thuật viên khả dụng...");
+          }
+        }
+      } catch (e) {
+        console.warn("Lỗi thăm dò trạng thái cứu hộ:", e);
+      }
+    };
+
+    checkRequestStatus();
+    pollTimer = setInterval(checkRequestStatus, 1500);
+
+    return () => {
+      isMounted = false;
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [step, activeRequestId, router]);
 
   useEffect(() => {
     return () => {
@@ -243,31 +407,110 @@ export default function SosPage() {
     }
 
     setFormError("");
-    setConnectionStatus("connecting");
-    setSmsStatus("pending");
-    setConnectingDots("");
-    setTechnicianEta("~8 phút");
-    setStep("CALLING");
 
     try {
-      const images = await Promise.all(uploadedPhotos.map(fileToStoredImage));
-      await fetch("/api/sos", {
+      const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+      if (!getAuthToken()) {
+        router.push("/login?redirect=/home/sos");
+        return;
+      }
+      if (!location) {
+        setFormError("Cần bật vị trí GPS để gửi yêu cầu SOS.");
+        return;
+      }
+
+      // Ưu tiên xe người dùng đánh dấu mặc định, không phụ thuộc thứ tự API.
+      let deviceId = selectedDeviceId;
+      if (!deviceId) {
+        const latestDevices = await fetchApi<any[]>("/devices");
+        const defaultDevice = (latestDevices || []).find((item: any) => item.is_default === true || item.isDefault === true) || latestDevices?.[0];
+        deviceId = defaultDevice?.id || "";
+      }
+      if (!deviceId) {
+        setFormError("Bạn chưa có thiết bị nào. Vui lòng thêm thiết bị trước khi gửi yêu cầu SOS.");
+        return;
+      }
+
+      const payload = {
+        device_id: deviceId,
+        issue_type: selectedIssue ? selectedIssue.toUpperCase() : "GENERAL",
+        issue_description: problemDetails || "Yêu cầu cứu hộ khẩn cấp SOS",
+        location_address: [streetAddress.trim(), ward.trim(), province.trim()].join(", "),
+        latitude: location.latitude,
+        longitude: location.longitude,
+        is_sos: true,
+        request_type: "EMERGENCY",
+        images: [],
+      };
+
+      const createdReq = await fetchApi<any>("/repair-requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: selectedIssue,
-          details: problemDetails,
-          address: [streetAddress.trim(), ward.trim(), province.trim()].join(", "),
-          locationMethod: "manual",
-          images,
-        }),
+        body: JSON.stringify(payload),
       });
-    } catch (err) {
-      console.error("Failed to register SOS request", err);
+
+      if (createdReq) {
+        if (createdReq.id) {
+          setActiveRequestId(createdReq.id);
+          sessionStorage.setItem("activeSosId", createdReq.id);
+
+          if (uploadedPhotos.length > 0) {
+            try {
+              await Promise.allSettled(
+                uploadedPhotos.map((photoFile) => {
+                  const formData = new FormData();
+                  formData.append("file", photoFile);
+                  return fetchApi(`/repair-requests/${createdReq.id}/images`, {
+                    method: "POST",
+                    body: formData,
+                  });
+                })
+              );
+            } catch (uploadErr) {
+              console.warn("Lỗi tải lên một số ảnh của khách hàng:", uploadErr);
+            }
+          }
+        }
+        if (createdReq.technician) {
+          setAssignedTech(createdReq.technician);
+        } else if (createdReq.id) {
+          try {
+            const detailReq = await fetchApi<any>(`/repair-requests/${createdReq.id}`);
+            if (detailReq && detailReq.technician) {
+              setAssignedTech(detailReq.technician);
+            }
+          } catch (detErr) {
+            console.warn("Lỗi tải chi tiết yêu cầu sửa chữa:", detErr);
+          }
+        }
+      }
+
+      setConnectionStatus("connecting");
+      setSmsStatus("pending");
+      setConnectingDots("");
+      setStep("TECHNICIAN");
+    } catch (err: any) {
+      console.error("Lỗi đăng ký yêu cầu cứu hộ SOS:", err);
+      if (err.status === 401) {
+        router.push("/login?redirect=/home/sos");
+      } else {
+        setFormError(err.message || "Tạo yêu cầu thất bại. Vui lòng kiểm tra kết nối và thử lại.");
+      }
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    if (activeRequestId) {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        await fetchApi(`/repair-requests/${activeRequestId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "CANCELLED", cancel_reason: "Khách hàng hủy yêu cầu trên màn hình SOS" }),
+        });
+      } catch (err) {
+        console.warn("Lỗi hủy yêu cầu cứu hộ:", err);
+      }
+    }
+    sessionStorage.removeItem("activeSosId");
     router.push("/home");
   };
 
@@ -279,33 +522,23 @@ export default function SosPage() {
   return (
     <div className="sos-flow-page">
       <header className="sos-flow-header">
-        <div className="sos-flow-header-main">
-          <button type="button" className="sos-flow-back-btn" onClick={handleCancel} aria-label="Quay về trang chủ">
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div className="sos-flow-logo">
-            <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-              <circle cx="14" cy="14" r="3" fill="#0D2137" />
-              <line x1="14" y1="2" x2="14" y2="26" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="2" y1="14" x2="26" y2="14" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="5.5" y1="5.5" x2="22.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-              <line x1="22.5" y1="5.5" x2="5.5" y2="22.5" stroke="#0D2137" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <span className="sos-flow-logo-text">GLACIER</span>
-          </div>
-        </div>
-        {(step === "CALLING" || step === "TECHNICIAN") && (
-          <div className="sos-flow-header-badge">
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>emergency</span>
-            SOS
-          </div>
-        )}
+        <PageHeader
+          title="Gọi cứu hộ SOS"
+          subtitle={
+            step === "CALLING"
+              ? "Đang tìm kỹ thuật viên gần bạn"
+              : step === "TECHNICIAN"
+                ? TECH_SUBTITLE[currentRequestStatus] ?? "Đang điều phối kỹ thuật viên"
+                : "Mô tả sự cố để được hỗ trợ nhanh"
+          }
+          onBack={handleCancel}
+          trailing={step === "CALLING" || step === "TECHNICIAN" ? <Badge tone="danger">SOS</Badge> : null}
+        />
       </header>
 
       {step === "PROBLEM" && (
         <section className="sos-step-panel">
           <div className="sos-step-head">
-            <p className="sos-step-kicker">CHỌN SỰ CỐ</p>
             <h1 className="sos-step-title">Xe của bạn đang gặp vấn đề gì?</h1>
           </div>
 
@@ -405,7 +638,7 @@ export default function SosPage() {
             />
             {!cameraReady && (
               <Image
-                src="/wheelchair.png"
+                src="/electric-scooter.jpg"
                 alt="camera fallback"
                 fill
                 sizes="(max-width: 480px) 100vw, 480px"
@@ -459,9 +692,25 @@ export default function SosPage() {
         <section className="sos-step-panel sos-location-select-panel">
           <div className="sos-location-select-card">
             <h2>Địa điểm cần hỗ trợ</h2>
-            <p>Nhập đầy đủ địa chỉ để nhân viên SOS có thể đến đúng nơi.</p>
+            <p>Địa chỉ được tự điền theo GPS. Bạn có thể chỉnh lại trước khi gửi.</p>
+
+            <button type="button" className="sos-ghost-btn" onClick={fillCurrentLocation} disabled={isLocating}>
+              {isLocating ? "Đang lấy vị trí…" : "Dùng vị trí hiện tại"}
+            </button>
 
             <div className="booking-address-form">
+                {devices.length > 0 && (
+                  <label htmlFor="sos-device">
+                    <span>Thiết bị cần sửa <b>*</b></span>
+                    <select id="sos-device" value={selectedDeviceId} onChange={(event) => setSelectedDeviceId(event.target.value)}>
+                      {devices.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.nickname || device.name || device.model_name || device.model || "Thiết bị"}{device.is_default ? " (Mặc định)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               <label htmlFor="sos-province">
                 <span>Tỉnh / Thành phố <b>*</b></span>
                 <div className="booking-address-input">
@@ -526,6 +775,19 @@ export default function SosPage() {
               </div>
             )}
 
+            {location && (
+              <LocationPicker
+                latitude={location.latitude}
+                longitude={location.longitude}
+                onChange={(next) => {
+                  setLocation((current) => current ? { ...current, ...next } : current);
+                  if (next.address) setStreetAddress(next.address);
+                  if (next.ward) setWard(next.ward);
+                  if (next.province) setProvince(next.province);
+                }}
+              />
+            )}
+
             {formError && <p className="sos-form-error">{formError}</p>}
 
             <button className="sos-manual-submit" disabled={!canContinueLocation} onClick={handleContinueFromLocation}>
@@ -543,7 +805,7 @@ export default function SosPage() {
         <section className="sos-calling-step">
           <div className="sos-signal-container">
             <div className="sos-signal-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="#1565C0">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="#2479ad">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
               </svg>
             </div>
@@ -587,7 +849,7 @@ export default function SosPage() {
             <div className="sos-map-container">
               <div className="sos-map-mock">
                 <Image
-                  src="/wheelchair.png"
+                  src="/electric-scooter.jpg"
                   alt="location preview"
                   width={420}
                   height={150}
@@ -595,7 +857,7 @@ export default function SosPage() {
                 />
               </div>
               <div className="sos-map-address-badge">
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#1565C0" }}>place</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#2479ad" }}>place</span>
                 <span>{fullAddress}</span>
               </div>
             </div>
@@ -603,7 +865,7 @@ export default function SosPage() {
 
           <div className="sos-safety-section">
             <h3 className="sos-safety-title">
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#1565C0" }}>shield</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>shield</span>
               Hướng dẫn an toàn
             </h3>
             <ul className="sos-safety-list">
@@ -636,49 +898,116 @@ export default function SosPage() {
       )}
 
       {step === "TECHNICIAN" && (
-        <section className="sos-step-panel sos-tech-panel">
-          <div className="sos-tech-found">ĐÃ TÌM THẤY KỸ THUẬT VIÊN</div>
-          <h2 className="sos-tech-title">Kỹ thuật viên đang chờ bạn xác nhận</h2>
+        <section className="mx-auto flex w-full max-w-120 flex-1 flex-col gap-3 px-5 pt-1 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+          {reassignedNotice && (
+            <p role="status" className="flex items-start gap-2.5 rounded-card border border-amber-200 bg-amber-50 p-3.5 text-[13px] font-medium text-amber-900">
+              <RefreshCw className="mt-0.5 size-4 shrink-0 text-amber-600" />
+              {reassignedNotice}
+            </p>
+          )}
 
-          <article className="sos-tech-card">
-            <div className="sos-tech-avatar">
-              <span className="material-symbols-outlined">person</span>
-            </div>
-            <h3>Nguyễn Văn A</h3>
-            <p>Chuyên gia bảo trì xe lăn điện</p>
+          <Card className="space-y-2">
+            <StatusBadge status={currentRequestStatus} />
+            <p className="text-base font-semibold leading-snug text-ink">
+              {techStatusText || (assignedTech ? "Kỹ thuật viên đang tiếp nhận cứu hộ" : "Hệ thống đang điều phối kỹ thuật viên gần bạn.")}
+            </p>
+          </Card>
 
-            <div className="sos-tech-meta">
-              <span>4.9 (128 reviews)</span>
-              <span>Đã xác minh</span>
-            </div>
-
-            <div className="sos-tech-stats">
-              <div>
-                <span>KINH NGHIỆM</span>
-                <strong>8 năm</strong>
+          {assignedTech ? (
+            <Card padded={false}>
+              <div className="flex items-center gap-3 p-4">
+                <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-600 text-lg font-bold text-white">
+                  {assignedTech.avatar && String(assignedTech.avatar).startsWith("http") ? (
+                    <img src={assignedTech.avatar} alt="" className="size-full object-cover" />
+                  ) : (
+                    String(assignedTech.name || "K").charAt(0).toUpperCase()
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-lg font-bold text-ink">{assignedTech.name || "Kỹ thuật viên"}</h2>
+                  <p className="truncate text-[13px] text-slate-600">
+                    {assignedTech.specialization || "Kỹ thuật viên V-HCare"}
+                  </p>
+                  {assignedTech.rating ? (
+                    <p className="mt-0.5 flex items-center gap-1 text-[13px] text-slate-600">
+                      <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-semibold text-ink tabular-nums">{Number(assignedTech.rating).toFixed(1)}</span>
+                      {assignedTech.reviews ? <span>({assignedTech.reviews} đánh giá)</span> : null}
+                    </p>
+                  ) : null}
+                </div>
+                {assignedTech.phone ? (
+                  <a
+                    href={`tel:${assignedTech.phone}`}
+                    aria-label={`Gọi ${assignedTech.name || "kỹ thuật viên"}`}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 active:scale-95"
+                  >
+                    <Phone className="size-5" />
+                  </a>
+                ) : null}
               </div>
+              {assignedTech.phone || assignedTech.experience_years ? (
+                <dl className="grid grid-cols-2 divide-x divide-line border-t border-line">
+                  <div className="px-4 py-3">
+                    <dt className="text-xs text-slate-500">Số điện thoại</dt>
+                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{assignedTech.phone || "Chưa cập nhật"}</dd>
+                  </div>
+                  <div className="px-4 py-3">
+                    <dt className="text-xs text-slate-500">Kinh nghiệm</dt>
+                    <dd className="mt-0.5 text-sm font-semibold text-ink">
+                      {assignedTech.experience_years ? `${assignedTech.experience_years} năm` : "Chưa cập nhật"}
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
+            </Card>
+          ) : (
+            <Card className="flex items-center gap-3">
+              <span className="flex size-14 shrink-0 animate-pulse items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                <UserRound className="size-6" />
+              </span>
               <div>
-                <span>KHOẢNG CÁCH</span>
-                <strong>1.2 km</strong>
+                <p className="text-sm font-semibold text-ink">Đang tìm kỹ thuật viên</p>
+                <p className="text-[13px] text-slate-600">Thông tin kỹ thuật viên sẽ hiện khi có người nhận đơn.</p>
               </div>
-              <div>
-                <span>THỜI GIAN</span>
-                <strong>{technicianEta}</strong>
-              </div>
-            </div>
-          </article>
+            </Card>
+          )}
 
-          <div className="sos-tech-issue-card">
-            <Image src="/wheelchair.png" alt="issue" width={48} height={48} />
-            <div>
-              <strong>Sự cố {selectedIssueLabel.toLowerCase()}</strong>
-              <p>Hệ thống đã ghi nhận sự cố và chuyển thông tin cho kỹ thuật viên.</p>
+          <Card className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-slate-100 text-slate-700">
+              <Wrench className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">Sự cố {selectedIssueLabel.toLowerCase()}</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-slate-600">
+                {currentRequestStatus === "REQUESTED" || currentRequestStatus === "ASSIGNED"
+                  ? "Trạng thái được cập nhật tự động. Khi kỹ thuật viên nhận đơn, hành trình sẽ hiện ở đây."
+                  : "Trạng thái được cập nhật tự động theo hành trình của kỹ thuật viên."}
+              </p>
             </div>
-          </div>
+          </Card>
 
-          <div className="sos-tech-actions">
-            <button type="button" className="sos-tech-decline" onClick={handleCancel}>Từ chối</button>
-            <button type="button" className="sos-tech-confirm" onClick={() => router.push("/home/history")}>Xác nhận</button>
+          <div className="mt-auto space-y-2.5 pt-2">
+            <button
+              type="button"
+              className={buttonClasses("primary", "lg", true)}
+              onClick={() => router.push(activeRequestId ? `/home/history/${activeRequestId}` : "/home/history")}
+            >
+              <Activity className="size-5" />
+              Theo dõi tiến độ
+            </button>
+            <button
+              type="button"
+              className={buttonClasses("secondary", "lg", true, "text-rose-700 hover:border-rose-200 hover:bg-rose-50")}
+              onClick={() => {
+                if (confirm("Bạn có chắc chắn muốn hủy yêu cầu cứu hộ khẩn cấp này không?")) {
+                  handleCancel();
+                }
+              }}
+            >
+              <XCircle className="size-5" />
+              Hủy yêu cầu cứu hộ
+            </button>
           </div>
         </section>
       )}

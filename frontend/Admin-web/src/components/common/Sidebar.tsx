@@ -1,111 +1,211 @@
-'use client';
-
-import React from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useAdmin } from "@/context/AdminContext";
+import { BrandMark } from "@h-mobility/ui";
 import {
-  LayoutDashboard,
-  Briefcase,
-  Users,
-  Monitor,
-  UserRoundCog,
-  History,
-  Settings,
-  LogOut,
-  Plus,
-  Circle,
+Briefcase,
+History,
+LayoutDashboard,
+LogOut,
+Monitor,
+PanelLeftClose,
+PanelLeftOpen,
+Plus,
+Settings,
+UserRoundCog,
+Users
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export const Sidebar = () => {
+export interface SidebarProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  onOpenCreateOrder: () => void;
+}
+
+export const Sidebar = ({
+  activeTab,
+  onTabChange,
+  onOpenCreateOrder,
+}: SidebarProps) => {
   const router = useRouter();
-  const pathname = usePathname();
+  const { sidebarCollapsed, toggleSidebar, showToast } = useAdmin();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
+    import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
     localStorage.removeItem("isLoggedIn");
     router.replace("/");
   };
 
-  // Danh sách đường dẫn menu
   const navItems = [
-    { label: "Bảng điều khiển", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Yêu cầu sửa chữa", href: "/repair-requests", icon: Briefcase },
-    { label: "Khách hàng", href: "/customers", icon: Users },
-    { label: "Thiết bị", href: "/devices", icon: Monitor },
-    { label: "Kỹ thuật viên", href: "/technicians", icon: UserRoundCog },
-    { label: "Lịch sử", href: "/history", icon: History },
+    { id: "dashboard", label: "Bảng điều khiển", icon: LayoutDashboard },
+    { id: "orders", label: "Yêu cầu sửa chữa", icon: Briefcase },
+    { id: "customers", label: "Khách hàng", icon: Users },
+    { id: "devices", label: "Phương tiện / Thiết bị", icon: Monitor },
+    { id: "technicians", label: "Kỹ thuật viên", icon: UserRoundCog },
+    { id: "history", label: "Lịch sử sửa chữa", icon: History },
   ];
 
   return (
-    <aside className="w-72 bg-white border-r border-slate-200 flex flex-col justify-between p-5 min-h-screen">
-      <div>
-        {/* Logo */}
-        <div className="flex items-center gap-3.5 px-2 py-3 mb-5">
-          <div className="w-10 h-10 bg-sky-800 rounded-xl flex items-center justify-center text-white shadow-sm">
-            <Circle className="w-6 h-6 fill-white" />
+    <aside
+      className={`bg-white border-r border-slate-200 flex flex-col justify-between h-screen sticky top-0 shrink-0 z-40 transition-all duration-300 ease-in-out select-none ${
+        sidebarCollapsed ? "w-20 p-3" : "w-72 p-5"
+      }`}
+    >
+      <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div
+          className={`flex items-center ${
+            sidebarCollapsed ? "justify-center flex-col gap-2.5 mb-4" : "justify-between mb-5"
+          } px-1 py-2`}
+        >
+          <div className="flex items-center gap-3 overflow-hidden">
+            <BrandMark size={40} />
+            {!sidebarCollapsed && (
+              <div className="truncate animate-in fade-in duration-200">
+                <h1 className="font-bold text-brand-950 text-base leading-tight truncate">
+                  V-HCare
+                </h1>
+                <span className="text-xs text-brand-600 font-medium block">
+                  Quản trị hệ thống
+                </span>
+              </div>
+            )}
           </div>
-          <div>
-            <h1 className="font-bold text-sky-900 text-lg leading-tight">
-              AdminRepair
-            </h1>
-            <span className="text-[11px] text-slate-400 font-bold tracking-wider">
-              GLACIER EDITION
-            </span>
-          </div>
+
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="p-2 rounded-xl text-slate-400 hover:text-brand-900 hover:bg-slate-100 transition cursor-pointer shrink-0"
+            title={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+            aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="w-5 h-5" />
+            ) : (
+              <PanelLeftClose className="w-5 h-5" />
+            )}
+          </button>
         </div>
 
-        {/* Action Button */}
-        <button className="w-full bg-sky-900 hover:bg-sky-950 text-white py-3.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer">
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span>Tạo đơn mới</span>
+        <button
+          type="button"
+          onClick={onOpenCreateOrder}
+          className={`bg-brand-900 hover:bg-brand-950 text-white font-bold text-sm flex items-center justify-center gap-2.5 mb-6 shadow-sm transition cursor-pointer ${
+            sidebarCollapsed
+              ? "w-11 h-11 mx-auto rounded-xl p-0"
+              : "w-full py-3.5 px-4 rounded-xl"
+          }`}
+          title="Tạo đơn mới"
+        >
+          <Plus className="w-5 h-5 stroke-[2.5] shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Tạo đơn mới</span>}
         </button>
 
-        {/* Menu Items */}
-        <nav className="space-y-1.5 text-sm font-semibold">
+        <nav className="space-y-1.5 text-sm font-semibold flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = activeTab === item.id;
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition ${
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onTabChange(item.id)}
+                className={`w-full flex items-center rounded-xl transition cursor-pointer ${
+                  sidebarCollapsed
+                    ? "justify-center p-3 h-11"
+                    : "gap-3.5 px-3.5 py-3 text-left"
+                } ${
                   isActive
-                    ? "text-sky-900 bg-sky-100/70"
-                    : "text-slate-600 hover:bg-slate-50"
+                    ? "text-brand-950 bg-brand-100/80 font-bold shadow-xs"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
+                title={sidebarCollapsed ? item.label : undefined}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </Link>
+                <Icon
+                  className={`w-5 h-5 shrink-0 ${
+                    isActive ? "text-brand-900" : "text-slate-400"
+                  }`}
+                />
+                {!sidebarCollapsed && (
+                  <span className="truncate animate-in fade-in duration-150">
+                    {item.label}
+                  </span>
+                )}
+              </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Footer */}
-      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold">
-        <Link
-          href="/settings"
-          className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition ${
-            pathname === "/settings"
-              ? "text-sky-900 bg-sky-100/70"
-              : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <Settings className="w-5 h-5" />
-          <span>Cài đặt</span>
-        </Link>
-
-        {/* Logout */}
+      <div className="space-y-1.5 border-t border-slate-100 pt-4 text-sm font-semibold shrink-0">
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3.5 px-3.5 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-xl transition cursor-pointer"
+          type="button"
+          onClick={() => showToast("Chức năng Cài đặt hệ thống đang được phát triển.")}
+          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-slate-50 cursor-pointer ${
+            sidebarCollapsed
+              ? "justify-center p-3 h-11"
+              : "gap-3.5 px-3.5 py-3 text-left"
+          }`}
+          title={sidebarCollapsed ? "Cài đặt hệ thống" : undefined}
         >
-          <LogOut className="w-5 h-5" />
-          <span>Đăng xuất</span>
+          <Settings className="w-5 h-5 text-slate-400 shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Cài đặt hệ thống</span>}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowLogoutConfirm(true)}
+          className={`w-full flex items-center rounded-xl transition text-slate-600 hover:bg-rose-50 hover:text-rose-600 cursor-pointer ${
+            sidebarCollapsed
+              ? "justify-center p-3 h-11"
+              : "gap-3.5 px-3.5 py-3 text-left"
+          }`}
+          title={sidebarCollapsed ? "Đăng xuất" : undefined}
+        >
+          <LogOut className="w-5 h-5 shrink-0" />
+          {!sidebarCollapsed && <span className="truncate">Đăng xuất</span>}
         </button>
       </div>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-600 shadow-xs">
+              <LogOut className="w-6 h-6 stroke-[2.2]" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">
+                Xác nhận đăng xuất
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Bạn có chắc chắn muốn đăng xuất khỏi trang Quản trị viên không?
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs shadow-rose-600/30"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 };

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query, status
+from app.core.validation import Identifier
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
 from app.customers.schemas import (
@@ -19,6 +20,7 @@ from app.customers.service import (
     update_customer,
     update_customer_status,
     update_own_customer,
+    upload_own_avatar,
 )
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
@@ -34,6 +36,14 @@ def modify_my_customer(data: CustomerUpdate, current_user: dict = Depends(get_cu
     return update_own_customer(current_user, data)
 
 
+@router.post("/me/avatar", response_model=CustomerResponse, dependencies=[Depends(require_customer)])
+def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    return upload_own_avatar(current_user, file)
+
+
 @router.get("", response_model=CustomerListResponse, dependencies=[Depends(require_admin)])
 @router.get("/", response_model=CustomerListResponse, dependencies=[Depends(require_admin)], include_in_schema=False)
 def get_customers(
@@ -45,7 +55,7 @@ def get_customers(
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def get_customer(customer_id: str):
+def get_customer(customer_id: Identifier):
     return fetch_customer(customer_id)
 
 
@@ -56,15 +66,15 @@ def add_customer(data: CustomerCreate):
 
 
 @router.patch("/{customer_id}", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def modify_customer(customer_id: str, data: CustomerUpdate):
+def modify_customer(customer_id: Identifier, data: CustomerUpdate):
     return update_customer(customer_id, data)
 
 
 @router.patch("/{customer_id}/status", response_model=CustomerResponse, dependencies=[Depends(require_admin)])
-def modify_customer_status(customer_id: str, data: CustomerStatusUpdate):
+def modify_customer_status(customer_id: Identifier, data: CustomerStatusUpdate):
     return update_customer_status(customer_id, data)
 
 
 @router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def remove_customer(customer_id: str):
+def remove_customer(customer_id: Identifier):
     delete_customer(customer_id)

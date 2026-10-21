@@ -1,26 +1,20 @@
-'use client';
-
 import React from "react";
+import { Button } from "@h-mobility/ui";
 
-interface SubmitButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface SubmitButtonProps {
   label?: string;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
 export const SubmitButton: React.FC<SubmitButtonProps> = ({
-  label = "Tạo mới",
+  label = "Lưu",
   isLoading = false,
-  className = "",
-  ...props
+  disabled = false,
 }) => {
   return (
-    <button
-      type="submit"
-      disabled={isLoading || props.disabled}
-      className={`px-5 py-2.5 rounded-xl bg-sky-900 hover:bg-sky-950 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50 ${className}`}
-      {...props}
-    >
+    <Button type="submit" loading={isLoading} disabled={disabled}>
       {isLoading ? "Đang xử lý..." : label}
-    </button>
+    </Button>
   );
 };

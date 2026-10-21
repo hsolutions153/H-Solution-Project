@@ -31,9 +31,15 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
         raise AppException(ErrorCode.TECHNICIAN_NOT_FOUND)
     if technician["kyc_status"] != "APPROVED":
         raise AppException(ErrorCode.TECHNICIAN_NOT_KYC_APPROVED)
+    if not technician.get("is_online"):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="KTV chưa bật trạng thái nhận việc")
+
+    from app.repair_requests.service import _has_fresh_technician_location
+    if not _has_fresh_technician_location(technician):
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vị trí GPS của KTV đã quá hạn; yêu cầu KTV cập nhật lại.")
 
     assigned_at = datetime.now(timezone.utc).isoformat()
-    repository.assign_order(order_id, technician_id, assigned_at)
+    repository.assign_order(order_id, technician_id, assigned_at, assigned_by)
     repository.add_status_history(
         {
             "id": secrets.token_hex(5).upper(),
@@ -50,3 +56,21 @@ def get_dashboard_metrics():
     counts = Counter(order["status"] for order in repository.get_order_statuses())
     by_status = {order_status: counts[order_status] for order_status in sorted(ORDER_STATUSES)}
     return {"total_orders": sum(counts.values()), "by_status": by_status}
+
+
+def cancel_order(order_id: str, reason: str | None, cancelled_by: str):
+    from app.repair_requests import service as repair_service
+    return repair_service.update_request_status(
+        order_id,
+        current_user={"sub": cancelled_by, "role": "ADMIN"},
+        data={"status": "CANCELLED", "cancel_reason": reason or "Quản trị viên hủy đơn"},
+    )
+
+
+def update_order_status(order_id: str, status: str, reason: str | None, updated_by: str):
+    from app.repair_requests import service as repair_service
+    return repair_service.update_request_status(
+        order_id,
+        current_user={"sub": updated_by, "role": "ADMIN"},
+        data={"status": status, "cancel_reason": reason},
+    )

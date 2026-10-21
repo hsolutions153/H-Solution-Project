@@ -1,0 +1,80 @@
+@theme {
+  --color-brand-50: #eef6fb;
+  --color-brand-100: #d7eaf5;
+  --color-brand-200: #b2d5ea;
+  --color-brand-300: #7fb8da;
+  --color-brand-400: #4896c4;
+  --color-brand-500: #2479ad;
+  --color-brand-600: #156495;
+  --color-brand-700: #12537d;
+  --color-brand-800: #114567;
+  --color-brand-900: #0f3a56;
+  --color-brand-950: #0a2540;
+  --color-canvas: #f4f7fa;
+  --color-surface: #ffffff;
+  --color-line: #e2e8f0;
+  --color-ink: #0a2540;
+  --color-ink-muted: #475569;
+  --color-ink-subtle: #64748b;
+  --font-sans: var(--font-brand), "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-control: 0.75rem;
+  --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
+  --shadow-card: 0 1px 2px rgb(10 37 64 / 0.04), 0 4px 16px rgb(10 37 64 / 0.06);
+  --shadow-raised: 0 2px 4px rgb(10 37 64 / 0.06), 0 12px 32px rgb(10 37 64 / 0.12);
+  --shadow-nav: 0 -1px 0 rgb(10 37 64 / 0.06), 0 -8px 24px rgb(10 37 64 / 0.06);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Field-level validation (see useFieldErrors / FieldError): any input marked invalid gets
+   the same red border and focus ring, whichever app or CSS class styles it. */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"],
+button[aria-invalid="true"],
+[role="combobox"][aria-invalid="true"] {
+  border-color: #e11d48 !important;
+  background-color: #fff7f8;
+}
+
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus,
+[role="combobox"][aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 4px rgb(225 29 72 / 0.15) !important;
+  outline: none;
+}
+
+.dark input[aria-invalid="true"],
+.dark select[aria-invalid="true"],
+.dark textarea[aria-invalid="true"] {
+  border-color: #fb7185 !important;
+  background-color: rgb(225 29 72 / 0.08);
+}

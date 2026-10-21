@@ -7,6 +7,8 @@ import { VerifyOtpScreen } from "@/features/auth/VerifyOtpScreen";
 import { ResetPasswordScreen } from "@/features/auth/ResetPasswordScreen";
 import { TaskListScreen } from "@/features/tasks/TaskListScreen";
 import { TaskHistoryScreen } from "@/features/tasks/components/TaskHistoryScreen";
+import { TechnicianProfileScreen } from "@/features/profile/TechnicianProfileScreen";
+import { ScheduleScreen } from "@/features/schedule/ScheduleScreen";
 import { AppLayout } from "@/components/AppLayout";
 import { HistoryTask } from "@/types/task";
 
@@ -15,6 +17,9 @@ export default function HomePage() {
   const [currentView, setCurrentView] = useState<
     "login" | "forgot-password" | "verify-otp" | "reset-password"
   >("login");
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [developmentCode, setDevelopmentCode] = useState<string>();
   const [isMounted, setIsMounted] = useState(false);
 
   // Quản lý Tab hiển thị hiện tại trên BottomNav
@@ -26,10 +31,19 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const savedLoginState = sessionStorage.getItem("isLoggedIn");
-    if (savedLoginState === "true") {
-      setIsLoggedIn(true);
-    }
+    import("@/lib/api-client").then(({ getAuthToken, getUserInfo, removeAuthToken }) => {
+      const token = getAuthToken();
+      const user = getUserInfo();
+      if (token) {
+        if (user && user.role && user.role !== "TECHNICIAN") {
+          // Token thuộc về Admin hoặc Customer từ các app khác, xóa để tránh kẹt lỗi 403
+          removeAuthToken();
+          setIsLoggedIn(false);
+        } else {
+          setIsLoggedIn(true);
+        }
+      }
+    });
   }, []);
 
   if (!isMounted) return null;
@@ -47,7 +61,7 @@ export default function HomePage() {
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         onLogout={() => {
-          sessionStorage.removeItem("isLoggedIn");
+          import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
           sessionStorage.removeItem("currentView");
           sessionStorage.removeItem("selectedTask");
           sessionStorage.removeItem("subStep");
@@ -60,28 +74,34 @@ export default function HomePage() {
           sessionStorage.removeItem("subStep");
         }}
       >
-        {/* Tab 1: Trang chủ / Danh sách công việc */}
-        {activeTab === "home" && (
-          <TaskListScreen onCompleteRepair={handleCompleteRepair} />
+        
+        {(activeTab === "home" || activeTab === "tasks") && (
+          <TaskListScreen
+            key={activeTab}
+            view={activeTab as "home" | "tasks"}
+            onNavigate={setActiveTab}
+            onCompleteRepair={handleCompleteRepair}
+          />
         )}
 
-        {/* Tab 2: Lịch trình */}
         {activeTab === "schedule" && (
-          <div className="p-4 text-center text-xs text-slate-500 pt-10 font-medium">
-            Màn hình Schedule (Lịch trình)
-          </div>
+          <ScheduleScreen
+            onOpenTask={(task) => {
+              sessionStorage.setItem("selectedTask", JSON.stringify(task));
+              sessionStorage.setItem("currentView", "detail");
+              setActiveTab("tasks");
+            }}
+          />
         )}
 
-        {/* Tab 3: Lịch sử công việc */}
+        
         {activeTab === "history" && (
           <TaskHistoryScreen newCompletedTask={lastCompletedTask} />
         )}
 
-        {/* Tab 4: Trang cá nhân */}
+        
         {activeTab === "profile" && (
-          <div className="p-4 text-center text-xs text-slate-500 pt-10 font-medium">
-            Màn hình Profile (Tài khoản)
-          </div>
+          <TechnicianProfileScreen />
         )}
       </AppLayout>
     );
@@ -92,7 +112,7 @@ export default function HomePage() {
     return (
       <ForgotPasswordScreen
         onBackToLogin={() => setCurrentView("login")}
-        onSubmitSuccess={() => setCurrentView("verify-otp")}
+        onSubmitSuccess={(phone, code) => { setResetPhone(phone); setDevelopmentCode(code); setCurrentView("verify-otp"); }}
       />
     );
   }
@@ -100,8 +120,10 @@ export default function HomePage() {
   if (currentView === "verify-otp") {
     return (
       <VerifyOtpScreen
+        phone={resetPhone}
+        developmentCode={developmentCode}
         onBack={() => setCurrentView("forgot-password")}
-        onVerifySuccess={() => setCurrentView("reset-password")}
+        onVerifySuccess={(otp) => { setResetOtp(otp); setCurrentView("reset-password"); }}
       />
     );
   }
@@ -109,8 +131,11 @@ export default function HomePage() {
   if (currentView === "reset-password") {
     return (
       <ResetPasswordScreen
+        phone={resetPhone}
+        otpCode={resetOtp}
         onResetSuccess={() => {
           alert("Đặt lại mật khẩu thành công!");
+          setResetOtp(""); setResetPhone(""); setDevelopmentCode(undefined);
           setCurrentView("login");
         }}
         onBackToLogin={() => setCurrentView("login")}
@@ -121,7 +146,6 @@ export default function HomePage() {
   return (
     <LoginScreen
       onLoginSuccess={() => {
-        sessionStorage.setItem("isLoggedIn", "true");
         setIsLoggedIn(true);
       }}
       onForgotPassword={() => setCurrentView("forgot-password")}

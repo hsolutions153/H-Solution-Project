@@ -2,19 +2,22 @@
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { VerifyOtpFormData } from '@/types/auth';
+import { FieldError } from '@h-mobility/ui';
 
 interface VerifyOtpFormProps {
-  onSubmit: (data: VerifyOtpFormData) => void;
-  onResendOtp?: () => void;
+  loading?: boolean;
+  onSubmit: (data: VerifyOtpFormData) => void | Promise<void>;
+  onResendOtp?: () => void | Promise<void>;
 }
 
 export interface VerifyOtpFormRef {
-  resetOtp: () => void;
+  resetOtp: () => void | Promise<void>;
 }
 
 export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
-  ({ onSubmit, onResendOtp }, ref) => {
+  ({ onSubmit, onResendOtp, loading }, ref) => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+    const [otpError, setOtpError] = useState('');
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     // Cung cấp hàm resetOtp ra bên ngoài thông qua ref
@@ -31,6 +34,7 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
       const newOtp = [...otp];
       newOtp[index] = value.slice(-1);
       setOtp(newOtp);
+      setOtpError('');
 
       if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
@@ -64,26 +68,32 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
       e.preventDefault();
       const fullOtp = otp.join('');
       if (fullOtp.length < 6) {
-        alert('Vui lòng nhập đủ 6 chữ số OTP!');
+        const missing = 6 - fullOtp.length;
+        setOtpError(
+          fullOtp.length === 0
+            ? 'Vui lòng nhập mã OTP gồm 6 chữ số.'
+            : `Mã OTP gồm 6 chữ số, bạn còn thiếu ${missing} số.`,
+        );
+        inputRefs.current[otp.findIndex((d) => !d)]?.focus();
         return;
       }
       onSubmit({ otp: fullOtp });
     };
 
     return (
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6 text-center">
-        {/* Tiêu đề & Mô tả */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6 text-center">
+        
         <div className="mb-5">
           <h2 className="text-base font-bold text-slate-800 mb-2">
             Nhập mã xác thực
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed max-w-[260px] mx-auto">
-            Mã xác thực OTP đã được gửi đến số điện thoại/email của bạn. Vui lòng nhập mã gồm 6 chữ số dưới đây.
+            Mã xác thực OTP đã được gửi đến số điện thoại của bạn. Vui lòng nhập mã gồm 6 chữ số dưới đây.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Khối 6 ô nhập OTP */}
+          
           <div className="flex justify-between gap-1.5 px-1">
             {otp.map((digit, index) => (
               <input
@@ -98,26 +108,32 @@ export const VerifyOtpForm = forwardRef<VerifyOtpFormRef, VerifyOtpFormProps>(
                 onChange={(e) => handleChange(e.target.value, index)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 onPaste={handlePaste}
-                className="w-10 h-12 text-center text-base font-bold bg-white border border-gray-300 rounded-lg text-slate-800 focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600 transition-all shadow-sm"
+                aria-label={`Chữ số OTP thứ ${index + 1}`}
+                aria-invalid={otpError && !digit ? true : undefined}
+                aria-describedby={otpError ? 'otp-error' : undefined}
+                className="w-10 h-12 text-center text-base font-bold bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-all shadow-sm"
               />
             ))}
           </div>
+          <FieldError id="otp-error" message={otpError} className="text-center" />
 
-          {/* Link Gửi lại mã */}
+          
           <div>
             <button
               type="button"
               onClick={onResendOtp}
-              className="text-xs font-bold text-sky-800 hover:underline inline-block"
+              disabled={loading}
+              className="text-xs font-bold text-brand-800 hover:underline inline-block"
             >
               Gửi lại mã
             </button>
           </div>
 
-          {/* Nút Xác nhận */}
+          
           <button
             type="submit"
-            className="w-full py-3 bg-sky-800 hover:bg-sky-900 active:bg-sky-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
+            disabled={loading}
+            className="w-full py-3 bg-brand-800 hover:bg-brand-900 active:bg-brand-950 text-white font-bold text-sm rounded-lg shadow-md transition-colors"
           >
             Xác nhận
           </button>

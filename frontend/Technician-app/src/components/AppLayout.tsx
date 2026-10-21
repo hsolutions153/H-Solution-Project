@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -19,24 +19,70 @@ export const AppLayout = ({
   onLogout,
   onResetHome,
 }: AppLayoutProps) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const sendPresence = async () => {
+      try {
+        const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+        if (!getAuthToken() || !navigator.geolocation) return;
+
+        const me = await fetchApi<any>("/technicians/me");
+        if (me?.is_online !== true || cancelled) return;
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            if (cancelled) return;
+            try {
+              await fetchApi("/technicians/me/presence", {
+                method: "PATCH",
+                body: JSON.stringify({
+                  is_online: true,
+                  last_latitude: position.coords.latitude,
+                  last_longitude: position.coords.longitude,
+                }),
+              });
+            } catch (error) {
+              console.warn("Không thể cập nhật GPS KTV:", error);
+            }
+          },
+          () => undefined,
+          { enableHighAccuracy: true, timeout: 15_000, maximumAge: 15_000 }
+        );
+      } catch {
+        // Người dùng chưa đăng nhập hoặc API tạm thời không khả dụng.
+      }
+    };
+
+    void sendPresence();
+    const interval = window.setInterval(sendPresence, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const handleTabChange = (tabName: string) => {
     onTabChange(tabName);
-    if (tabName === "home" && onResetHome) {
+    if ((tabName === "home" || tabName === "tasks") && onResetHome) {
       onResetHome();
     }
   };
 
   return (
-    <div className="h-screen bg-slate-50 max-w-sm mx-auto border-x border-gray-200 flex flex-col relative shadow-lg rounded-3xl overflow-hidden font-sans">
-      {/* 1. Header cố định */}
+    <div className="h-full bg-canvas w-full flex flex-col relative overflow-hidden font-sans">
+      
       <Header onLogout={onLogout} />
 
-      {/* 2. Nội dung hiển thị */}
-      <div className="flex-1 overflow-y-auto scroll-area pb-24">
+      
+      <div className="flex-1 overflow-y-auto scroll-area">
         {children}
       </div>
 
-      {/* 3. BottomNav cố định ở đáy */}
+      
+      <div id="fab-container" className="absolute bottom-22 right-4 z-30 pointer-events-auto" />
+
+      
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );

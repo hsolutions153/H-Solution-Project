@@ -10,7 +10,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { PasswordResetShell } from "@/components/auth/password-reset-shell";
-import { isStrongPassword } from "@/utils/auth-validation";
+import { strongPasswordRule } from "@/utils/auth-validation";
+import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const longEnough = password.length >= 8;
   const hasUppercase = /[A-Z]/.test(password);
@@ -29,10 +31,18 @@ export default function ResetPasswordPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!isStrongPassword(password) || !matches) {
-      setError("Vui lòng đáp ứng đầy đủ các yêu cầu về mật khẩu.");
-      return;
-    }
+    setError("");
+    const valid = validate(
+      { password, confirmPassword },
+      {
+        password: strongPasswordRule("Mật khẩu mới"),
+        confirmPassword: [
+          rules.required("Mật khẩu xác nhận"),
+          rules.matches(() => password, "Mật khẩu xác nhận không khớp với mật khẩu mới."),
+        ],
+      },
+    );
+    if (!valid) return;
     const stored = sessionStorage.getItem("passwordResetVerified");
     if (!stored) {
       setError("Phiên đặt lại mật khẩu đã hết hạn. Vui lòng thực hiện lại.");
@@ -43,24 +53,26 @@ export default function ResetPasswordPage() {
     setError("");
     try {
       const credentials = JSON.parse(stored) as {
-        requestId: string;
-        resetToken: string;
+        phone: string;
+        otp_code: string;
       };
-      const response = await fetch("/api/auth/password-reset/reset", {
+      const { fetchApi } = await import("@/lib/api-client");
+      await fetchApi<{ message: string }>("/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...credentials, password }),
+        body: JSON.stringify({
+          phone: credentials.phone,
+          otp_code: credentials.otp_code,
+          new_password: password,
+        }),
       });
-      const payload = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        setError(payload.message ?? "Không thể cập nhật mật khẩu.");
-        return;
-      }
+
       sessionStorage.removeItem("passwordResetRequest");
       sessionStorage.removeItem("passwordResetVerified");
       router.push("/login?reset=success");
-    } catch {
-      setError("Không thể kết nối tới máy chủ.");
+    } catch (err: any) {
+      if (!fromApi(err, { new_password: "password" })) {
+        setError(err.message || "Không thể cập nhật mật khẩu.");
+      }
     } finally {
       setLoading(false);
     }
@@ -71,7 +83,7 @@ export default function ResetPasswordPage() {
       <section className="reset-card reset-card--password">
         <h1>Tạo mật khẩu mới</h1>
         <p>Nhập mật khẩu mới cho tài khoản. Mật khẩu phải có ít nhất 8 ký tự.</p>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} noValidate>
           <label htmlFor="new-password">MẬT KHẨU MỚI</label>
           <div className="reset-password-input">
             <LockKeyhole aria-hidden="true" />
@@ -79,19 +91,20 @@ export default function ResetPasswordPage() {
               id="new-password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={128}
-              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
-              title="Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+              maxLength={72}
               placeholder="Nhập mật khẩu mới"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              {...inputProps("password")}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                clearError("password");
+              }}
             />
             <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label="Hiện hoặc ẩn mật khẩu">
               {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </button>
           </div>
+          <FieldError id="password-error" message={errors.password} />
           <label htmlFor="confirm-new-password">XÁC NHẬN MẬT KHẨU</label>
           <div className="reset-password-input">
             <ShieldCheck aria-hidden="true" />
@@ -99,19 +112,20 @@ export default function ResetPasswordPage() {
               id="confirm-new-password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={128}
-              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
-              title="Mật khẩu xác nhận phải đúng quy tắc và trùng với mật khẩu mới"
+              maxLength={72}
               placeholder="Nhập lại mật khẩu mới"
               value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
+              {...inputProps("confirmPassword")}
+              onChange={(event) => {
+                setConfirmPassword(event.target.value);
+                clearError("confirmPassword");
+              }}
             />
             <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label="Hiện hoặc ẩn mật khẩu">
               {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
             </button>
           </div>
+          <FieldError id="confirmPassword-error" message={errors.confirmPassword} />
           <div className="reset-requirements">
             <b>YÊU CẦU MẬT KHẨU</b>
             <span className={longEnough ? "is-valid" : ""}>○ Ít nhất 8 ký tự</span>

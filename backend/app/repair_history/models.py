@@ -1,7 +1,0 @@
-CUSTOMER_DEVICES_TABLE = "customer_devices"
-REPAIR_REQUESTS_TABLE = "repair_requests"
-REPAIR_IMAGES_TABLE = "repair_requests_images"
-REPAIR_QUOTES_TABLE = "repair_quotes"
-QUOTE_ITEMS_TABLE = "quote_items"
-REVIEWS_TABLE = "reviews"
-USERS_TABLE = "users"

@@ -1,14 +1,18 @@
-import { auth } from "@/auth";
 import { ProfileScreen } from "@/components/profile/profile-screen";
-import { getProfile } from "@/services/profile";
 import "../profile.css";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditProfilePage() {
-  const session = await auth();
-  const profile = await getProfile(session?.accessToken, session?.user);
+export default function EditProfilePage() {
+  const profile = {
+    id: "",
+    name: "Người dùng",
+    email: "",
+    phone: "",
+    address: "",
+    avatar: "",
+    notifications: true,
+  };
 
   return <ProfileScreen initialProfile={profile} mode="edit" />;
 }
-

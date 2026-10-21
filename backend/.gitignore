@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 backend-current-flow.md
 .idea/
+uploads/

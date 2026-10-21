@@ -2,22 +2,22 @@
 
 import React, { useEffect, useState } from 'react';
 import { Task } from '@/types/task';
-import {
-  BadgeAlert,
-  MapPin,
-  TriangleAlert,
-  CalendarCheck,
-  CarFront,
-  CircleCheck,
-  CircleX,
-} from 'lucide-react';
+import { MapPin, TriangleAlert, CalendarCheck, CarFront, CircleCheck, Timer } from 'lucide-react';
+import { Button } from '@h-mobility/ui';
+import { Modal } from '@/components/ui';
 
 interface NewAssignmentModalProps {
   isOpen: boolean;
   task: Task | null;
   onClose: () => void;
   onAccept: (taskId: string) => void;
-  onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối
+  onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối thủ công
+  onTimeout?: (taskId: string) => void; // Tự động xử lý khi hết 2 phút
+}
+
+interface RouteEstimate {
+  distance_meters: number;
+  duration_seconds: number;
 }
 
 export const NewAssignmentModal = ({
@@ -26,20 +26,29 @@ export const NewAssignmentModal = ({
   onClose,
   onAccept,
   onReject,
+  onTimeout,
 }: NewAssignmentModalProps) => {
-  const [timeLeft, setTimeLeft] = useState(300); // 5 phút
+  const [timeLeft, setTimeLeft] = useState(120); // 2 phút đếm ngược
+  const [route, setRoute] = useState<RouteEstimate | null>(null);
+  const [routeError, setRouteError] = useState(false);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const taskId = task?.id;
 
   useEffect(() => {
-    if (!isOpen || !task) return;
+    if (!isOpen || !taskId) return;
 
-    // Reset về 5 phút mỗi lần mở popup
-    setTimeLeft(300);
+    // Reset về 2 phút (120 giây) mỗi lần nhận phân công mới (theo taskId)
+    setTimeLeft(120);
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          onReject(task.id); // Hết 5 phút -> Tự động gọi handler từ chối
+          if (onTimeout) {
+            onTimeout(taskId);
+          } else {
+            onReject(taskId);
+          }
           return 0;
         }
         return prev - 1;
@@ -47,163 +56,111 @@ export const NewAssignmentModal = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, task, onReject]);
+  }, [isOpen, taskId, onReject, onTimeout]);
+
+  useEffect(() => {
+    if (!isOpen || !taskId) return;
+
+    let cancelled = false;
+    setRoute(null);
+    setRouteError(false);
+    setIsLoadingRoute(true);
+
+    const loadRoute = async () => {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const result = await fetchApi<RouteEstimate>(`/repair-requests/${taskId}/route`);
+        if (!cancelled) setRoute(result);
+      } catch (error) {
+        console.warn("Không thể tính lộ trình Mapbox:", error);
+        if (!cancelled) setRouteError(true);
+      } finally {
+        if (!cancelled) setIsLoadingRoute(false);
+      }
+    };
+
+    loadRoute();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, taskId]);
 
   if (!isOpen || !task) return null;
 
   const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const seconds = String(timeLeft % 60).padStart(2, '0');
+  const urgent = timeLeft <= 60;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
-      {/* Box Container Popup */}
-      <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
-
-        {/* Header */}
-        <div className="bg-sky-800 text-white px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-base">
-            <span className="p-1 bg-white/20 rounded-lg flex items-center justify-center">
-              <BadgeAlert className="w-4 h-4 text-white" />
-            </span>
-            <span>Yêu cầu mới</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-white/80 hover:text-white p-1 text-lg font-semibold cursor-pointer"
+    <Modal
+      open
+      onClose={onClose}
+      variant="sheet"
+      title={
+        <span className="flex items-center gap-2.5">
+          Yêu cầu mới
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums ${
+              urgent ? 'bg-rose-50 text-rose-700' : 'bg-brand-50 text-brand-700'
+            }`}
+            aria-label={`Còn ${minutes} phút ${seconds} giây để phản hồi`}
           >
-            ✕
-          </button>
+            <Timer className="size-4" />
+            {minutes}:{seconds}
+          </span>
+        </span>
+      }
+    >
+      <div className="divide-y divide-line">
+        <div className="flex gap-3 pb-3.5">
+          <MapPin className="mt-0.5 size-5 shrink-0 text-brand-600" />
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500">Địa điểm khách hàng</p>
+            <p className="mt-0.5 text-sm font-bold leading-snug text-ink">{task.address}</p>
+            <p className="mt-0.5 text-[13px] text-slate-600">
+              Khách hàng: <span className="font-semibold text-slate-800">{task.customerName}</span>
+            </p>
+          </div>
         </div>
 
-        {/* Nội dung */}
-        <div className="p-4 space-y-4 text-xs text-slate-700">
-
-          {/* Địa điểm */}
-          <div className="flex gap-3">
-            <span className="text-sky-800 mt-0.5 flex-shrink-0">
-              <MapPin className="w-4 h-4" />
-            </span>
-
-            <div>
-              <p className="text-[11px] text-slate-400 font-semibold">
-                Địa điểm khách hàng
+        <div className="flex gap-3 py-3.5">
+          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500">Lỗi dự kiến</p>
+            <p className="mt-0.5 text-sm font-bold leading-snug text-ink">{task.serviceName}</p>
+            {task.urgency && (
+              <p className="mt-0.5 text-[13px] text-slate-600">
+                Mức độ ưu tiên: <span className="font-bold text-rose-700">{task.urgency}</span>
               </p>
-
-              <p className="font-bold text-slate-900 mt-0.5 leading-snug">
-                {task.address}
-              </p>
-
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Khách hàng:{' '}
-                <span className="font-semibold text-slate-700">
-                  {task.customerName}
-                </span>
-              </p>
-            </div>
+            )}
           </div>
+        </div>
 
-          <hr className="border-gray-100" />
-
-          {/* Lỗi dự kiến */}
-          <div className="flex gap-3">
-            <span className="text-amber-500 mt-0.5 flex-shrink-0">
-              <TriangleAlert className="w-4 h-4" />
-            </span>
-
-            <div>
-              <p className="text-[11px] text-slate-400 font-semibold">
-                Lỗi dự kiến
-              </p>
-
-              <p className="font-bold text-slate-900 mt-0.5 leading-snug">
-                {task.serviceName}
-              </p>
-
-              {task.urgency && (
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Mức độ ưu tiên:{' '}
-                  <span className="font-extrabold text-red-600">
-                    {task.urgency}
-                  </span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          <hr className="border-gray-100" />
-
-          {/* Thời gian */}
-          <div className="flex gap-3">
-            <span className="text-sky-800 mt-0.5 flex-shrink-0">
-              <CalendarCheck className="w-4 h-4" />
-            </span>
-
-            <div>
-              <p className="text-[11px] text-slate-400 font-semibold">
-                Thời gian yêu cầu
-              </p>
-
-              <p className="font-bold text-slate-900 mt-0.5">
-                {task.requestedTime || task.time}
-              </p>
-
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Thời gian phản hồi:{' '}
-                <span
-                  className={`font-bold ${
-                    timeLeft <= 60 ? 'text-red-600' : 'text-sky-800'
-                  }`}
-                >
-                  {minutes}:{seconds}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Khoảng cách */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sky-800 flex-shrink-0">
-                <CarFront className="w-4 h-4" />
-              </span>
-
-              <span className="text-[11px] text-slate-600 font-medium">
-                Khoảng cách:{' '}
-                <strong className="text-slate-900">
-                  {task.distance || '2.4 km'}
-                </strong>
-              </span>
-            </div>
-
-            <span className="text-[11px] font-bold text-slate-700">
-              {task.travelTime || '~ 12 phút di chuyển'}
-            </span>
-          </div>
-
-          {/* Buttons */}
-          <div className="space-y-2 pt-2">
-            <button
-              type="button"
-              onClick={() => onAccept(task.id)}
-              className="w-full py-2.5 bg-sky-800 hover:bg-sky-900 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <CircleCheck className="w-4 h-4" />
-              <span>Chấp nhận</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onReject(task.id)} // Bấm Từ chối -> Gọi handler mở RejectTaskModal
-              className="w-full py-2.5 bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <CircleX className="w-4 h-4 text-slate-500" />
-              <span>Từ chối</span>
-            </button>
+        <div className="flex gap-3 py-3.5">
+          <CalendarCheck className="mt-0.5 size-5 shrink-0 text-brand-600" />
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500">Thời gian yêu cầu</p>
+            <p className="mt-0.5 text-sm font-bold text-ink tabular-nums">{task.requestedTime || task.time}</p>
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="mt-1 flex items-center justify-between gap-3 rounded-control bg-slate-100 px-3.5 py-3 text-[13px]">
+        <span className="flex items-center gap-2 text-slate-600">
+          <CarFront className="size-4 text-slate-500" />
+          Khoảng cách <strong className="font-bold text-ink">{isLoadingRoute ? "Đang tính…" : route ? `${(route.distance_meters / 1000).toFixed(1)} km` : "Chưa có dữ liệu"}</strong>
+        </span>
+        <span className="font-semibold text-slate-700">{isLoadingRoute ? "" : route ? `~ ${Math.ceil(route.duration_seconds / 60)} phút di chuyển` : routeError ? "Không tính được lộ trình" : ""}</span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">
+        <Button size="lg" variant="secondary" onClick={() => onReject(task.id)}>
+          Từ chối
+        </Button>
+        <Button size="lg" icon={<CircleCheck className="size-5" />} onClick={() => onAccept(task.id)}>
+          Chấp nhận
+        </Button>
+      </div>
+    </Modal>
   );
 };

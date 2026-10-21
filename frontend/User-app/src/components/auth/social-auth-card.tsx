@@ -1,25 +1,21 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { digitsOnly, strongPasswordRule } from "@/utils/auth-validation";
+import { BrandLockup, FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import {
-  Eye,
-  EyeOff,
-  LockKeyhole,
-  Mail,
-  Phone,
-  ShieldCheck,
-  UserRound,
+Eye,
+EyeOff,
+LockKeyhole,
+Mail,
+MapPin,
+Phone,
+ShieldCheck,
+UserRound,
 } from "lucide-react";
-import {
-  digitsOnly,
-  EMAIL_PATTERN,
-  isStrongPassword,
-  VIETNAM_PHONE_PATTERN,
-} from "@/utils/auth-validation";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
+import { useRouter,useSearchParams } from "next/navigation";
+import { useEffect,useState } from "react";
 
 type SocialAuthCardProps = {
   mode: "login" | "register";
@@ -41,16 +37,19 @@ export function SocialAuthCard({
   mode,
   availableProviders,
 }: SocialAuthCardProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
   const errorCode = searchParams.get("error");
   const oauthError = errorCode
@@ -60,72 +59,111 @@ export function SocialAuthCard({
   const errorMessage = formError || oauthError;
   const isLogin = mode === "login";
 
+  // Kiểm tra phiên xác thực NextAuth (sau chuyển hướng Google OAuth)
+  useEffect(() => {
+    let isMounted = true;
+    async function checkNextAuthSession() {
+      if (searchParams.get("logged_out")) {
+        const { removeAuthToken } = await import("@/lib/api-client");
+        removeAuthToken();
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/session");
+        if (res.ok) {
+          const session = await res.json();
+          if (session?.accessToken) {
+            const { setAuthToken } = await import("@/lib/api-client");
+            const backendUser = session.backendUser || {
+              id: session.user?.id || "google-user",
+              name: session.user?.name || "Khách hàng",
+              email: session.user?.email,
+            };
+            const isProfileComplete = session.isProfileComplete ?? backendUser.is_profile_complete;
+            const isNewUser = session.isNewUser ?? backendUser.is_new_user;
+
+            backendUser.is_new_user = isNewUser;
+            backendUser.is_profile_complete = isProfileComplete;
+
+            setAuthToken(session.accessToken, backendUser);
+            if (isMounted) {
+              if (isNewUser || isProfileComplete === false) {
+                router.push("/complete-profile");
+              } else {
+                router.push("/home");
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    checkNextAuthSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [router, searchParams]);
+
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
 
-    if (!VIETNAM_PHONE_PATTERN.test(phone)) {
-      setFormError("Số điện thoại phải gồm 10 chữ số và đúng đầu số Việt Nam.");
-      return;
-    }
-    if (!isLogin && !EMAIL_PATTERN.test(email)) {
-      setFormError("Email phải đúng định dạng, ví dụ: ten@example.com.");
-      return;
-    }
-    if (!isLogin && !isStrongPassword(password)) {
-      setFormError(
-        "Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.",
-      );
-      return;
-    }
-    if (!isLogin && password !== confirmPassword) {
-      setFormError("Mật khẩu xác nhận không khớp.");
-      return;
-    }
-    if (!isLogin && !acceptTerms) {
-      setFormError("Bạn cần đồng ý với điều khoản sử dụng.");
-      return;
-    }
+    const valid = isLogin
+      ? validate({ phone, password }, {
+          phone: rules.phone({ required: true }),
+          password: rules.loginPassword(),
+        })
+      : validate({ name, email, phone, address, password, confirmPassword, acceptTerms }, {
+          name: rules.name(),
+          email: rules.email(),
+          phone: rules.phone({ required: true }),
+          address: rules.maxLength("Địa chỉ", 255),
+          password: strongPasswordRule(),
+          confirmPassword: [
+            rules.required("Mật khẩu xác nhận"),
+            rules.matches(() => password, "Mật khẩu xác nhận không khớp với mật khẩu đã nhập."),
+          ],
+          acceptTerms: (checked) => (checked ? undefined : "Bạn cần đồng ý với Điều khoản sử dụng để tạo tài khoản."),
+        });
+    if (!valid) return;
 
     setLoadingProvider("credentials");
     try {
+      const { fetchApi, setAuthToken } = await import("@/lib/api-client");
+
       if (!isLogin) {
-        const response = await fetch("/api/auth/register", {
+        await fetchApi<{ message: string; user_id: string }>("/auth/signup", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, phone, password, acceptTerms }),
+          body: JSON.stringify({ name, email, phone, password, address }),
         });
-        const payload = (await response.json()) as { message?: string };
-        if (!response.ok) {
-          setFormError(payload.message ?? "Không thể tạo tài khoản.");
-          return;
-        }
       }
 
-      console.log("[login] Calling signIn credentials with phone:", phone);
-      const result = await signIn("credentials", {
-        phone,
-        password,
-        redirect: false,
-        callbackUrl: "/home",
+      const loginRes = await fetchApi<{
+        access_token: string;
+        token_type: string;
+        is_new_user?: boolean;
+        is_profile_complete?: boolean;
+        user: { id: string; name: string; phone?: string; address?: string; is_new_user?: boolean; is_profile_complete?: boolean };
+      }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: email || phone, password }),
       });
-      console.log("[login] signIn result:", result);
 
-      if (result?.error) {
-        console.error("[login] signIn failed with error:", result.error);
-        setFormError(
-          isLogin
-            ? "Số điện thoại hoặc mật khẩu không chính xác."
-            : "Tài khoản đã tạo nhưng không thể đăng nhập tự động.",
-        );
-        return;
+      if (loginRes.access_token) {
+        setAuthToken(loginRes.access_token, loginRes.user);
+        if (loginRes.is_profile_complete === false || loginRes.user?.is_profile_complete === false) {
+          router.push("/complete-profile");
+        } else {
+          router.push("/home");
+        }
+        router.refresh();
+      } else {
+        setFormError("Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.");
       }
-
-      console.log("[login] Login successful, redirecting to /home...");
-      window.location.href = "/home";
-    } catch (err) {
-      console.error("[login] Exception during login:", err);
-      setFormError("Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
+    } catch (err: any) {
+      // Lỗi định dạng từ API hiện ngay dưới ô tương ứng; lỗi khác hiện ở đầu form
+      if (!fromApi(err, isLogin ? { email: "phone" } : {})) {
+        setFormError(err.message || "Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
+      }
     } finally {
       setLoadingProvider(null);
     }
@@ -142,7 +180,7 @@ export function SocialAuthCard({
     setFormError("");
     setLoadingProvider(provider);
     try {
-      await signIn(provider, { redirectTo: "/home" });
+      await signIn(provider, { callbackUrl: "/home" });
     } catch {
       setFormError("Không thể bắt đầu đăng nhập với nhà cung cấp này.");
       setLoadingProvider(null);
@@ -152,22 +190,16 @@ export function SocialAuthCard({
   const isBusy = Boolean(loadingProvider);
 
   return (
-    <div className="responsive-container bg-background text-on-background font-sans selection:bg-primary/20 selection:text-primary">
-      <main className="responsive-card px-margin-mobile py-lg md:py-xl">
-        <div className="flex flex-col items-center mb-lg text-center responsive-header">
-          <div className="w-64 h-32 overflow-hidden flex items-center justify-center mb-xs -mt-sm relative">
-            <Image
-              src="/logo.jpg"
-              alt="H-solutions Logo"
-              fill
-              sizes="256px"
-              className="w-full h-full scale-[1.8] object-contain"
-              priority
-            />
-          </div>
-          <h1 className="font-headline-md text-headline-md text-on-surface">
-            {isLogin ? "Đăng nhập tài khoản" : "Tạo tài khoản"}
+    <div className="responsive-container bg-surface text-on-background font-sans selection:bg-primary/20 selection:text-primary">
+      <main className="responsive-card px-margin-mobile py-lg">
+        <div className="mb-7 responsive-header">
+          <BrandLockup size={44} product="Cứu hộ & chăm sóc xe máy điện" />
+          <h1 className="mt-7 text-2xl font-bold tracking-tight text-ink">
+            {isLogin ? "Đăng nhập" : "Tạo tài khoản"}
           </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {isLogin ? "Gọi cứu hộ, đặt lịch sửa chữa và theo dõi xe của bạn." : "Chỉ mất một phút để bắt đầu."}
+          </p>
         </div>
 
         {errorMessage && (
@@ -188,7 +220,7 @@ export function SocialAuthCard({
           </div>
         )}
 
-        <form className="space-y-md" onSubmit={handleCredentials}>
+        <form className="space-y-md" onSubmit={handleCredentials} noValidate>
           {!isLogin && (
             <div className="flex flex-col gap-xs">
               <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="name">
@@ -203,14 +235,18 @@ export function SocialAuthCard({
                   id="name"
                   type="text"
                   autoComplete="name"
-                  required
-                  minLength={2}
+                  placeholder="Nguyễn Văn A"
                   maxLength={100}
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  {...inputProps("name")}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    clearError("name");
+                  }}
                   className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
+              <FieldError id="name-error" message={errors.name} />
             </div>
           )}
 
@@ -228,14 +264,18 @@ export function SocialAuthCard({
                   id="email"
                   type="email"
                   autoComplete="email"
-                  required
-                  pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}"
-                  title="Nhập email đúng định dạng, ví dụ: ten@example.com"
+                  placeholder="example@gmail.com"
+                  maxLength={100}
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  {...inputProps("email")}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    clearError("email");
+                  }}
                   className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                 />
               </div>
+              <FieldError id="email-error" message={errors.email} />
             </div>
           )}
 
@@ -253,17 +293,48 @@ export function SocialAuthCard({
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
-                required
-                pattern="0(?:3|5|7|8|9)[0-9]{8}"
                 maxLength={10}
-                title="Nhập số điện thoại Việt Nam, ví dụ 0912345678"
-                placeholder="Ví dụ: 0912345678"
+                placeholder="0912345678"
                 value={phone}
-                onChange={(event) => setPhone(digitsOnly(event.target.value))}
+                {...inputProps("phone")}
+                onChange={(event) => {
+                  setPhone(digitsOnly(event.target.value));
+                  clearError("phone");
+                }}
                 className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
+            <FieldError id="phone-error" message={errors.phone} />
           </div>
+
+          {!isLogin && (
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="address">
+                Địa chỉ
+              </label>
+              <div className="relative">
+                <MapPin
+                  aria-hidden="true"
+                  className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-outline pointer-events-none"
+                />
+                <input
+                  id="address"
+                  type="text"
+                  autoComplete="street-address"
+                  maxLength={255}
+                  placeholder="Ví dụ: 123 Nguyễn Trãi, Q.1, TP.HCM"
+                  value={address}
+                  {...inputProps("address")}
+                  onChange={(event) => {
+                    setAddress(event.target.value);
+                    clearError("address");
+                  }}
+                  className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                />
+              </div>
+              <FieldError id="address-error" message={errors.address} />
+            </div>
+          )}
 
           <div className="flex flex-col gap-xs">
             <label className="font-label-lg text-label-lg text-on-surface-variant" htmlFor="password">
@@ -278,17 +349,14 @@ export function SocialAuthCard({
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete={isLogin ? "current-password" : "new-password"}
-                required
-                minLength={8}
-                maxLength={128}
-                pattern={isLogin ? undefined : "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\\s]).{8,128}"}
-                title={
-                  isLogin
-                    ? undefined
-                    : "Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
-                }
+                placeholder="Abc123456@"
+                maxLength={72}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                {...inputProps("password")}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  clearError("password");
+                }}
                 className="w-full h-14 pl-12 pr-14 bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
               <button
@@ -304,7 +372,8 @@ export function SocialAuthCard({
                 )}
               </button>
             </div>
-            {!isLogin && (
+            <FieldError id="password-error" message={errors.password} />
+            {!isLogin && !errors.password && (
               <p className="text-xs leading-5 text-on-surface-variant">
                 Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
               </p>
@@ -333,26 +402,35 @@ export function SocialAuthCard({
                     id="confirmPassword"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    required
-                    minLength={8}
-                    maxLength={128}
-                    pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s]).{8,128}"
-                    title="Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+                    placeholder="Abc123456@"
+                    maxLength={72}
                     value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    {...inputProps("confirmPassword")}
+                    onChange={(event) => {
+                      setConfirmPassword(event.target.value);
+                      clearError("confirmPassword");
+                    }}
                     className="w-full h-14 pl-12 pr-md bg-surface-container-lowest border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                   />
                 </div>
+                <FieldError id="confirmPassword-error" message={errors.confirmPassword} />
               </div>
-              <label className="flex items-start gap-sm text-sm text-on-surface-variant">
-                <input
-                  type="checkbox"
-                  checked={acceptTerms}
-                  onChange={(event) => setAcceptTerms(event.target.checked)}
-                  className="mt-1 accent-primary"
-                />
-                <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</span>
-              </label>
+              <div>
+                <label className="flex items-start gap-sm text-sm text-on-surface-variant">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    {...inputProps("acceptTerms")}
+                    onChange={(event) => {
+                      setAcceptTerms(event.target.checked);
+                      clearError("acceptTerms");
+                    }}
+                    className="mt-1 accent-primary"
+                  />
+                  <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</span>
+                </label>
+                <FieldError id="acceptTerms-error" message={errors.acceptTerms} />
+              </div>
             </>
           )}
 
@@ -388,7 +466,7 @@ export function SocialAuthCard({
             className="flex items-center justify-center gap-sm h-14 border border-outline-variant rounded-xl bg-surface-container-lowest disabled:opacity-60 cursor-pointer"
           >
             <svg fill="none" height="24" viewBox="0 0 24 24" width="24" aria-hidden="true">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#7fb8da" />
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />

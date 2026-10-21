@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, User, LogOut } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Bell, LogOut } from 'lucide-react';
+import { BrandMark, Button } from '@h-mobility/ui';
+import { Modal } from '@/components/ui';
+import { AVATAR_UPDATED_EVENT } from '@/lib/avatar';
+import { PRESENCE_UPDATED_EVENT, getCachedPresence, setCachedPresence } from '@/lib/presence';
 
 interface HeaderProps {
   onLogout?: () => void; // Hàm nhận sự kiện đăng xuất
@@ -9,7 +13,57 @@ interface HeaderProps {
 
 export const Header = ({ onLogout }: HeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [techName, setTechName] = useState<string>("Kỹ thuật viên");
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    const cached = getCachedPresence();
+    return cached !== null ? cached : true;
+  });
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const { fetchApi, getUserInfo } = await import("@/lib/api-client");
+        const cached = getUserInfo();
+        if (cached && cached.name) {
+          setTechName(cached.name);
+        }
+        const me = await fetchApi<any>("/technicians/me");
+        if (me && me.user && me.user.full_name) {
+          setTechName(me.user.full_name);
+        }
+        if (me?.user?.avatar_url) {
+          setAvatarUrl(me.user.avatar_url);
+        }
+        if (me && typeof me.is_online === "boolean") {
+          setIsOnline(me.is_online);
+          setCachedPresence(me.is_online);
+        }
+      } catch (err) {
+        console.warn("Lỗi tải thông tin KTV trên header:", err);
+      }
+    }
+    loadProfile();
+  }, []);
+
+  // Đồng bộ trạng thái trực tuyến/ngoại tuyến ngay lập tức từ màn Hồ sơ
+  useEffect(() => {
+    const onPresenceUpdated = (event: Event) => {
+      const online = (event as CustomEvent<boolean>).detail;
+      setIsOnline(Boolean(online));
+    };
+    window.addEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
+    return () => window.removeEventListener(PRESENCE_UPDATED_EVENT, onPresenceUpdated);
+  }, []);
+
+  // Cập nhật ảnh ngay khi kỹ thuật viên đổi ảnh ở màn hồ sơ
+  useEffect(() => {
+    const onAvatarUpdated = (event: Event) => setAvatarUrl((event as CustomEvent<string>).detail || "");
+    window.addEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
+    return () => window.removeEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
+  }, []);
 
   // Đóng menu khi click ra bên ngoài
   useEffect(() => {
@@ -22,67 +76,101 @@ export const Header = ({ onLogout }: HeaderProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const avatarChar = techName ? techName.charAt(0).toUpperCase() : "K";
+
   return (
-    <div className="relative flex items-center justify-between p-4 bg-white border-b border-gray-100">
-      {/* Khung thông tin User có thể bấm vào */}
-      <div 
-        ref={menuRef}
-        className="relative"
-      >
-        <div 
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-3 cursor-pointer select-none hover:bg-slate-50 p-1.5 rounded-xl transition-colors"
+    <header className="relative z-20 flex items-center justify-between gap-3 bg-canvas px-4 pt-[calc(0.875rem+env(safe-area-inset-top))] pb-2.5">
+      <div className="flex min-w-0 items-center gap-2.5 select-none">
+        <BrandMark size={34} />
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-base font-extrabold tracking-wide text-ink">V-HCare</span>
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-600">
+            Kỹ thuật viên cứu hộ 24/7
+          </span>
+        </span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          aria-label="Thông báo"
+          className="relative flex size-10 items-center justify-center rounded-full bg-slate-200/70 text-ink transition-colors hover:bg-slate-200 cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-full bg-slate-300 overflow-hidden flex items-center justify-center font-bold text-slate-700">
-            A
-          </div>
-          <div>
-            <h2 className="font-bold text-slate-900 text-sm leading-tight">Nguyễn Văn A</h2>
-            <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Đang hoạt động
+          <Bell className="size-5" strokeWidth={2} />
+          <span className="absolute top-2 right-2 size-2 rounded-full bg-rose-500 ring-2 ring-canvas" aria-hidden />
+        </button>
+
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-haspopup="menu"
+            aria-expanded={isOpen}
+            aria-label={`Tài khoản của ${techName}`}
+            className="relative block rounded-full cursor-pointer"
+          >
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-brand-600 text-sm font-bold text-white">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : avatarChar}
             </span>
-          </div>
+            <span
+              className={`absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-canvas ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`}
+              aria-hidden
+            />
+          </button>
+
+          {isOpen && (
+            <div
+              role="menu"
+              className="anim-dialog absolute right-0 top-full z-50 mt-2 w-60 rounded-card border border-line bg-white p-1.5 shadow-raised"
+            >
+              <div className="border-b border-line px-3 pt-2 pb-2.5">
+                <p className="truncate text-sm font-bold text-ink">{techName}</p>
+                <p className={`mt-0.5 text-xs font-medium ${isOnline ? "text-emerald-700" : "text-slate-500"}`}>
+                  {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setIsOpen(false);
+                  setShowLogoutModal(true);
+                }}
+                className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 cursor-pointer"
+              >
+                <LogOut className="size-4" />
+                Đăng xuất
+              </button>
+            </div>
+          )}
         </div>
-
-        {/* Dropdown Menu */}
-        {isOpen && (
-          <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                // Thêm logic chuyển đến trang hồ sơ kỹ thuật viên ở đây nếu muốn
-              }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-900 transition-colors cursor-pointer font-medium"
-            >
-              <User className="w-4 h-4 text-sky-800" />
-              <span>Hồ sơ kỹ thuật viên</span>
-            </button>
-
-            <div className="h-px bg-gray-100 my-1"></div>
-
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                if (onLogout) onLogout();
-              }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors cursor-pointer font-medium"
-            >
-              <LogOut className="w-4 h-4 text-red-500" />
-              <span>Đăng xuất</span>
-            </button>
-          </div>
-        )}
       </div>
 
-      <div className="flex items-center gap-1">
-        <button className="p-2 text-slate-600 hover:bg-sky-50 rounded-full flex items-center justify-center transition-colors cursor-pointer">
-          <Search className="w-5 h-5 text-sky-900" strokeWidth={2.2} />
-        </button>
-        <button className="p-2 text-slate-600 hover:bg-sky-50 rounded-full relative flex items-center justify-center transition-colors cursor-pointer">
-          <Bell className="w-5 h-5 text-sky-900" strokeWidth={2.2} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full ring-2 ring-white"></span>
-        </button>
-      </div>
-    </div>
+      <Modal open={showLogoutModal} onClose={() => setShowLogoutModal(false)} hideClose>
+        <div className="text-center">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+            <LogOut className="size-6" />
+          </span>
+          <h3 className="mt-4 text-base font-bold text-ink">Xác nhận đăng xuất</h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+            Bạn có chắc muốn đăng xuất khỏi tài khoản kỹ thuật viên?
+          </p>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <Button variant="secondary" onClick={() => setShowLogoutModal(false)}>
+            Hủy
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setShowLogoutModal(false);
+              if (onLogout) onLogout();
+            }}
+          >
+            Đăng xuất
+          </Button>
+        </div>
+      </Modal>
+    </header>
   );
 };
