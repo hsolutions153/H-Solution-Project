@@ -82,6 +82,10 @@ class RepairRequestStatusUpdate(InputModel):
         return self
 
 
+class FinalCostRequest(InputModel):
+    final_cost: Money
+
+
 from enum import Enum
 
 

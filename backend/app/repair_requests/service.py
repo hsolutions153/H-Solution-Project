@@ -938,6 +938,62 @@ def _respond_to_pending_quote(request_id: str, payload: dict, fields: dict):
     return query.execute()
 
 
+def _get_payment(request_id: str):
+    from app.payments import repository as payment_repository
+    return payment_repository.get_payment_by_repair_id(request_id)
+
+
+def _validated_final_cost(request_id: str, submitted_cost: float | None) -> float:
+    """Chi phí thực tế phải không vượt tổng báo giá đã duyệt và không còn báo giá chờ duyệt."""
+    try:
+        quotes = repository.get_quotes_by_repair_id(request_id) or []
+    except Exception as check_err:
+        logger.warning(f"Error checking quote vs final cost: {check_err}")
+        raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+    if any(q.get("status") == "PENDING" for q in quotes):
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
+    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+    if not accepted_quotes:
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
+    est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+    final_cost = submitted_cost if submitted_cost is not None else est_price
+    if final_cost > est_price:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+        )
+    return final_cost
+
+
+def submit_final_cost(request_id: str, data: dict, current_user: dict):
+    """KTV chốt chi phí thực tế khi sửa xong; đơn giữ nguyên trạng thái chờ khách thanh toán."""
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if not (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]):
+        raise AppException(ErrorCode.FORBIDDEN)
+    if request.get("status") not in {"ESTIMATE_APPROVED", "REPAIRING"}:
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ chốt chi phí khi đơn đang sửa chữa.")
+
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import FinalCostRequest
+    payload = validated_payload(FinalCostRequest, data)
+    final_cost = _validated_final_cost(request_id, float(payload["final_cost"]))
+
+    payment = _get_payment(request_id)
+    if payment and payment.get("payment_status") in {"PENDING", "PAID"} and not math.isclose(
+        float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01
+    ):
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=f"Khách hàng đã báo thanh toán {float(payment.get('amount') or 0):,.0f} đ nên không thể đổi chi phí thực tế.",
+        )
+
+    if not repository.update_repair_request(request_id, {"total_amount": final_cost, "updated_by": current_user["sub"]}):
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    return fetch_request(request_id, current_user)
+
+
 def update_request_status(request_id: str, current_user: dict, data):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -952,9 +1008,11 @@ def update_request_status(request_id: str, current_user: dict, data):
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
     is_customer = _is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"]
 
-    # Nếu trạng thái không thay đổi, coi như thành công ngay lập tức (Idempotent)
+    # Nếu trạng thái không thay đổi và không có chi phí/thông tin cập nhật kèm theo, coi như thành công ngay lập tức (Idempotent)
     if new_status == request["status"]:
-        return fetch_request(request_id, current_user)
+        submitted_cost = _submitted_final_cost(payload)
+        if submitted_cost is None and not payload.get("cancel_reason"):
+            return fetch_request(request_id, current_user)
 
     if _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") != current_user["sub"]:
         raise AppException(
@@ -1133,29 +1191,20 @@ def update_request_status(request_id: str, current_user: dict, data):
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
-            total_amt = _submitted_final_cost(payload)
-            try:
-                quotes = repository.get_quotes_by_repair_id(request_id) or []
-                if any(q.get("status") == "PENDING" for q in quotes):
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
-                accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
-                if not accepted_quotes:
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
-                est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
-                final_cost = total_amt if total_amt is not None else est_price
-                if final_cost > est_price:
+            final_cost = _validated_final_cost(request_id, _submitted_final_cost(payload))
+            # Đơn có phí chỉ được hoàn tất sau khi thanh toán đã được xác nhận
+            if final_cost > 0:
+                payment = _get_payment(request_id)
+                if not payment or payment.get("payment_status") != "PAID":
                     raise AppException(
-                        ErrorCode.VALIDATION_ERROR,
-                        message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+                        ErrorCode.INVALID_STATUS_TRANSITION,
+                        message="Khách hàng chưa thanh toán. Đơn chỉ được hoàn tất sau khi khách chuyển khoản hoặc trả tiền mặt và bạn đã xác nhận nhận tiền.",
                     )
-                update_data["total_amount"] = final_cost
-            except AppException:
-                raise
-            except Exception as check_err:
-                logger.warning(f"Error checking quote vs final cost: {check_err}")
-                raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+                if not math.isclose(float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01):
+                    raise AppException(ErrorCode.VALIDATION_ERROR, message="Chi phí thực tế không khớp với số tiền khách đã thanh toán.")
+            update_data["total_amount"] = final_cost
 
-            update_data["completed_at"] = now
+            update_data["completed_at"] = request.get("completed_at") or now
         elif new_status == "CANCELLED":
             update_data["cancelled_at"] = now
             update_data["cancel_reason"] = payload.get("cancel_reason")

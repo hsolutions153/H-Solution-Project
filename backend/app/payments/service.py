@@ -67,7 +67,7 @@ def _final_amount(repair: dict) -> Decimal:
     if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
         raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
     amt = repair.get('total_amount')
-    if amt is None or (isinstance(amt, (int, float, str)) and float(amt) == 0):
+    if amt is None or (repair.get('status') != 'COMPLETED' and isinstance(amt, (int, float, str)) and float(amt) == 0):
         try:
             accepted_quote = repository.get_accepted_quote(repair['id'])
             if accepted_quote and accepted_quote.get('estimated_price') is not None:
