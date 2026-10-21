@@ -1113,6 +1113,9 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   onConfirm={handleConfirmPaymentAndComplete}
                   isConfirming={isConfirmingPayment}
                   isSuccess={Boolean(paymentSuccessMessage)}
+                  // Chỉ mở khi khách đã báo thanh toán trên app (backend cũng chặn)
+                  disabled={paymentInfo?.payment?.payment_status !== "PENDING"}
+                  disabledText="Chờ khách thanh toán"
                 />
               </div>
             </>

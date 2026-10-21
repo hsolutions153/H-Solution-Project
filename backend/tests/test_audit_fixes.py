@@ -127,10 +127,34 @@ class PaymentVerificationTests(MockedTest):
 
     def test_technician_confirm_payment_moves_to_paid(self):
         assigned_tech = {"sub": "TECH000001", "role": "TECHNICIAN"}
-        result = payments.technician_confirm_payment("REPAIR0001", assigned_tech, "CASH")
+        payments.customer_submit_payment("REPAIR0001", self.customer, "CASH")
+        result = payments.technician_confirm_payment("REPAIR0001", assigned_tech)
         self.assertTrue(result["success"])
         self.assertEqual(self.payment["payment_status"], "PAID")
         self.assertEqual(self.payment["payment_method"], "CASH")
+
+    def test_technician_cannot_confirm_before_customer_pays(self):
+        assigned_tech = {"sub": "TECH000001", "role": "TECHNICIAN"}
+        self.rejects(400, payments.technician_confirm_payment, "REPAIR0001", assigned_tech, "BANK_TRANSFER")
+        self.assertEqual(self.payment["payment_status"], "UNPAID")
+        self.writes.assert_not_called(); self.history.assert_not_called()
+
+    def test_technician_confirm_keeps_customer_payment_method(self):
+        assigned_tech = {"sub": "TECH000001", "role": "TECHNICIAN"}
+        payments.customer_submit_payment("REPAIR0001", self.customer, "BANK_TRANSFER")
+        payments.technician_confirm_payment("REPAIR0001", assigned_tech, "CASH")
+        self.assertEqual(self.payment["payment_status"], "PAID")
+        self.assertEqual(self.payment["payment_method"], "BANK_TRANSFER")
+
+    def test_free_repair_can_be_confirmed_without_customer_action(self):
+        self.repair["total_amount"] = 0
+        self.payment = None
+        created = {"id": "PAYMENT002", "repair_id": "REPAIR0001", "payment_code": "HSFREE0001", "amount": "0", "payment_method": "CASH", "payment_status": "UNPAID"}
+        self.mock("app.payments.service.repository.create_payment", return_value=created)
+        self.writes.side_effect = lambda payment_id, data: {**created, **data}
+        self.mock("app.payments.service.repository.update_payment", side_effect=lambda payment_id, data: {**created, **data})
+        result = payments.technician_confirm_payment("REPAIR0001", {"sub": "TECH000001", "role": "TECHNICIAN"})
+        self.assertEqual(result["payment"]["payment_status"], "PAID")
 
     def test_unassigned_or_admin_cannot_confirm_technician_payment(self):
         foreign_tech = {"sub": "TECH000002", "role": "TECHNICIAN"}

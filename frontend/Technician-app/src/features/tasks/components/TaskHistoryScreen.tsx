@@ -354,13 +354,15 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
                             size="sm"
                             variant="primary"
                             icon={<CheckCircle2 className="size-4" />}
+                            // Chỉ xác nhận được khi khách đã báo thanh toán trên app
+                            disabled={item.paymentStatus !== "PENDING"}
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedConfirmTask(item);
                               setConfirmMethod(item.paymentMethod === "CASH" ? "CASH" : "BANK_TRANSFER");
                             }}
                           >
-                            Xác nhận nhận tiền
+                            {item.paymentStatus === "PENDING" ? "Xác nhận nhận tiền" : "Chờ khách thanh toán"}
                           </Button>
                           <Button
                             size="sm"
@@ -422,33 +424,12 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-2 rounded-control bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmMethod("BANK_TRANSFER")}
-                    className={cn(
-                      "flex items-center justify-center gap-1.5 rounded-control py-2 text-xs font-semibold transition-all cursor-pointer",
-                      confirmMethod === "BANK_TRANSFER"
-                        ? "bg-white text-brand-700 shadow-sm"
-                        : "text-slate-600 hover:text-ink"
-                    )}
-                  >
-                    <QrCode className="size-4" />
-                    Chuyển khoản
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmMethod("CASH")}
-                    className={cn(
-                      "flex items-center justify-center gap-1.5 rounded-control py-2 text-xs font-semibold transition-all cursor-pointer",
-                      confirmMethod === "CASH"
-                        ? "bg-white text-brand-700 shadow-sm"
-                        : "text-slate-600 hover:text-ink"
-                    )}
-                  >
-                    <Banknote className="size-4" />
-                    Tiền mặt
-                  </button>
+                <div className="flex items-center justify-between rounded-control border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    {confirmMethod === "CASH" ? <Banknote className="size-4" /> : <QrCode className="size-4" />}
+                    Khách đã báo trả: {confirmMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"}
+                  </span>
+                  <span className="text-[11px] font-medium text-emerald-700">Kiểm tra trước khi xác nhận</span>
                 </div>
 
                 <Button
