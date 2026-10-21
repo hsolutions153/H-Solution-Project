@@ -419,3 +419,81 @@ class QuoteApprovalTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def store_quote_updates(self):
+        def update_pending(quote_id, fields):
+            quote = next((q for q in self.request["repair_quotes"] if q["id"] == quote_id and q["status"] == "PENDING"), None)
+            if not quote:
+                return None
+            quote.update(fields)
+            return deepcopy(quote)
+
+        self.start_patch("app.repair_requests.service.repository.update_pending_quote").side_effect = update_pending
+        self.start_patch("app.repair_requests.service.repository.create_quote_item").side_effect = lambda fields: deepcopy(fields)
+        self.deleted_items = self.start_patch("app.repair_requests.service.repository.delete_quote_items_by_ids")
+        self.quote_history = self.start_patch("app.repair_requests.service.repository.add_quote_history")
+
+    def edit_quote(self, quote_id, price):
+        return self.client.put(f"/repair-requests/REPAIR0001/quotes/{quote_id}", json={
+            "items": [{"item_name": "Bo mạch", "item_type": "SPARE_PART", "quantity": 1, "unit_price": price, "subtotal": price}],
+            "parts_cost": price, "labor_fee": 0, "estimated_price": price, "total_amount": price,
+        })
+
+    def test_technician_edits_pending_quote_in_place(self):
+        self.as_technician()
+        self.store_quote_updates()
+        self.start_patch("app.repair_requests.service.repository.get_quote_items").return_value = [{"id": "OLDITEM001"}]
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["id"], "INITIAL001")
+        self.assertEqual(response.json()["status"], "PENDING")
+        self.assertEqual(len(self.request["repair_quotes"]), 1)
+        self.assertEqual(self.request["repair_quotes"][0]["estimated_price"], 300000)
+        self.assertEqual(self.request["total_amount"], 300000)
+        self.deleted_items.assert_called_once_with(["OLDITEM001"])
+        self.assertEqual(self.quote_history.call_args.args[0]["action"], "UPDATED")
+        self.assertIn("450,000 đ → 300,000 đ", self.history.call_args.args[0]["note"])
+
+    def test_editing_supplementary_quote_preserves_approved_total(self):
+        self.prepare_repair()
+        self.request["repair_quotes"].append(self.quote("EXTRA00001", "PENDING", 300000))
+        self.request["status"] = "WAITING_FOR_APPROVAL"
+        self.store_quote_updates()
+        response = self.edit_quote("EXTRA00001", 200000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+        self.assertEqual(self.request["repair_quotes"][1]["estimated_price"], 200000)
+
+    def test_answered_quote_cannot_be_edited(self):
+        self.request["repair_quotes"][0]["status"] = "ACCEPTED"
+        self.as_technician()
+        self.store_quote_updates()
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.request["repair_quotes"][0]["estimated_price"], 450000)
+
+    def test_other_technician_cannot_edit_quote(self):
+        self.as_technician()
+        self.request["technician_id"] = "TECH000002"
+        self.store_quote_updates()
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 403, response.text)
+
+    def test_customer_cannot_approve_quote_edited_after_viewing(self):
+        self.request["repair_quotes"][0]["updated_at"] = "2026-10-03T05:00:00+00:00"
+        response = self.client.patch("/repair-requests/REPAIR0001/status", json={
+            "status": "ESTIMATE_APPROVED", "quote_id": "INITIAL001", "quote_updated_at": "2026-10-03T01:00:00+00:00",
+        })
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.request["status"], "WAITING_FOR_APPROVAL")
+        self.assertEqual(self.request["repair_quotes"][0]["status"], "PENDING")
+
+    def test_customer_approves_viewed_quote_version(self):
+        self.request["repair_quotes"][0]["updated_at"] = "2026-10-03T05:00:00+00:00"
+        chain = self.database.table.return_value.update.return_value.eq.return_value.eq.return_value
+        chain.eq.return_value.eq.return_value.execute.side_effect = chain.execute.side_effect
+        response = self.client.patch("/repair-requests/REPAIR0001/status", json={
+            "status": "ESTIMATE_APPROVED", "quote_id": "INITIAL001", "quote_updated_at": "2026-10-03T05:00:00Z",
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["quotes"][0]["status"], "ACCEPTED")

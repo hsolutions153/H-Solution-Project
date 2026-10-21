@@ -33,6 +33,7 @@ from app.repair_requests.service import (
     fetch_request_status_sync,
     fetch_technician_requests,
     submit_technician_rating,
+    update_quote_for_request,
     update_request_status,
 )
 
@@ -151,6 +152,16 @@ def create_quote(
     current_user: dict = Depends(get_current_user),
 ):
     return create_quote_for_request(request_id, data.model_dump(), current_user)
+
+
+@router.put("/{request_id}/quotes/{quote_id}", response_model=QuoteResponse)
+def update_quote(
+    request_id: Identifier,
+    quote_id: Identifier,
+    data: QuoteCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return update_quote_for_request(request_id, quote_id, data.model_dump(), current_user)
 
 
 @router.get("/{request_id}/quotes", response_model=list[QuoteResponse])

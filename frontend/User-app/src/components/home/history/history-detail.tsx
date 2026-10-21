@@ -614,6 +614,10 @@ export function HistoryDetail() {
           status: nextStatus,
           cancel_reason: finalReason,
           reject_reason: finalReason,
+          // Phiên bản báo giá khách đang xem; backend từ chối nếu KTV vừa sửa báo giá
+          ...(quoteData?.status === "PENDING" && quoteData?.id
+            ? { quote_id: quoteData.id, quote_updated_at: quoteData.updated_at ?? undefined }
+            : {}),
         }),
       });
 
@@ -642,6 +646,8 @@ export function HistoryDetail() {
       await refreshDetailRef.current?.();
     } catch (err: any) {
       alert(err.message || "Lỗi khi xử lý phản hồi báo giá");
+      // Báo giá có thể vừa được KTV cập nhật: tải lại để khách xem bản mới nhất
+      await refreshDetailRef.current?.();
     } finally {
       setIsApprovingQuote(false);
     }
