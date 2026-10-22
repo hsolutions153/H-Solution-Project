@@ -28,8 +28,8 @@ type SidebarNavProps = {
 };
 
 export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams() ?? new URLSearchParams();
 
   const defaultExpanded = useMemo(
     () =>

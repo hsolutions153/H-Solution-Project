@@ -17,7 +17,7 @@ function navFor(pathname: string): HomeNavId {
 export default function HomeLoading() {
   const pathname = usePathname();
   return (
-    <HomeShell activeNav={navFor(pathname)}>
+    <HomeShell activeNav={navFor(pathname ?? "")}>
       <PageBodySkeleton />
     </HomeShell>
   );
