@@ -8,6 +8,17 @@ export default defineConfig({
     compatibilityFlags: ["nodejs_compat"],
     workersDev: false,
     previewUrls: false,
+    observability: {
+      enabled: true,
+      logs: { enabled: true },
+    },
+    domains: [
+      {
+        hostname: "vhcare.click",
+        production: true,
+        previews: false,
+      },
+    ],
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",
@@ -15,6 +26,7 @@ export default defineConfig({
     },
     env: {
       ASSETS: bindings.assets(),
+      AUTH_TRUST_HOST: bindings.text("true"),
     },
   }),
 });

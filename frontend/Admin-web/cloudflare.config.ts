@@ -8,6 +8,17 @@ export default defineConfig({
     compatibilityFlags: ["nodejs_compat"],
     workersDev: false,
     previewUrls: false,
+    domains: [
+      {
+        hostname: "admin-vhcare.click",
+        production: true,
+        previews: false,
+      },
+    ],
+    observability: {
+      enabled: true,
+      logs: { enabled: true },
+    },
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",
