@@ -2,7 +2,7 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
   worker: defineWorker({
-    name: "admin-web",
+    name: "vhcare-admin-web",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-22",
     compatibilityFlags: ["nodejs_compat"],
