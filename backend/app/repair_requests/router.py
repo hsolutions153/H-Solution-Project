@@ -169,3 +169,15 @@ def rate_technician(
 ):
     return submit_technician_rating(request_id, data.model_dump(), current_user)
 
+
+@router.patch("/{request_id}/assign")
+def assign_technician_endpoint(
+    request_id: Identifier,
+    payload: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    from app.orders.service import assign_technician
+    tech_id = payload.get("technician_id")
+    order = assign_technician(request_id, tech_id, current_user["sub"])
+    return {"message": "Phân công kỹ thuật viên thành công", "order": order}
+

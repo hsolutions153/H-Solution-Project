@@ -21,9 +21,10 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
+import { useAdmin } from "@/context/AdminContext";
 import { CreateOrderModal } from "./CreateOrderModal";
-import { OrderDetailModal,type OrderRecord,type TechnicianItem } from "./OrderDetailModal";
+import { OrderDetailModal, type OrderRecord, type TechnicianItem } from "./OrderDetailModal";
 
 
 function toLocalDateKey(date: Date) {
@@ -72,6 +73,7 @@ export const OrdersList = () => {
     } catch {}
   };
 
+  const { selectedOrderId, closeOrderDetail } = useAdmin();
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -137,6 +139,27 @@ export const OrdersList = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedOrderId) return;
+    const found = orders.find(
+      (o) => o.id === selectedOrderId || o.request_code === selectedOrderId
+    );
+    if (found) {
+      setSelectedOrder(found);
+    } else {
+      import("@/lib/api-client").then(async ({ fetchApi }) => {
+        try {
+          const single = await fetchApi<OrderRecord>(`/repair-requests/${selectedOrderId}`);
+          if (single) {
+            setSelectedOrder(single);
+          }
+        } catch (err) {
+          console.warn("Lỗi tải chi tiết đơn hàng theo ID:", err);
+        }
+      });
+    }
+  }, [selectedOrderId, orders]);
 
   const handleShowToast = (msg: string) => {
     setToastMessage(msg);
@@ -216,7 +239,11 @@ export const OrdersList = () => {
     const isAssignable =
       st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
     if (!isAssignable) {
-      handleShowToast("Đơn ở trạng thái này không thể phân công thợ!");
+      handleShowToast(
+        st === "CANCELLED"
+          ? "Đơn hàng đã bị hủy, không thể phân công KTV nữa!"
+          : "Đơn ở trạng thái này không thể phân công thợ!"
+      );
       return;
     }
     const targetTech = technicians.find((t) => (t.user_id || t.id) === selectedTechId);
@@ -512,8 +539,7 @@ export const OrdersList = () => {
                     (order.issue_type ? ISSUE_TYPE_LABELS[order.issue_type] : undefined) ||
                     order.issue_type ||
                     "Kỹ thuật";
-                  const isFinished =
-                    order.status === "COMPLETED" || order.status === "CANCELLED";
+                  const isFinished = order.status === "COMPLETED" || order.status === "CANCELLED";
 
                   return (
                     <div
@@ -656,7 +682,7 @@ export const OrdersList = () => {
                             const st = (order.status || "").toUpperCase();
                             const isAssignable =
                               st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
-                            const isDisabled = isFinished || !isAssignable;
+                            const isDisabled = order.status === "COMPLETED" || order.status === "CANCELLED" || !isAssignable;
                             return (
                               <button
                                 disabled={isDisabled}
@@ -683,8 +709,10 @@ export const OrdersList = () => {
                                     : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
                                 }`}
                                 title={
-                                  isFinished
-                                    ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
+                                  order.status === "COMPLETED"
+                                    ? "Không thể phân công (đơn đã hoàn thành)"
+                                    : order.status === "CANCELLED"
+                                    ? "Không thể phân công (đơn đã bị hủy)"
                                     : !isAssignable
                                     ? "Đơn ở trạng thái này không thể gán thợ"
                                     : order.technician
@@ -763,8 +791,7 @@ export const OrdersList = () => {
                       (order.issue_type ? ISSUE_TYPE_LABELS[order.issue_type] : undefined) ||
                       order.issue_type ||
                       "Kỹ thuật";
-                    const isFinished =
-                      order.status === "COMPLETED" || order.status === "CANCELLED";
+                    const isFinished = order.status === "COMPLETED";
 
                     return (
                       <tr
@@ -893,7 +920,7 @@ export const OrdersList = () => {
                               const st = (order.status || "").toUpperCase();
                               const isAssignable =
                                 st === "REQUESTED" || st === "PENDING" || st === "CONFIRMED" || st === "ASSIGNED";
-                              const isDisabled = isFinished || !isAssignable;
+                              const isDisabled = order.status === "COMPLETED" || order.status === "CANCELLED" || !isAssignable;
                               return (
                                 <button
                                   disabled={isDisabled}
@@ -920,10 +947,12 @@ export const OrdersList = () => {
                                       : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer shadow-2xs"
                                   }`}
                                   title={
-                                    isFinished
-                                      ? "Không thể phân công (đơn đã hoàn thành hoặc đã hủy)"
+                                    order.status === "COMPLETED"
+                                      ? "Không thể phân công (đơn đã hoàn thành)"
+                                      : order.status === "CANCELLED"
+                                      ? "Không thể phân công (đơn đã bị hủy)"
                                       : !isAssignable
-                                      ? "Chỉ được phép gán thợ khi đơn ở trạng thái Mới gửi yêu cầu"
+                                      ? "Đơn ở trạng thái này không thể gán thợ"
                                       : order.technician
                                       ? "Đổi kỹ thuật viên"
                                       : "Phân công kỹ thuật viên"
@@ -987,7 +1016,10 @@ export const OrdersList = () => {
         <OrderDetailModal
           order={selectedOrder}
           technicians={technicians}
-          onClose={() => setSelectedOrder(null)}
+          onClose={() => {
+            setSelectedOrder(null);
+            closeOrderDetail();
+          }}
           onRefresh={fetchOrdersAndTechs}
           onToast={handleShowToast}
         />

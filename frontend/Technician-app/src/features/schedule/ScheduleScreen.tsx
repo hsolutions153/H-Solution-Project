@@ -93,8 +93,12 @@ export function ScheduleScreen({ onOpenTask }: ScheduleScreenProps) {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const { fetchApiPages } = await import("@/lib/api-client");
-      const res = await fetchApiPages<unknown>("/repair-requests/technician/me");
+      const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+      if (!getAuthToken()) {
+        setRefreshing(false);
+        return;
+      }
+      const res = await fetchApi<{ items: unknown[] }>("/repair-requests/technician/me?limit=50");
       setTasks(Array.isArray(res?.items) ? res.items.map(mapApiTask) : []);
       setError("");
     } catch (err) {

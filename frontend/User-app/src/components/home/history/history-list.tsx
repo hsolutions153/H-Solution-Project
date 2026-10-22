@@ -19,6 +19,9 @@ interface RepairHistoryItem {
   issueType?: string;
   isSos?: boolean;
   location?: string;
+  bookingDate?: string;
+  bookingSlot?: string;
+  cancelReason?: string;
 }
 
 type FilterTab = "all" | "this_month" | "completed";
@@ -120,9 +123,23 @@ function formatCurrency(amount: number): string {
 // Bộ nhớ đệm module phục vụ tải tức thì Stale-While-Revalidate
 let memoryHistoryCache: RepairHistoryItem[] | null = null;
 
+const cancelReasonOptions = [
+  { key: "BUSY_RESCHEDULE", label: "Lịch bận đột xuất / Cần đổi ngày giờ khác" },
+  { key: "FIXED_SELF", label: "Xe đã hoạt động lại bình thường / Đã tự khắc phục" },
+  { key: "WRONG_INFO", label: "Đặt nhầm thông tin hoặc loại sự cố" },
+  { key: "FOUND_OTHER", label: "Đã tìm được giải pháp sửa chữa khác" },
+  { key: "WAIT_TOO_LONG", label: "Thời gian chờ đợi không phù hợp" },
+  { key: "OTHER", label: "Lý do khác (vui lòng nhập bên dưới)" },
+];
+
 export function HistoryList() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [cancellingItem, setCancellingItem] = useState<RepairHistoryItem | null>(null);
+  const [cancelReasonKey, setCancelReasonKey] = useState("BUSY_RESCHEDULE");
+  const [customCancelText, setCustomCancelText] = useState("");
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+  const [cancelListError, setCancelListError] = useState("");
 
   // Khởi tạo ngay từ bộ nhớ đệm (hiển thị tức thì 0ms)
   const [allRequests, setAllRequests] = useState<RepairHistoryItem[]>(() => {
@@ -192,6 +209,9 @@ export function HistoryList() {
           issueType: item.issue_type,
           isSos,
           location,
+          bookingDate: item.booking_date || undefined,
+          bookingSlot: item.booking_slot || undefined,
+          cancelReason: item.cancel_reason || undefined,
           total: Number(item.total_amount ?? item.quote?.estimated_price ?? 0),
         };
       });
@@ -208,6 +228,35 @@ export function HistoryList() {
       setLoading(false);
     }
   }, []);
+
+  const handleConfirmCancelFromList = async () => {
+    if (!cancellingItem) return;
+    setIsSubmittingCancel(true);
+    setCancelListError("");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const selectedOption = cancelReasonOptions.find((r) => r.key === cancelReasonKey);
+      const finalReason =
+        cancelReasonKey === "OTHER"
+          ? (customCancelText.trim() || "Khách hàng hủy đơn đặt lịch")
+          : (selectedOption?.label || "Khách hàng hủy đơn đặt lịch");
+
+      await fetchApi<any>(`/repair-requests/${cancellingItem.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "CANCELLED",
+          cancel_reason: finalReason,
+        }),
+      });
+
+      setCancellingItem(null);
+      await fetchHistory();
+    } catch (err: any) {
+      setCancelListError(err?.message || "Không thể hủy đơn. Vui lòng thử lại.");
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
 
   // Thăm dò dữ liệu ngầm mỗi 10s (tự dừng khi chuyển tab)
   useEffect(() => {
@@ -403,6 +452,24 @@ export function HistoryList() {
                         {item.dateTime}
                       </span>
 
+                      {(item.bookingDate || item.bookingSlot) && (
+                        <span className="rh-datetime-badge" style={{ background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                            calendar_month
+                          </span>
+                          {item.bookingSlot ? `${item.bookingSlot} ` : ""}{item.bookingDate || ""}
+                        </span>
+                      )}
+
+                      {item.rawStatus === "CANCELLED" && item.cancelReason && (
+                        <span className="rh-datetime-badge" style={{ background: "#fff1f2", color: "#be123c", borderColor: "#fecdd3" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                            cancel
+                          </span>
+                          {item.cancelReason.length > 25 ? `${item.cancelReason.slice(0, 25)}...` : item.cancelReason}
+                        </span>
+                      )}
+
                       {item.technicianName && (
                         <span className="rh-technician-badge">
                           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
@@ -430,6 +497,31 @@ export function HistoryList() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {Boolean(
+                      !["COMPLETED", "PAID", "CANCELLED", "EN_ROUTE", "ARRIVED", "REPAIRING"].includes(
+                        (item.rawStatus || item.status || "").toUpperCase()
+                      )
+                    ) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCancellingItem(item);
+                          setCancelReasonKey("BUSY_RESCHEDULE");
+                          setCustomCancelText("");
+                          setCancelListError("");
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition shadow-2xs cursor-pointer"
+                        title="Hủy lịch hẹn"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#E11D48" }}>
+                          cancel
+                        </span>
+                        <span>Hủy lịch</span>
+                      </button>
+                    )}
+
                     {(item.status === "completed" || item.rawStatus === "COMPLETED" || item.rawStatus === "PAID") && (
                       <Link
                         href={`/home/history/${item.id}#rating`}
@@ -457,6 +549,114 @@ export function HistoryList() {
           })
         )}
       </div>
+
+      {cancellingItem && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 24,
+              padding: 24,
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                  <span className="material-symbols-outlined text-base">event_busy</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {cancellingItem.isSos ? "Hủy yêu cầu cứu hộ" : "Hủy lịch hẹn sửa chữa"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingItem(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn hủy đơn <strong>#{cancellingItem.orderCode}</strong>? Vui lòng chọn lý do để hệ thống ghi nhận:
+            </p>
+
+            <div className="space-y-2 text-xs">
+              {cancelReasonOptions.map((opt) => (
+                <label
+                  key={opt.key}
+                  className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                    cancelReasonKey === opt.key
+                      ? "border-rose-300 bg-rose-50/50 text-rose-900 font-semibold"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="cancelListReason"
+                    value={opt.key}
+                    checked={cancelReasonKey === opt.key}
+                    onChange={(e) => setCancelReasonKey(e.target.value)}
+                    className="mt-0.5 accent-rose-600"
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {cancelReasonKey === "OTHER" && (
+              <textarea
+                value={customCancelText}
+                onChange={(e) => setCustomCancelText(e.target.value)}
+                placeholder="Nhập lý do hủy cụ thể..."
+                className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-rose-500 focus:outline-none resize-none h-20"
+              />
+            )}
+
+            {cancelListError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">error</span>
+                <span>{cancelListError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isSubmittingCancel}
+                onClick={() => setCancellingItem(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Giữ lại lịch
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingCancel || (cancelReasonKey === "OTHER" && !customCancelText.trim())}
+                onClick={handleConfirmCancelFromList}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+              >
+                {isSubmittingCancel ? "Đang xử lý..." : "Xác nhận hủy đơn"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

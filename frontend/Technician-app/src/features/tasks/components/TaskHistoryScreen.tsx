@@ -65,8 +65,12 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
     async function loadCompletedTasks() {
       try {
         setLoading(true);
-        const { fetchApiPages } = await import("@/lib/api-client");
-        const res = await fetchApiPages<any>("/repair-requests/technician/me?page=1&limit=50");
+        const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+        if (!getAuthToken()) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+        const res = await fetchApi<{ items: any[] }>("/repair-requests/technician/me?page=1&limit=50");
         if (res && Array.isArray(res.items)) {
           const completedFromApi: HistoryTask[] = res.items
             .filter((item: any) => item.status === "COMPLETED" || item.status === "completed")
@@ -122,7 +126,8 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.status === 401 || err?.status === 403) return;
         console.warn("Lỗi tải lịch sử công việc KTV:", err);
       } finally {
         if (isMounted) setLoading(false);

@@ -4,10 +4,22 @@ from app.core.validation import Address, Email, InputModel, LoginPassword, Name,
 
 class SignupRequest(InputModel):
     name: Name
-    phone: OptionalPhone = None
+    phone: Phone
     email: Email
     password: Password
     address: Address | None = None
+    otp_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
+
+
+class RegisterOtpRequest(InputModel):
+    phone: Phone
+    email: Email | None = None
+
+
+class RegisterOtpResponse(BaseModel):
+    message: str
+    expires_in_seconds: int
+    otp_code: str | None = None
 
 
 class LoginRequest(InputModel):

@@ -7,6 +7,7 @@ from app.payments.router import router as payments_router
 from app.repair_requests.router import router as repair_requests_router
 from app.technicians.router import router as technicians_router
 from app.users.router import router as users_router
+from app.notifications.router import router as notifications_router
 from fastapi import APIRouter
 
 api_router = APIRouter()
@@ -20,3 +21,4 @@ api_router.include_router(repair_requests_router)
 api_router.include_router(payments_router)
 api_router.include_router(technicians_router)
 api_router.include_router(users_router)
+api_router.include_router(notifications_router)
