@@ -41,7 +41,8 @@ class QuoteApprovalTests(unittest.TestCase):
 
         database = self.start_patch("app.db.database.supabase")
         self.database = database
-        self.start_patch("app.payments.repository.get_payment_by_repair_id").return_value = None
+        self.payment_lookup = self.start_patch("app.payments.repository.get_payment_by_repair_id")
+        self.payment_lookup.return_value = None
         database.table.return_value.select.return_value.or_.return_value.maybe_single.return_value.execute.side_effect = (
             lambda: SimpleNamespace(data=deepcopy(self.request))
         )
@@ -268,7 +269,13 @@ class QuoteApprovalTests(unittest.TestCase):
         self.request["repair_quotes"][0].update(status="ACCEPTED", estimated_price=estimate)
         self.as_technician()
 
-    def finish(self, amount):
+    def pay(self, amount, status="PAID"):
+        self.payment_lookup.return_value = {"id": "PAYMENT001", "repair_id": "REPAIR0001", "amount": amount, "payment_status": status}
+
+    def finish(self, amount, paid=True):
+        # Đơn có phí chỉ hoàn tất được sau khi thanh toán đã được xác nhận
+        if paid and self.payment_lookup.return_value is None:
+            self.pay(amount)
         return self.client.patch(
             "/repair-requests/REPAIR0001/status",
             json={"status": "COMPLETED", "final_cost": amount},
@@ -289,6 +296,18 @@ class QuoteApprovalTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "COMPLETED")
         self.assertEqual(float(response.json()["total_amount"]), 1000000)
         self.assertEqual(float(response.json()["approved_estimate"]), 1200000)
+
+    def test_completed_paid_repair_cannot_change_final_cost(self):
+        self.prepare_repair()
+        response1 = self.finish(1200000)
+        self.assertEqual(response1.status_code, 200, response1.text)
+        self.assertEqual(self.request["status"], "COMPLETED")
+        self.assertEqual(float(response1.json()["total_amount"]), 1200000)
+
+        # Đã thu 1.200.000 đ nên không được đổi chi phí thực tế khác số tiền đã thanh toán
+        response2 = self.finish(1000000)
+        self.assertEqual(response2.status_code, 422, response2.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
 
     def test_final_cost_above_estimate_preserves_repairing_status(self):
         self.prepare_repair()
@@ -393,7 +412,7 @@ class QuoteApprovalTests(unittest.TestCase):
         self.assertEqual(float(rejected["approved_estimate"]), 1200000)
         self.as_technician()
         self.respond("REPAIRING")
-        denied = self.finish(1500000)
+        denied = self.finish(1500000, paid=False)
         self.assertEqual(denied.status_code, 422, denied.text)
         response = self.finish(1200000)
         self.assertEqual(response.status_code, 200, response.text)
@@ -415,6 +434,133 @@ class QuoteApprovalTests(unittest.TestCase):
         response = self.client.post("/repair-requests/REPAIR0001/quotes", json={"labor_fee": 300000, "estimated_price": 300000})
         self.assertEqual(response.status_code, 409, response.text)
         self.assertEqual(len(self.request["repair_quotes"]), 2)
+
+
+
+    def store_quote_updates(self):
+        def update_pending(quote_id, fields):
+            quote = next((q for q in self.request["repair_quotes"] if q["id"] == quote_id and q["status"] == "PENDING"), None)
+            if not quote:
+                return None
+            quote.update(fields)
+            return deepcopy(quote)
+
+        self.start_patch("app.repair_requests.service.repository.update_pending_quote").side_effect = update_pending
+        self.start_patch("app.repair_requests.service.repository.create_quote_item").side_effect = lambda fields: deepcopy(fields)
+        self.deleted_items = self.start_patch("app.repair_requests.service.repository.delete_quote_items_by_ids")
+        self.quote_history = self.start_patch("app.repair_requests.service.repository.add_quote_history")
+
+    def edit_quote(self, quote_id, price):
+        return self.client.put(f"/repair-requests/REPAIR0001/quotes/{quote_id}", json={
+            "items": [{"item_name": "Bo mạch", "item_type": "SPARE_PART", "quantity": 1, "unit_price": price, "subtotal": price}],
+            "parts_cost": price, "labor_fee": 0, "estimated_price": price, "total_amount": price,
+        })
+
+    def test_technician_edits_pending_quote_in_place(self):
+        self.as_technician()
+        self.store_quote_updates()
+        self.start_patch("app.repair_requests.service.repository.get_quote_items").return_value = [{"id": "OLDITEM001"}]
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["id"], "INITIAL001")
+        self.assertEqual(response.json()["status"], "PENDING")
+        self.assertEqual(len(self.request["repair_quotes"]), 1)
+        self.assertEqual(self.request["repair_quotes"][0]["estimated_price"], 300000)
+        self.assertEqual(self.request["total_amount"], 300000)
+        self.deleted_items.assert_called_once_with(["OLDITEM001"])
+        self.assertEqual(self.quote_history.call_args.args[0]["action"], "UPDATED")
+        self.assertIn("450,000 đ → 300,000 đ", self.history.call_args.args[0]["note"])
+
+    def test_editing_supplementary_quote_preserves_approved_total(self):
+        self.prepare_repair()
+        self.request["repair_quotes"].append(self.quote("EXTRA00001", "PENDING", 300000))
+        self.request["status"] = "WAITING_FOR_APPROVAL"
+        self.store_quote_updates()
+        response = self.edit_quote("EXTRA00001", 200000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+        self.assertEqual(self.request["repair_quotes"][1]["estimated_price"], 200000)
+
+    def test_answered_quote_cannot_be_edited(self):
+        self.request["repair_quotes"][0]["status"] = "ACCEPTED"
+        self.as_technician()
+        self.store_quote_updates()
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.request["repair_quotes"][0]["estimated_price"], 450000)
+
+    def test_other_technician_cannot_edit_quote(self):
+        self.as_technician()
+        self.request["technician_id"] = "TECH000002"
+        self.store_quote_updates()
+        response = self.edit_quote("INITIAL001", 300000)
+        self.assertEqual(response.status_code, 403, response.text)
+
+    def test_customer_cannot_approve_quote_edited_after_viewing(self):
+        self.request["repair_quotes"][0]["updated_at"] = "2026-10-03T05:00:00+00:00"
+        response = self.client.patch("/repair-requests/REPAIR0001/status", json={
+            "status": "ESTIMATE_APPROVED", "quote_id": "INITIAL001", "quote_updated_at": "2026-10-03T01:00:00+00:00",
+        })
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.request["status"], "WAITING_FOR_APPROVAL")
+        self.assertEqual(self.request["repair_quotes"][0]["status"], "PENDING")
+
+    def test_customer_approves_viewed_quote_version(self):
+        self.request["repair_quotes"][0]["updated_at"] = "2026-10-03T05:00:00+00:00"
+        chain = self.database.table.return_value.update.return_value.eq.return_value.eq.return_value
+        chain.eq.return_value.eq.return_value.execute.side_effect = chain.execute.side_effect
+        response = self.client.patch("/repair-requests/REPAIR0001/status", json={
+            "status": "ESTIMATE_APPROVED", "quote_id": "INITIAL001", "quote_updated_at": "2026-10-03T05:00:00Z",
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["quotes"][0]["status"], "ACCEPTED")
+
+    def test_unpaid_repair_cannot_be_completed(self):
+        self.prepare_repair()
+        for status in (None, "UNPAID", "PENDING"):
+            if status:
+                self.pay(1200000, status)
+            response = self.finish(1200000, paid=False)
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertEqual(self.request["status"], "REPAIRING")
+        self.history.assert_not_called()
+
+    def test_free_repair_completes_without_payment(self):
+        self.prepare_repair()
+        response = self.finish(0, paid=False)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["status"], "COMPLETED")
+
+    def submit_final_cost(self, amount):
+        return self.client.post("/repair-requests/REPAIR0001/final-cost", json={"final_cost": amount})
+
+    def test_final_cost_is_saved_without_completing(self):
+        self.prepare_repair()
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["status"], "REPAIRING")
+        self.assertEqual(self.request["total_amount"], 1000000)
+        self.history.assert_not_called()
+
+    def test_final_cost_cannot_exceed_approved_estimate(self):
+        self.prepare_repair()
+        response = self.submit_final_cost(1500000)
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+
+    def test_final_cost_cannot_change_after_customer_reported_payment(self):
+        self.prepare_repair()
+        self.pay(1200000, "PENDING")
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+        self.assertEqual(self.submit_final_cost(1200000).status_code, 200)
+
+    def test_customer_cannot_submit_final_cost(self):
+        self.prepare_repair()
+        self.customer = {"sub": "CUSTOMER01", "role": "CUSTOMER"}
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 403, response.text)
 
 
 if __name__ == "__main__":

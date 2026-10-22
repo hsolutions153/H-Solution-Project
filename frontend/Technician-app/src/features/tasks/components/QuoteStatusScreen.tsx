@@ -177,6 +177,12 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
           </a>
         ) : null}
 
+        {state === "pending" && onViewDetailQuote ? (
+          <Button size="lg" fullWidth variant="secondary" icon={<PencilLine className="size-5" />} onClick={onViewDetailQuote}>
+            {supplementary ? "Sửa chi phí phát sinh" : "Sửa báo giá"}
+          </Button>
+        ) : null}
+
         {isRejected && supplementary && onViewDetailQuote ? (
           <Button size="lg" fullWidth variant="secondary" icon={<PencilLine className="size-5" />} onClick={onViewDetailQuote}>
             Gửi lại chi phí phát sinh

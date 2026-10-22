@@ -233,6 +233,29 @@ def create_quote_item(data: dict):
     return response.data[0] if response and response.data else None
 
 
+def update_pending_quote(quote_id: str, data: dict):
+    # Chỉ sửa được khi khách chưa phản hồi; trả None nếu báo giá đã được duyệt/từ chối
+    response = (
+        supabase.table(REPAIR_QUOTES_TABLE)
+        .update(data)
+        .eq("id", quote_id)
+        .eq("status", "PENDING")
+        .execute()
+    )
+    return response.data[0] if response and response.data else None
+
+
+def delete_quote_items_by_ids(item_ids: list[str]):
+    if not item_ids:
+        return
+    supabase.table("repair_quote_items").delete().in_("id", item_ids).execute()
+
+
+def add_quote_history(data: dict):
+    response = supabase.table("quote_history").insert(data).execute()
+    return response.data[0] if response and response.data else None
+
+
 def get_quotes_by_repair_id(repair_id: str):
     response = (
         supabase.table(REPAIR_QUOTES_TABLE)

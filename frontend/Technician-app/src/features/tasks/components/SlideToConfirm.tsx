@@ -10,6 +10,7 @@ interface SlideToConfirmProps {
   disabled?: boolean;
   title?: string;
   confirmedText?: string;
+  disabledText?: string;
 }
 
 export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
@@ -19,6 +20,7 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
   disabled = false,
   title = "Xác nhận thanh toán",
   confirmedText = "Đã xác nhận",
+  disabledText = "Chưa thể xác nhận",
 }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
           {title}
         </span>
         <span className="text-[11px] font-medium text-emerald-700">
-          {isConfirming ? "Đang xử lý..." : isConfirmed ? "Đã xong" : "Gạt để xác nhận"}
+          {isConfirming ? "Đang xử lý..." : isConfirmed ? "Đã xong" : disabled ? "" : "Gạt để xác nhận"}
         </span>
       </div>
 
@@ -203,10 +205,13 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         style={{ touchAction: "none" }}
-        className={`relative h-14 w-full select-none rounded-full border-2 p-1 overflow-hidden cursor-pointer transition-colors duration-200 ${
+        aria-disabled={disabled || undefined}
+        className={`relative h-14 w-full select-none rounded-full border-2 p-1 overflow-hidden transition-colors duration-200 ${
           isConfirmed || isConfirming
-            ? "border-emerald-500 bg-emerald-50 shadow-inner"
-            : "border-slate-300 bg-slate-100 hover:border-slate-400"
+            ? "border-emerald-500 bg-emerald-50 shadow-inner cursor-pointer"
+            : disabled
+            ? "border-slate-200 bg-slate-50 cursor-not-allowed opacity-60"
+            : "border-slate-300 bg-slate-100 hover:border-slate-400 cursor-pointer"
         }`}
       >
         <div
@@ -227,6 +232,8 @@ export const SlideToConfirm: React.FC<SlideToConfirmProps> = ({
               <span className="text-white drop-shadow-xs">Đang xử lý...</span>
             ) : isConfirmed ? (
               <span className="text-white drop-shadow-xs">{confirmedText}</span>
+            ) : disabled ? (
+              disabledText
             ) : (
               "Gạt để xác nhận"
             )}

@@ -67,7 +67,7 @@ def _final_amount(repair: dict) -> Decimal:
     if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
         raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
     amt = repair.get('total_amount')
-    if amt is None or (isinstance(amt, (int, float, str)) and float(amt) == 0):
+    if amt is None or (repair.get('status') != 'COMPLETED' and isinstance(amt, (int, float, str)) and float(amt) == 0):
         try:
             accepted_quote = repository.get_accepted_quote(repair['id'])
             if accepted_quote and accepted_quote.get('estimated_price') is not None:
@@ -285,21 +285,21 @@ def technician_confirm_payment(repair_id: str, current_user: dict, payment_metho
         raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ có thể xác nhận thanh toán khi đơn đang sửa chữa hoặc đã hoàn thành.")
 
     payment = repository.get_payment_by_repair_id(repair_id)
-    method = payment_method or (payment.get('payment_method') if payment else 'CASH')
-    if method in {'COD', 'CASH'}:
-        method = 'CASH'
-    elif method not in {'CASH', 'BANK_TRANSFER'}:
-        method = 'BANK_TRANSFER'
-
     amount = _final_amount(repair)
-    if not payment:
-        payment = _ensure_payment(repair, current_user, method)
+    if not payment and amount == 0:
+        payment = _ensure_payment(repair, current_user, 'CASH')
 
-    if payment.get('payment_status') == 'PAID':
+    if payment and payment.get('payment_status') == 'PAID':
         return {"success": True, "message": "Thanh toán đã được xác nhận trước đó.", "payment": payment}
 
-    if payment.get('payment_method') != method:
-        payment = repository.update_unpaid_payment(payment['id'], {'payment_method': method, 'updated_by': current_user['sub']}) or payment
+    # KTV chỉ được xác nhận sau khi khách đã báo thanh toán trên app (PENDING);
+    # đơn 0 đ không cần khách thao tác. Phương thức lấy theo lựa chọn của khách.
+    if amount > 0 and (not payment or payment.get('payment_status') != 'PENDING'):
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message="Khách hàng chưa xác nhận thanh toán trên ứng dụng. Vui lòng chờ khách thanh toán trước khi xác nhận nhận tiền.",
+        )
+    method = 'CASH' if payment.get('payment_method') in {'COD', 'CASH'} else 'BANK_TRANSFER'
 
     tx_code = f"TECH:{current_user['sub']}:{secrets.token_hex(3).upper()}"
     settled = _settle(payment, tx_code, changed_by=current_user['sub'])

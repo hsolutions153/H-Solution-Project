@@ -692,6 +692,10 @@ export function HistoryDetail() {
           status: nextStatus,
           cancel_reason: finalReason,
           reject_reason: finalReason,
+          // Phiên bản báo giá khách đang xem; backend từ chối nếu KTV vừa sửa báo giá
+          ...(quoteData?.status === "PENDING" && quoteData?.id
+            ? { quote_id: quoteData.id, quote_updated_at: quoteData.updated_at ?? undefined }
+            : {}),
         }),
       });
 
@@ -720,6 +724,8 @@ export function HistoryDetail() {
       await refreshDetailRef.current?.();
     } catch (err: any) {
       alert(err.message || "Lỗi khi xử lý phản hồi báo giá");
+      // Báo giá có thể vừa được KTV cập nhật: tải lại để khách xem bản mới nhất
+      await refreshDetailRef.current?.();
     } finally {
       setIsApprovingQuote(false);
     }
@@ -1255,16 +1261,40 @@ export function HistoryDetail() {
         )}
 
         {["WAITING_FOR_APPROVAL", "ESTIMATE_SUBMITTED", "DIAGNOSED"].includes(detail.rawStatus) && (
-          <div className="bg-brand-50/60 border border-brand-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
-            <div className="flex items-start gap-2.5">
-              <span className="material-symbols-outlined text-brand-800" style={{ fontSize: 26 }}>
-                {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-brand-950">
+          <div className={`rounded-3xl p-5 mb-4 shadow-sm space-y-4 border ${
+            detail.isSupplementaryQuote
+              ? "bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 border-amber-200"
+              : "bg-gradient-to-b from-brand-50/70 via-white to-brand-50/30 border-brand-200"
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+                detail.isSupplementaryQuote
+                  ? "bg-amber-500 text-white"
+                  : "bg-brand-600 text-white"
+              }`}>
+                <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+                  {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  {detail.isSupplementaryQuote ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80">
+                      <span className="material-symbols-outlined text-xs" aria-hidden="true">add_alert</span>
+                      Chi phí phát sinh
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-100 text-brand-900 border border-brand-300/80">
+                      <span className="material-symbols-outlined text-xs" aria-hidden="true">assignment</span>
+                      Báo giá ban đầu
+                    </span>
+                  )}
+                  <span className="text-[11px] font-medium text-slate-500">Chờ bạn phê duyệt</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 leading-snug">
                   {detail.isSupplementaryQuote ? "Yêu Cầu Duyệt Chi Phí Phát Sinh Bổ Sung" : "Bảng Báo Giá Chi Tiết Từ Kỹ Thuật Viên"}
                 </h3>
-                <p className="text-xs text-brand-800/80 mt-0.5">
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                   {detail.isSupplementaryQuote
                     ? "Kỹ thuật viên đã kiểm tra và ghi nhận các hạng mục linh kiện/vật tư phát sinh trong quá trình sửa chữa. Vui lòng xác nhận để tiếp tục."
                     : "KTV đã kiểm tra thiết bị và gửi bảng kê chi phí linh kiện & tiền công. Vui lòng xác nhận để KTV bắt đầu sửa chữa."}
@@ -1273,8 +1303,8 @@ export function HistoryDetail() {
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-brand-700 text-sm">settings</span>
+              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-brand-700 text-sm" aria-hidden="true">settings</span>
                 <span>{detail.isSupplementaryQuote ? "Linh kiện & Hạng mục phát sinh" : "Linh kiện & Vật tư thay thế"}</span>
               </div>
               {detail.parts && detail.parts.length > 0 ? (
@@ -1282,19 +1312,24 @@ export function HistoryDetail() {
                   {detail.parts.map((p, idx) => (
                     <div
                       key={idx}
-                      className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs"
+                      className="bg-white rounded-2xl p-3.5 border border-slate-200/80 hover:border-brand-200 flex items-center justify-between shadow-2xs transition"
                     >
-                      <div>
-                        <div className="font-bold text-xs text-slate-900">{p.name}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Đơn giá: {formatCurrency(p.unitPrice)}
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+                          <span className="material-symbols-outlined text-base" aria-hidden="true">extension</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs text-slate-900">{p.name}</div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Đơn giá: {formatCurrency(p.unitPrice)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block">
+                      <div className="text-right shrink-0">
+                        <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block tabular-nums">
                           SL: {p.quantity}
                         </div>
-                        <div className="text-xs font-black text-brand-950 mt-1">
+                        <div className="text-xs font-black text-slate-900 mt-1 tabular-nums">
                           {formatCurrency(p.subtotal)}
                         </div>
                       </div>
@@ -1302,73 +1337,119 @@ export function HistoryDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-brand-100 text-center">
+                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-slate-200 text-center">
                   Không thay thế linh kiện (chỉ thực hiện kiểm tra, bảo dưỡng & căn chỉnh)
                 </div>
               )}
             </div>
 
-            <div className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs">
-              <div>
-                <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Kiểm tra & lắp ráp tại chỗ</div>
+            <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">engineering</span>
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Kiểm tra & lắp ráp tại chỗ</div>
+                </div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-black text-brand-950">
+                <div className="text-xs font-black text-slate-900 tabular-nums">
                   {formatCurrency(detail.laborCost !== undefined ? detail.laborCost : 0)}
                 </div>
               </div>
             </div>
 
             {quoteData?.diagnosis_note && (
-              <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-brand-100">
-                <span className="font-bold text-brand-950">{detail.isSupplementaryQuote ? "Ghi chú phát sinh:" : "Ghi chú sửa chữa:"}</span> {quoteData.diagnosis_note}
+              <div className="bg-white p-3.5 rounded-2xl text-xs text-slate-700 border border-slate-200/80 flex items-start gap-2 shadow-2xs">
+                <span className="material-symbols-outlined text-brand-600 text-sm mt-0.5 shrink-0" aria-hidden="true">chat</span>
+                <div>
+                  <span className="font-bold text-slate-900">
+                    {detail.isSupplementaryQuote ? "Lý do phát sinh:" : "Ghi chú sửa chữa:"}
+                  </span>{" "}
+                  <span className="text-slate-600">{quoteData.diagnosis_note}</span>
+                </div>
               </div>
             )}
 
-            <div className="bg-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2">
+            <div className="bg-gradient-to-br from-slate-900 via-brand-950 to-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2.5">
               {detail.isSupplementaryQuote && (
-                <div className="space-y-1.5 pb-2 border-b border-brand-800/80 text-xs">
-                  <div className="flex justify-between items-center text-brand-200">
-                    <span>Báo giá đã duyệt trước đó:</span>
-                    <span className="font-bold text-white">{formatCurrency(detail.approvedEstimate || 0)}</span>
+                <div className="space-y-2 pb-2.5 border-b border-white/10 text-xs">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-slate-400 text-sm" aria-hidden="true">check_circle</span>
+                      Báo giá đã duyệt trước đó:
+                    </span>
+                    <span className="font-bold text-white tabular-nums">
+                      {formatCurrency(detail.approvedEstimate || 0)}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center text-amber-300 font-bold">
-                    <span>Chi phí phát sinh bổ sung:</span>
-                    <span className="text-amber-300 font-black text-sm">+{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-amber-400 text-sm" aria-hidden="true">add_circle</span>
+                      Chi phí phát sinh bổ sung:
+                    </span>
+                    <span className="text-amber-300 font-black text-sm tabular-nums">
+                      +{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}
+                    </span>
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-brand-200">
-                  {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
-                </span>
-                <span className="text-lg font-black text-amber-300">
-                  {formatCurrency(detail.isSupplementaryQuote
-                    ? ((detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0))
-                    : detail.total)}
+              <div className="flex justify-between items-center pt-0.5">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-brand-200 block">
+                    {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {detail.isSupplementaryQuote ? "Đã bao gồm chi phí phát sinh mới" : "Chi phí trọn gói nghiệm thu"}
+                  </span>
+                </div>
+                <span className="text-xl font-black text-amber-300 tabular-nums">
+                  {formatCurrency(
+                    detail.isSupplementaryQuote
+                      ? (detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0)
+                      : detail.total
+                  )}
                 </span>
               </div>
-              <div className="text-[11px] text-brand-200/90 italic">
+
+              <div className="text-[11px] text-slate-400 italic pt-1 border-t border-white/10">
                 ⓘ Chi phí gồm {detail.parts && detail.parts.length > 0 ? `${detail.parts.length} linh kiện (${formatCurrency(detail.partsCost || 0)})` : "0 linh kiện"} + tiền công kỹ thuật ({formatCurrency(detail.laborCost || 0)}).
               </div>
             </div>
 
-            <div className="flex gap-2 pt-1">
-              <button
-                disabled={isApprovingQuote}
-                onClick={() => setIsRejectModalOpen(true)}
-                className="flex-1 py-3 bg-white border border-rose-200 text-rose-600 font-bold text-xs rounded-xl hover:bg-rose-50 transition cursor-pointer"
-              >
-                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối báo giá"}
-              </button>
+            <div className="space-y-2 pt-1.5">
               <button
                 disabled={isApprovingQuote}
                 onClick={() => handleApproveQuote(true)}
-                className="flex-1 py-3 bg-brand-900 hover:bg-brand-950 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-brand-900 to-brand-800 hover:from-brand-950 hover:to-brand-900 active:scale-[0.99] text-white font-bold text-sm rounded-2xl transition shadow-md flex items-center justify-between cursor-pointer disabled:opacity-60"
               >
-                {isApprovingQuote ? "Đang xử lý..." : detail.isSupplementaryQuote ? `Duyệt phát sinh (+${formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)})` : "Duyệt báo giá ngay ✓"}
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-400 text-lg" aria-hidden="true">
+                    check_circle
+                  </span>
+                  <span>
+                    {isApprovingQuote
+                      ? "Đang xử lý..."
+                      : detail.isSupplementaryQuote
+                        ? "Duyệt phát sinh"
+                        : "Duyệt báo giá ngay ✓"}
+                  </span>
+                </span>
+                {detail.isSupplementaryQuote && !isApprovingQuote && (
+                  <span className="bg-white/15 px-3 py-1 rounded-xl text-xs font-black text-amber-300 tabular-nums tracking-wide">
+                    +{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}
+                  </span>
+                )}
+              </button>
+
+              <button
+                disabled={isApprovingQuote}
+                onClick={() => setIsRejectModalOpen(true)}
+                className="w-full py-2.5 bg-white border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 hover:bg-rose-50/50 active:scale-[0.99] font-bold text-xs rounded-2xl transition cursor-pointer text-center disabled:opacity-60 shadow-2xs"
+              >
+                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối báo giá"}
               </button>
             </div>
           </div>

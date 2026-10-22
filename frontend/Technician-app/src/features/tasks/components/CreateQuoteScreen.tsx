@@ -56,16 +56,20 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
   const [submitError, setSubmitError] = useState("");
   const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
   const existingQuoteId = task?.quote?.id;
+  // Báo giá khách chưa phản hồi: gửi lại sẽ cập nhật trực tiếp thay vì tạo báo giá mới
+  const [pendingQuote, setPendingQuote] = useState<{ id: string; diagnosis_note?: string } | null>(null);
 
   useEffect(() => {
-    if (!task?.id || !existingQuoteId) return;
+    if (!task?.id) return;
     let isMounted = true;
     setIsLoadingQuote(true);
     import("@/lib/api-client").then(({ fetchApi }) =>
       fetchApi<any[]>(`/repair-requests/${task.id}/quotes`)
     ).then((quotes) => {
       if (!isMounted) return;
-      const quote = quotes.find((entry) => entry.id === existingQuoteId);
+      const pending = quotes.find((entry) => entry.status === "PENDING");
+      setPendingQuote(pending ? { id: pending.id, diagnosis_note: pending.diagnosis_note } : null);
+      const quote = pending || quotes.find((entry) => entry.id === existingQuoteId);
       if (!quote) return;
       setComponents((quote.items || [])
         .filter((item: any) => item.item_type !== "LABOR")
@@ -216,7 +220,7 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
       labor_fee: laborCost,
       estimated_price: totalCost,
       total_amount: totalCost,
-      diagnosis_note: diagnosticData?.note || "Báo giá sửa chữa thiết bị",
+      diagnosis_note: diagnosticData?.note || pendingQuote?.diagnosis_note || "Báo giá sửa chữa thiết bị",
       estimatedTime,
     };
 
@@ -224,10 +228,15 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
       let createdQuote: any = null;
       if (task?.id) {
         const { fetchApi } = await import("@/lib/api-client");
-        createdQuote = await fetchApi(`/repair-requests/${task.id}/quotes`, {
-          method: "POST",
-          body: JSON.stringify(quotePayload),
-        });
+        createdQuote = await fetchApi(
+          pendingQuote
+            ? `/repair-requests/${task.id}/quotes/${pendingQuote.id}`
+            : `/repair-requests/${task.id}/quotes`,
+          {
+            method: pendingQuote ? "PUT" : "POST",
+            body: JSON.stringify(quotePayload),
+          }
+        );
       }
       const savedQuote = { ...quotePayload, ...createdQuote, repair_id: task?.id };
       sessionStorage.setItem("quoteData", JSON.stringify(savedQuote));
@@ -247,11 +256,17 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
   return (
     <div className="space-y-5 px-4 pt-4">
       <ScreenHeader
-        title="Tạo báo giá"
+        title={pendingQuote ? "Sửa báo giá" : "Tạo báo giá"}
         subtitle={`Mã đơn ${task.code || "#JOB-99281"}`}
         onBack={onBack}
-        trailing={<Badge tone="brand">Khảo sát xong</Badge>}
+        trailing={pendingQuote ? <Badge tone="warning">Chờ khách duyệt</Badge> : <Badge tone="brand">Khảo sát xong</Badge>}
       />
+
+      {pendingQuote ? (
+        <p className="rounded-control border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] leading-relaxed text-amber-900">
+          Khách hàng chưa phản hồi báo giá này. Sau khi cập nhật, khách sẽ thấy báo giá mới thay cho báo giá cũ.
+        </p>
+      ) : null}
 
       <Card className="space-y-1">
         <h3 className="text-sm font-bold text-ink">{task.serviceName || "Sửa chữa xe lăn điện Karma"}</h3>
@@ -392,7 +407,7 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
           icon={<Send className="size-4" />}
           onClick={handleSend}
         >
-          {isSubmitting ? "Đang gửi..." : "Gửi báo giá"}
+          {isSubmitting ? "Đang gửi..." : pendingQuote ? "Cập nhật báo giá" : "Gửi báo giá"}
         </Button>
       </ActionBar>
 

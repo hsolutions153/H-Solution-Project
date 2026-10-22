@@ -949,6 +949,84 @@ def fetch_request_status_sync(request_id: str, current_user: dict):
     }
 
 
+def _respond_to_pending_quote(request_id: str, payload: dict, fields: dict):
+    """Ghi phản hồi của khách vào báo giá PENDING.
+
+    Nếu client gửi kèm quote_id/quote_updated_at của bản khách đang xem, từ chối khi
+    KTV đã sửa báo giá sau thời điểm đó để khách không duyệt nhầm số tiền chưa thấy.
+    """
+    from app.db.database import supabase
+    query = supabase.table("repair_quotes").update(fields).eq("repair_id", request_id).eq("status", "PENDING")
+    quote_id = payload.get("quote_id")
+    if quote_id:
+        quote = next((q for q in repository.get_quotes_by_repair_id(request_id) or [] if q.get("id") == quote_id), None)
+        if not quote or quote.get("status") != "PENDING":
+            raise AppException(ErrorCode.QUOTE_ALREADY_DECIDED)
+        seen_at = payload.get("quote_updated_at")
+        if seen_at and quote.get("updated_at"):
+            if datetime.fromisoformat(str(seen_at)) != datetime.fromisoformat(str(quote["updated_at"])):
+                raise AppException(ErrorCode.QUOTE_ALREADY_DECIDED, message="Kỹ thuật viên vừa cập nhật báo giá. Vui lòng xem lại báo giá mới trước khi phản hồi.")
+            query = query.eq("updated_at", quote["updated_at"])
+        query = query.eq("id", quote_id)
+    return query.execute()
+
+
+def _get_payment(request_id: str):
+    from app.payments import repository as payment_repository
+    return payment_repository.get_payment_by_repair_id(request_id)
+
+
+def _validated_final_cost(request_id: str, submitted_cost: float | None) -> float:
+    """Chi phí thực tế phải không vượt tổng báo giá đã duyệt và không còn báo giá chờ duyệt."""
+    try:
+        quotes = repository.get_quotes_by_repair_id(request_id) or []
+    except Exception as check_err:
+        logger.warning(f"Error checking quote vs final cost: {check_err}")
+        raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+    if any(q.get("status") == "PENDING" for q in quotes):
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
+    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+    if not accepted_quotes:
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
+    est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+    final_cost = submitted_cost if submitted_cost is not None else est_price
+    if final_cost > est_price:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+        )
+    return final_cost
+
+
+def submit_final_cost(request_id: str, data: dict, current_user: dict):
+    """KTV chốt chi phí thực tế khi sửa xong; đơn giữ nguyên trạng thái chờ khách thanh toán."""
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if not (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]):
+        raise AppException(ErrorCode.FORBIDDEN)
+    if request.get("status") not in {"ESTIMATE_APPROVED", "REPAIRING"}:
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ chốt chi phí khi đơn đang sửa chữa.")
+
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import FinalCostRequest
+    payload = validated_payload(FinalCostRequest, data)
+    final_cost = _validated_final_cost(request_id, float(payload["final_cost"]))
+
+    payment = _get_payment(request_id)
+    if payment and payment.get("payment_status") in {"PENDING", "PAID"} and not math.isclose(
+        float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01
+    ):
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=f"Khách hàng đã báo thanh toán {float(payment.get('amount') or 0):,.0f} đ nên không thể đổi chi phí thực tế.",
+        )
+
+    if not repository.update_repair_request(request_id, {"total_amount": final_cost, "updated_by": current_user["sub"]}):
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    return fetch_request(request_id, current_user)
+
+
 def update_request_status(request_id: str, current_user: dict, data):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
@@ -967,9 +1045,11 @@ def update_request_status(request_id: str, current_user: dict, data):
         and str(request.get("customer_id")) == str(current_user.get("sub"))
     )
 
-    # Nếu trạng thái không thay đổi, coi như thành công ngay lập tức (Idempotent)
+    # Nếu trạng thái không thay đổi và không có chi phí/thông tin cập nhật kèm theo, coi như thành công ngay lập tức (Idempotent)
     if new_status == request["status"]:
-        return fetch_request(actual_id, current_user)
+        submitted_cost = _submitted_final_cost(payload)
+        if submitted_cost is None and not payload.get("cancel_reason"):
+            return fetch_request(actual_id, current_user)
 
     if _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") != current_user["sub"]:
         raise AppException(
@@ -1156,14 +1236,13 @@ def update_request_status(request_id: str, current_user: dict, data):
             update_data["diagnosed_at"] = now
         elif new_status == "ESTIMATE_APPROVED":
             try:
-                from app.db.database import supabase
-                quote_response = supabase.table("repair_quotes").update({
+                quote_response = _respond_to_pending_quote(request_id, payload, {
                     "status": "ACCEPTED",
                     "replied_by": current_user["sub"],
                     "replied_at": now,
                     "updated_by": current_user["sub"],
                     "updated_at": now,
-                }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+                })
                 if not quote_response or not quote_response.data:
                     raise AppException(ErrorCode.QUOTE_NOT_FOUND)
             except AppException:
@@ -1184,15 +1263,14 @@ def update_request_status(request_id: str, current_user: dict, data):
         elif new_status == "ESTIMATE_REJECTED":
             reject_reason = payload.get("cancel_reason") or payload.get("reject_reason") or "Không đồng ý"
             try:
-                from app.db.database import supabase
-                quote_response = supabase.table("repair_quotes").update({
+                quote_response = _respond_to_pending_quote(request_id, payload, {
                     "status": "REJECTED",
                     "reject_reason": reject_reason,
                     "replied_by": current_user["sub"],
                     "replied_at": now,
                     "updated_by": current_user["sub"],
                     "updated_at": now,
-                }).eq("repair_id", request_id).eq("status", "PENDING").execute()
+                })
                 if not quote_response or not quote_response.data:
                     raise AppException(ErrorCode.QUOTE_NOT_FOUND)
             except AppException:
@@ -1203,29 +1281,20 @@ def update_request_status(request_id: str, current_user: dict, data):
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
-            total_amt = _submitted_final_cost(payload)
-            try:
-                quotes = repository.get_quotes_by_repair_id(request_id) or []
-                if any(q.get("status") == "PENDING" for q in quotes):
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
-                accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
-                if not accepted_quotes:
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
-                est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
-                final_cost = total_amt if total_amt is not None else est_price
-                if final_cost > est_price:
+            final_cost = _validated_final_cost(request_id, _submitted_final_cost(payload))
+            # Đơn có phí chỉ được hoàn tất sau khi thanh toán đã được xác nhận
+            if final_cost > 0:
+                payment = _get_payment(request_id)
+                if not payment or payment.get("payment_status") != "PAID":
                     raise AppException(
-                        ErrorCode.VALIDATION_ERROR,
-                        message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+                        ErrorCode.INVALID_STATUS_TRANSITION,
+                        message="Khách hàng chưa thanh toán. Đơn chỉ được hoàn tất sau khi khách chuyển khoản hoặc trả tiền mặt và bạn đã xác nhận nhận tiền.",
                     )
-                update_data["total_amount"] = final_cost
-            except AppException:
-                raise
-            except Exception as check_err:
-                logger.warning(f"Error checking quote vs final cost: {check_err}")
-                raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+                if not math.isclose(float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01):
+                    raise AppException(ErrorCode.VALIDATION_ERROR, message="Chi phí thực tế không khớp với số tiền khách đã thanh toán.")
+            update_data["total_amount"] = final_cost
 
-            update_data["completed_at"] = now
+            update_data["completed_at"] = request.get("completed_at") or now
         elif new_status == "CANCELLED":
             cancel_msg = payload.get("cancel_reason") or ("Khách hàng hủy đơn đặt lịch" if is_customer else "Yêu cầu đã bị hủy")
             update_data["cancelled_at"] = now
@@ -1390,7 +1459,10 @@ def add_customer_image(request_id: str, file: UploadFile, current_user: dict):
 
 
 
-def create_quote_for_request(request_id: str, data: dict, current_user: dict):
+QUOTE_EDITABLE_STATUSES = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED", "ACCEPTED", "REPAIRING"}
+
+
+def _authorize_quote_author(request_id: str, current_user: dict) -> dict:
     request = repository.get_repair_request_by_id(request_id)
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
@@ -1402,18 +1474,16 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if not is_technician:
         raise AppException(ErrorCode.FORBIDDEN)
 
-    allowed_statuses = {"DIAGNOSING", "ARRIVED", "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED", "ACCEPTED", "REPAIRING"}
-    if request.get("status") not in allowed_statuses:
+    if request.get("status") not in QUOTE_EDITABLE_STATUSES:
         raise AppException(
             ErrorCode.INVALID_STATUS_TRANSITION,
             message="Yêu cầu không ở trạng thái cho phép tạo báo giá.",
         )
+    return request
 
-    previous_quotes = repository.get_quotes_by_repair_id(request_id) or []
-    if any(quote.get("status") == "PENDING" for quote in previous_quotes):
-        raise AppException(ErrorCode.QUOTE_ALREADY_EXISTS, message="Đã có báo giá đang chờ khách hàng duyệt. Vui lòng xử lý báo giá đó trước.")
-    accepted_quotes = [quote for quote in previous_quotes if quote.get("status") == "ACCEPTED"]
-    is_supplementary = bool(accepted_quotes)
+
+def _prepare_quote(data: dict, is_supplementary: bool) -> tuple[dict, list[dict]]:
+    """Kiểm tra payload báo giá và tính chi phí; dùng chung cho tạo mới và cập nhật."""
     from app.core.validation import validated_payload
     from app.repair_requests.schemas import QuoteCreateRequest
     data = validated_payload(QuoteCreateRequest, data)
@@ -1476,22 +1546,17 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Tổng báo giá phải khớp với chi phí các hạng mục. Báo giá bổ sung chỉ gồm chi phí phát sinh.")
     total = float(supplied_total) if supplied_total is not None else calculated_total
 
-    import secrets
-    quote_id = secrets.token_hex(5).upper()[:10]
-    quote_record = {
-        "id": quote_id,
-        "repair_id": request_id,
+    fields = {
         "diagnosis_note": diagnosis_note,
         "severity": severity,
         "labor_fee": labor_fee,
         "parts_cost": parts_cost,
         "estimated_price": total,
-        "status": "PENDING",
-        "created_by": current_user["sub"],
-        "updated_by": current_user["sub"],
     }
-    created_quote = repository.create_quote(quote_record)
+    return fields, parsed_items
 
+
+def _save_quote_items(quote_id: str, parsed_items: list[dict]) -> list[dict]:
     created_items = []
     for p_it in parsed_items:
         item_id = secrets.token_hex(5).upper()[:10]
@@ -1509,6 +1574,31 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
             created_items.append(ci)
         else:
             created_items.append(item_rec)
+    return created_items
+
+
+def create_quote_for_request(request_id: str, data: dict, current_user: dict):
+    _authorize_quote_author(request_id, current_user)
+
+    previous_quotes = repository.get_quotes_by_repair_id(request_id) or []
+    if any(quote.get("status") == "PENDING" for quote in previous_quotes):
+        raise AppException(ErrorCode.QUOTE_ALREADY_EXISTS, message="Đã có báo giá đang chờ khách hàng duyệt. Vui lòng sửa báo giá đó thay vì tạo mới.")
+    accepted_quotes = [quote for quote in previous_quotes if quote.get("status") == "ACCEPTED"]
+    is_supplementary = bool(accepted_quotes)
+    fields, parsed_items = _prepare_quote(data, is_supplementary)
+    total = fields["estimated_price"]
+
+    quote_id = secrets.token_hex(5).upper()[:10]
+    quote_record = {
+        "id": quote_id,
+        "repair_id": request_id,
+        **fields,
+        "status": "PENDING",
+        "created_by": current_user["sub"],
+        "updated_by": current_user["sub"],
+    }
+    created_quote = repository.create_quote(quote_record)
+    created_items = _save_quote_items(quote_id, parsed_items)
 
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -1544,9 +1634,7 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     result_quote = created_quote or {
         "id": quote_id,
         "repair_id": request_id,
-        "labor_fee": labor_fee,
-        "parts_cost": parts_cost,
-        "estimated_price": total,
+        **fields,
         "status": "PENDING",
         "items": created_items
     }
@@ -1560,6 +1648,68 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
     if created_quote:
         created_quote["items"] = created_items
     return result_quote
+
+
+def update_quote_for_request(request_id: str, quote_id: str, data: dict, current_user: dict):
+    """KTV sửa trực tiếp báo giá đang chờ duyệt; khách hàng sẽ thấy và duyệt bản mới."""
+    _authorize_quote_author(request_id, current_user)
+
+    quotes = repository.get_quotes_by_repair_id(request_id) or []
+    quote = next((q for q in quotes if q.get("id") == quote_id), None)
+    if not quote:
+        raise AppException(ErrorCode.QUOTE_NOT_FOUND)
+    if quote.get("status") != "PENDING":
+        raise AppException(ErrorCode.QUOTE_ALREADY_DECIDED, message="Khách hàng đã phản hồi báo giá này nên không thể sửa. Vui lòng tạo báo giá mới.")
+
+    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+    is_supplementary = bool(accepted_quotes)
+    fields, parsed_items = _prepare_quote(data, is_supplementary)
+    total = fields["estimated_price"]
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    updated_quote = repository.update_pending_quote(quote_id, {
+        **fields,
+        "updated_by": current_user["sub"],
+        "updated_at": now_iso,
+    })
+    if not updated_quote:
+        raise AppException(ErrorCode.QUOTE_ALREADY_DECIDED, message="Khách hàng vừa phản hồi báo giá này nên không thể sửa. Vui lòng tải lại đơn.")
+
+    # Thêm hạng mục mới trước rồi mới xóa hạng mục cũ để không mất dữ liệu nếu ghi lỗi giữa chừng
+    old_item_ids = [item["id"] for item in repository.get_quote_items(quote_id) or [] if item.get("id")]
+    created_items = _save_quote_items(quote_id, parsed_items)
+    repository.delete_quote_items_by_ids(old_item_ids)
+
+    try:
+        repository.add_quote_history({
+            "id": secrets.token_hex(5).upper()[:10],
+            "quote_id": quote_id,
+            "action": "UPDATED",
+            "old_data": {key: quote.get(key) for key in ("labor_fee", "parts_cost", "estimated_price", "diagnosis_note")},
+            "new_data": fields,
+            "changed_by": current_user["sub"],
+        })
+    except Exception as history_err:
+        logger.warning(f"Failed to write quote history: {history_err}")
+
+    update_fields = {"updated_by": current_user["sub"]}
+    if not is_supplementary:
+        update_fields["total_amount"] = total
+    if not repository.update_repair_request(request_id, update_fields):
+        raise AppException(ErrorCode.DATABASE_ERROR)
+
+    label = "chi phí phát sinh" if is_supplementary else "báo giá"
+    old_total = float(quote.get("estimated_price") or 0)
+    repository.add_status_history({
+        "id": _request_id(),
+        "repair_id": request_id,
+        "status": "WAITING_FOR_APPROVAL",
+        "changed_by": current_user["sub"],
+        "note": f"Kỹ thuật viên đã cập nhật {label} ({old_total:,.0f} đ → {total:,.0f} đ), chờ khách hàng duyệt",
+    })
+
+    updated_quote["items"] = created_items
+    return updated_quote
 
 
 def fetch_quotes_for_request(request_id: str, current_user: dict):

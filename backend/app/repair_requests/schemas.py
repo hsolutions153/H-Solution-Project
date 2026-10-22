@@ -72,11 +72,18 @@ class RepairRequestStatusUpdate(InputModel):
     total_amount: Money | None = None
     totalCost: Money | None = None
     final_cost: Money | None = None
+    # Báo giá khách hàng đang xem khi duyệt/từ chối; dùng để phát hiện KTV vừa sửa báo giá
+    quote_id: Identifier | None = None
+    quote_updated_at: datetime | None = None
 
     @model_validator(mode="after")
     def valid_amounts(self):
         validate_aliases(self, ("total_amount", "totalCost", "final_cost"))
         return self
+
+
+class FinalCostRequest(InputModel):
+    final_cost: Money
 
 
 from enum import Enum
@@ -205,6 +212,7 @@ class QuoteResponse(BaseModel):
     status: str
     reject_reason: str | None = None
     created_at: datetime | str | None = None
+    updated_at: datetime | str | None = None
     payment_method: str | None = None
     items: list[QuoteItemResponse] = []
 
