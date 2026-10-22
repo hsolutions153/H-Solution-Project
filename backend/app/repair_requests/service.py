@@ -33,6 +33,19 @@ from app.repair_requests.models import (
 MAX_IMAGE_SIZE_MB = 50
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+DUPLICATE_REQUEST_WINDOW_SECONDS = 60
+# Trạng thái KTV đã nhận đơn và chưa hoàn tất / hủy.
+TECHNICIAN_IN_PROGRESS_STATUSES = {
+    "ACCEPTED",
+    "EN_ROUTE",
+    "ARRIVED",
+    "DIAGNOSING",
+    "ESTIMATE_SUBMITTED",
+    "WAITING_FOR_APPROVAL",
+    "ESTIMATE_APPROVED",
+    "ESTIMATE_REJECTED",
+    "REPAIRING",
+}
 
 
 
@@ -65,6 +78,36 @@ def _scheduled_start_at(request: dict) -> datetime | None:
         ).replace(tzinfo=VN_TZ)
     except ValueError:
         return None
+
+
+def _is_future_appointment(request: dict, now: datetime) -> bool:
+    """Lịch hẹn chưa tới khung di chuyển (trước giờ hẹn hơn 30 phút)."""
+    scheduled_start = _scheduled_start_at(request)
+    return scheduled_start is not None and now < scheduled_start - timedelta(minutes=30)
+
+
+def _ensure_technician_not_busy(technician_id: str, request: dict) -> None:
+    """KTV chỉ được làm một đơn tại một thời điểm.
+
+    Lịch hẹn tương lai vẫn được nhận trước và không tính là đơn đang làm.
+    """
+    now_vn = datetime.now(VN_TZ)
+    if _is_future_appointment(request, now_vn):
+        return
+    in_progress = [
+        job for job in repository.get_technician_requests_in_statuses(technician_id, sorted(TECHNICIAN_IN_PROGRESS_STATUSES))
+        if job.get("id") != request.get("id")
+        and not (job.get("status") == "ACCEPTED" and _is_future_appointment(job, now_vn))
+    ]
+    if in_progress:
+        current = in_progress[0]
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=(
+                f"Bạn đang xử lý đơn #{current.get('request_code') or str(current.get('id'))[:8]}. "
+                "Vui lòng hoàn tất đơn hiện tại trước khi tiếp nhận đơn mới."
+            ),
+        )
 
 
 def _submitted_final_cost(payload: dict):
@@ -591,6 +634,14 @@ def create_request(current_user: dict, data):
 
     address = address or "Địa chỉ chưa xác định"
 
+    # Chống tạo trùng khi khách bấm gửi nhiều lần liên tiếp: trả lại đơn vừa tạo
+    # thay vì tạo đơn mới (và tránh gán thêm một KTV cho đơn SOS trùng).
+    duplicate_window_start = (datetime.now(timezone.utc) - timedelta(seconds=DUPLICATE_REQUEST_WINDOW_SECONDS)).isoformat()
+    existing = repository.find_recent_open_request(customer_id, device_id, bool(is_sos), duplicate_window_start)
+    if existing:
+        logger.info(f"Duplicate create_request from {customer_id} ignored, returning {existing['id']}")
+        return fetch_request(existing["id"], current_user)
+
     request_id = _request_id()
     tech_id = None
     initial_status = "REQUESTED"
@@ -1094,6 +1145,9 @@ def update_request_status(request_id: str, current_user: dict, data):
     if not allowed:
         raise AppException(ErrorCode.INVALID_STATUS_TRANSITION)
 
+    if is_technician and new_status in {"ACCEPTED", "EN_ROUTE"}:
+        _ensure_technician_not_busy(current_user["sub"], request)
+
     # Scheduled appointments may be accepted in advance, but travelling only
     # starts inside the 30-minute arrival window. SOS jobs have no window.
     if new_status == "EN_ROUTE" and request.get("status") == "ACCEPTED":
@@ -1578,7 +1632,7 @@ def _save_quote_items(quote_id: str, parsed_items: list[dict]) -> list[dict]:
 
 
 def create_quote_for_request(request_id: str, data: dict, current_user: dict):
-    _authorize_quote_author(request_id, current_user)
+    request = _authorize_quote_author(request_id, current_user)
 
     previous_quotes = repository.get_quotes_by_repair_id(request_id) or []
     if any(quote.get("status") == "PENDING" for quote in previous_quotes):

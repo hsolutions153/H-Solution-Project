@@ -6,6 +6,8 @@ import time
 import unittest
 from unittest.mock import patch
 
+from tests.notification_isolation import setUpModule, tearDownModule  # noqa: F401
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

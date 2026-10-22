@@ -1,6 +1,6 @@
 "use client";
 
-import React,{ useEffect,useMemo,useState } from "react";
+import React,{ useEffect,useMemo,useRef,useState } from "react";
 import { CreateTaskScreen } from "./components/CreateTaskScreen";
 import { HomeOverview } from "./components/HomeOverview";
 import { NewAssignmentModal } from "./components/NewAssignmentModal";
@@ -175,6 +175,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   });
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Đếm các lần cập nhật trạng thái đang gửi lên máy chủ. Polling bỏ qua kết quả
+  // tải về trong lúc đó, nếu không trạng thái cũ sẽ ghi đè trạng thái vừa chuyển.
+  const statusMutationRef = useRef({ inFlight: 0, seq: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
@@ -279,10 +282,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     async function loadTechnicianTasks() {
       if (inFlight || (typeof document !== "undefined" && document.hidden)) return;
       inFlight = true;
+      const startSeq = statusMutationRef.current.seq;
       try {
         const { fetchApi, getAuthToken } = await import("@/lib/api-client");
         if (!getAuthToken()) return;
         const res = await fetchApi<{ items: any[] }>("/repair-requests/technician/me?limit=50");
+        const mutation = statusMutationRef.current;
+        if (mutation.inFlight > 0 || mutation.seq !== startSeq) return;
         if (res && Array.isArray(res.items)) {
           const apiTasks: Task[] = res.items.map(mapApiTask);
 
@@ -428,6 +434,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     statusText: string,
     explicitBackendStatus?: string
   ) => {
+    const previousTask = tasks.find((task) => task.id === taskId);
     setTasks((prev) =>
       prev.map((task) =>
         task.id === taskId ? { ...task, status, statusText } : task
@@ -466,6 +473,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     }
 
     if (backendStatus) {
+      const mutation = statusMutationRef.current;
+      mutation.inFlight += 1;
+      mutation.seq += 1;
       (async () => {
         try {
           const { fetchApi } = await import("@/lib/api-client");
@@ -480,8 +490,29 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             sessionStorage.setItem("selectedTask", JSON.stringify(updatedTask));
             return updatedTask;
           });
-        } catch (err) {
+        } catch (err: any) {
           console.warn("Lỗi đồng bộ trạng thái đơn lên máy chủ:", err);
+          // Không giữ trạng thái giả trên màn hình: lấy lại trạng thái thật từ máy chủ.
+          let serverTask: Task | undefined = previousTask;
+          try {
+            const { fetchApi } = await import("@/lib/api-client");
+            serverTask = mapApiTask(await fetchApi<any>(`/repair-requests/${taskId}`));
+          } catch (reloadErr) {
+            console.warn("Không tải lại được trạng thái đơn:", reloadErr);
+          }
+          if (serverTask) {
+            const restored = serverTask;
+            setTasks((prev) => prev.map((task) => task.id === taskId ? restored : task));
+            setSelectedTask((prev) => {
+              if (prev?.id !== taskId) return prev;
+              sessionStorage.setItem("selectedTask", JSON.stringify(restored));
+              return restored;
+            });
+          }
+          alert(err?.message || "Không thể cập nhật trạng thái đơn. Vui lòng thử lại.");
+        } finally {
+          mutation.inFlight -= 1;
+          mutation.seq += 1;
         }
       })();
     }

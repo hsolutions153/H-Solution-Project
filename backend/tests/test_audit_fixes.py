@@ -7,6 +7,8 @@ from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from tests.notification_isolation import setUpModule, tearDownModule  # noqa: F401
+
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
@@ -327,6 +329,7 @@ class AccessAndReviewTests(MockedTest):
     def test_admin_can_create_for_customer_and_owns_audit_fields(self):
         self.mock("app.repair_requests.service.auth_repository.get_user_by_id", return_value={"id": "CUSTOMER01", "role_id": "CUSTOMER"})
         self.mock("app.repair_requests.service.repository.get_device_for_customer", return_value={"id": "DEVICE0001"})
+        self.mock("app.repair_requests.service.repository.find_recent_open_request", return_value=None)
         insert = self.mock("app.repair_requests.service.repository.create_repair_request", side_effect=lambda data: data)
         self.mock("app.repair_requests.service.repository.add_status_history")
         self.mock("app.repair_requests.service.fetch_request", return_value=self.repair)

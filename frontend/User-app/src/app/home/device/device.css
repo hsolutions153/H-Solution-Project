@@ -31,11 +31,11 @@
 .device-delete-icon-button { color: #dc2626 !important; border-color: #fee2e2 !important; background: #fffafa !important; }
 .device-delete-icon-button:hover { color: #b91c1c !important; background: #fee2e2 !important; border-color: #fca5a5 !important; }
 .device-delete-icon-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.device-register-card { min-height: 310px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1.5px dashed #b2d5ea; border-radius: var(--radius-card); color: #114567; text-decoration: none; background: rgba(255,255,255,.56); transition: .2s; }
+.device-register-card { min-height: 310px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 28px 24px; text-align: center; border: 1.5px dashed #b2d5ea; border-radius: var(--radius-card); color: #114567; text-decoration: none; background: rgba(255,255,255,.56); transition: .2s; }
 .device-register-card:hover { border-color: #156495; background: #eef6fb; }
 .device-register-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 4px; border-radius: 50%; color: #156495; background: #d7eaf5; }
 .device-register-card strong { font-size: 20px; }
-.device-register-card > span:last-child { color: #788b93; font-size: 12px; }
+.device-register-card > span:last-child { max-width: 340px; color: #5f737c; font-size: 13px; line-height: 1.55; }
 .device-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 56px 24px; background: white; border: 1.5px dashed #b2d5ea; border-radius: var(--radius-card); box-shadow: 0 8px 30px rgba(17, 62, 80, 0.04); }
 .device-empty-icon { width: 80px; height: 80px; border-radius: 50%; display: grid; place-items: center; background: #eef6fb; color: #156495; margin-bottom: 18px; }
 .device-empty-state h2 { font-size: 20px; color: #0f3a56; margin: 0 0 8px; font-weight: 700; }
@@ -120,7 +120,7 @@
 .device-page-content { padding: 8px 16px 102px; }
 .device-grid { grid-template-columns: 1fr; gap: 17px; }
 .device-image-wrap { height: 190px; }
-.device-register-card { min-height: 190px; }
+.device-register-card { min-height: 190px; padding: 24px 20px; }
 .device-fab { right: calc(50% - 216px); bottom: 82px; }
 .device-form { padding: 20px 16px; border-radius: 16px; }
 .device-stats { grid-template-columns: 1fr; }
