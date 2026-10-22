@@ -1,8 +1,3 @@
-"""Browser regressions for rejection text and live technician rating updates.
-
-Run with the User and Technician dev servers; uses no live database.
-"""
-
 from copy import deepcopy
 import json
 import os
