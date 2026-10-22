@@ -117,7 +117,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         if (account?.provider === "google") {
           if (!account.id_token) throw new Error("Thiếu thông tin xác minh Google.");
           try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+            const apiUrl = process.env.API_URL || "";
             const res = await fetch(`${apiUrl}/auth/google`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

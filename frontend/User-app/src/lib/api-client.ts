@@ -1,7 +1,7 @@
 import { fetchAllPages, describeApiIssues } from "@h-mobility/ui";
 
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || "";
+  return "";
 }
 
 // Tên vai trò dùng để backend chọn cookie refresh tương ứng với app này

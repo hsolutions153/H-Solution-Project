@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from app.api.v1.api import api_router
 from app.core.handlers import register_exception_handlers
 
@@ -26,6 +27,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    return JSONResponse({"status": "ok"})
 
 app.add_middleware(
     CORSMiddleware,
