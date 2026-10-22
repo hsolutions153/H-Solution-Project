@@ -1,7 +1,7 @@
 import { fetchAllPages, describeApiIssues } from "@h-mobility/ui";
 
 function getBaseUrl(): string {
-  return "/api";
+  return "/v1";
 }
 
 // Tên vai trò dùng để backend chọn cookie refresh tương ứng với app này
