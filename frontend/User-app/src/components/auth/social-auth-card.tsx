@@ -51,11 +51,11 @@ export function SocialAuthCard({
   const [formError, setFormError] = useState("");
   const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
 
-  const errorCode = searchParams.get("error");
+  const errorCode = searchParams?.get("error");
   const oauthError = errorCode
     ? authErrors[errorCode] ?? "Đăng nhập không thành công. Vui lòng thử lại."
     : "";
-  const resetSuccess = searchParams.get("reset") === "success";
+  const resetSuccess = searchParams?.get("reset") === "success";
   const errorMessage = formError || oauthError;
   const isLogin = mode === "login";
 
@@ -63,7 +63,7 @@ export function SocialAuthCard({
   useEffect(() => {
     let isMounted = true;
     async function checkNextAuthSession() {
-      if (searchParams.get("logged_out")) {
+      if (searchParams?.get("logged_out")) {
         const { removeAuthToken } = await import("@/lib/api-client");
         removeAuthToken();
         return;
