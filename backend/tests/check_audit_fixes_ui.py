@@ -1,4 +1,3 @@
-"""Browser regressions for the three apps; all API traffic uses test fixtures."""
 import json
 import os
 import re

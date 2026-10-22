@@ -1,8 +1,3 @@
-"""Browser regression checks using actual API handlers with an in-memory database.
-
-See README.md in this directory for setup and commands.
-"""
-
 from copy import deepcopy
 import json
 import os
