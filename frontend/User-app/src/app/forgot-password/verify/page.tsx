@@ -19,7 +19,7 @@ function maskPhone(phone: string) {
 function OtpVerificationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialPhone = searchParams.get("phone") ?? "";
+  const initialPhone = searchParams?.get("phone") ?? "";
   const [phone] = useState(initialPhone);
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [seconds, setSeconds] = useState(60);
