@@ -40,6 +40,7 @@ export function removeAuthToken(): void {
   }
   localStorage.removeItem("access_token");
   localStorage.removeItem("user_info");
+  window.dispatchEvent(new Event("AUTH_LOGOUT"));
 }
 
 let refreshPromise: Promise<boolean> | null = null;

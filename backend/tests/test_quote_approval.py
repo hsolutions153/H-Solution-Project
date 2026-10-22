@@ -41,7 +41,8 @@ class QuoteApprovalTests(unittest.TestCase):
 
         database = self.start_patch("app.db.database.supabase")
         self.database = database
-        self.start_patch("app.payments.repository.get_payment_by_repair_id").return_value = None
+        self.payment_lookup = self.start_patch("app.payments.repository.get_payment_by_repair_id")
+        self.payment_lookup.return_value = None
         database.table.return_value.select.return_value.or_.return_value.maybe_single.return_value.execute.side_effect = (
             lambda: SimpleNamespace(data=deepcopy(self.request))
         )
@@ -268,7 +269,13 @@ class QuoteApprovalTests(unittest.TestCase):
         self.request["repair_quotes"][0].update(status="ACCEPTED", estimated_price=estimate)
         self.as_technician()
 
-    def finish(self, amount):
+    def pay(self, amount, status="PAID"):
+        self.payment_lookup.return_value = {"id": "PAYMENT001", "repair_id": "REPAIR0001", "amount": amount, "payment_status": status}
+
+    def finish(self, amount, paid=True):
+        # Đơn có phí chỉ hoàn tất được sau khi thanh toán đã được xác nhận
+        if paid and self.payment_lookup.return_value is None:
+            self.pay(amount)
         return self.client.patch(
             "/repair-requests/REPAIR0001/status",
             json={"status": "COMPLETED", "final_cost": amount},
@@ -289,6 +296,18 @@ class QuoteApprovalTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "COMPLETED")
         self.assertEqual(float(response.json()["total_amount"]), 1000000)
         self.assertEqual(float(response.json()["approved_estimate"]), 1200000)
+
+    def test_completed_paid_repair_cannot_change_final_cost(self):
+        self.prepare_repair()
+        response1 = self.finish(1200000)
+        self.assertEqual(response1.status_code, 200, response1.text)
+        self.assertEqual(self.request["status"], "COMPLETED")
+        self.assertEqual(float(response1.json()["total_amount"]), 1200000)
+
+        # Đã thu 1.200.000 đ nên không được đổi chi phí thực tế khác số tiền đã thanh toán
+        response2 = self.finish(1000000)
+        self.assertEqual(response2.status_code, 422, response2.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
 
     def test_final_cost_above_estimate_preserves_repairing_status(self):
         self.prepare_repair()
@@ -393,7 +412,7 @@ class QuoteApprovalTests(unittest.TestCase):
         self.assertEqual(float(rejected["approved_estimate"]), 1200000)
         self.as_technician()
         self.respond("REPAIRING")
-        denied = self.finish(1500000)
+        denied = self.finish(1500000, paid=False)
         self.assertEqual(denied.status_code, 422, denied.text)
         response = self.finish(1200000)
         self.assertEqual(response.status_code, 200, response.text)
@@ -417,8 +436,6 @@ class QuoteApprovalTests(unittest.TestCase):
         self.assertEqual(len(self.request["repair_quotes"]), 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
     def store_quote_updates(self):
         def update_pending(quote_id, fields):
@@ -497,3 +514,54 @@ if __name__ == "__main__":
         })
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["quotes"][0]["status"], "ACCEPTED")
+
+    def test_unpaid_repair_cannot_be_completed(self):
+        self.prepare_repair()
+        for status in (None, "UNPAID", "PENDING"):
+            if status:
+                self.pay(1200000, status)
+            response = self.finish(1200000, paid=False)
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertEqual(self.request["status"], "REPAIRING")
+        self.history.assert_not_called()
+
+    def test_free_repair_completes_without_payment(self):
+        self.prepare_repair()
+        response = self.finish(0, paid=False)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["status"], "COMPLETED")
+
+    def submit_final_cost(self, amount):
+        return self.client.post("/repair-requests/REPAIR0001/final-cost", json={"final_cost": amount})
+
+    def test_final_cost_is_saved_without_completing(self):
+        self.prepare_repair()
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["status"], "REPAIRING")
+        self.assertEqual(self.request["total_amount"], 1000000)
+        self.history.assert_not_called()
+
+    def test_final_cost_cannot_exceed_approved_estimate(self):
+        self.prepare_repair()
+        response = self.submit_final_cost(1500000)
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+
+    def test_final_cost_cannot_change_after_customer_reported_payment(self):
+        self.prepare_repair()
+        self.pay(1200000, "PENDING")
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertEqual(self.request["total_amount"], 1200000)
+        self.assertEqual(self.submit_final_cost(1200000).status_code, 200)
+
+    def test_customer_cannot_submit_final_cost(self):
+        self.prepare_repair()
+        self.customer = {"sub": "CUSTOMER01", "role": "CUSTOMER"}
+        response = self.submit_final_cost(1000000)
+        self.assertEqual(response.status_code, 403, response.text)
+
+
+if __name__ == "__main__":
+    unittest.main()

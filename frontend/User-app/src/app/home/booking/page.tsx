@@ -112,6 +112,9 @@ export default function BookingPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCode, setOrderCode] = useState("");
+  const [createdRequestId, setCreatedRequestId] = useState<string | null>(null);
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
+  const [cancelBookingSuccess, setCancelBookingSuccess] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -386,6 +389,7 @@ export default function BookingPage() {
       }
 
       setOrderCode(result.request_code || result.id || "REQ-SUCCESS");
+      setCreatedRequestId(result.id || null);
       setStep("SUCCESS");
     } catch (submitError: any) {
       setError(submitError.message || "Không thể tạo lịch sửa chữa.");
@@ -743,20 +747,68 @@ export default function BookingPage() {
 
         {step === "SUCCESS" && (
           <section className="sos-step-panel booking-success">
-            <div className="booking-success-icon">
-              <span className="material-symbols-outlined">check</span>
+            <div className={`booking-success-icon ${cancelBookingSuccess ? "bg-rose-100 text-rose-600" : ""}`}>
+              <span className="material-symbols-outlined">{cancelBookingSuccess ? "close" : "check"}</span>
             </div>
-            <h1>Đặt lịch thành công!</h1>
-            <p>Yêu cầu của bạn đã được ghi nhận với mã <strong>{orderCode}</strong>.</p>
+            <h1>{cancelBookingSuccess ? "Đã hủy lịch hẹn" : "Đặt lịch thành công!"}</h1>
+            <p>
+              {cancelBookingSuccess ? (
+                <>Lịch hẹn <strong>#{orderCode}</strong> đã được hủy theo yêu cầu của bạn.</>
+              ) : (
+                <>Yêu cầu của bạn đã được ghi nhận với mã <strong>#{orderCode}</strong>.</>
+              )}
+            </p>
             <div className="booking-success-card">
               <div><span>Sự cố</span><strong>{selectedIssueLabel}</strong></div>
               <div><span>Thời gian</span><strong>{formatDate(selectedDate)}<br />{selectedTimeLabel}</strong></div>
-              <div><span>Nhân viên</span><strong className="booking-pending-text">Chờ admin phân công</strong></div>
+              <div>
+                <span>Trạng thái</span>
+                <strong className={cancelBookingSuccess ? "text-rose-600 font-bold" : "booking-pending-text"}>
+                  {cancelBookingSuccess ? "Đã hủy" : "Chờ admin phân công"}
+                </strong>
+              </div>
             </div>
-            <button type="button" className="sos-manual-submit" onClick={() => router.push("/home/history")}>
-              Xem lịch sử sửa chữa
+            <button
+              type="button"
+              className="sos-manual-submit"
+              onClick={() => router.push(createdRequestId ? `/home/history/${createdRequestId}` : "/home/history")}
+            >
+              Xem chi tiết lịch hẹn
             </button>
-            <button type="button" className="sos-cancel-link" onClick={() => router.push("/home")}>Về trang chủ</button>
+
+            {!cancelBookingSuccess && createdRequestId && (
+              <button
+                type="button"
+                disabled={isCancellingBooking}
+                className="w-full py-3 mt-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
+                onClick={async () => {
+                  if (!window.confirm("Bạn có chắc chắn muốn hủy lịch hẹn sửa chữa này không?")) return;
+                  setIsCancellingBooking(true);
+                  try {
+                    const { fetchApi } = await import("@/lib/api-client");
+                    await fetchApi(`/repair-requests/${createdRequestId}/status`, {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        status: "CANCELLED",
+                        cancel_reason: "Khách hàng hủy ngay sau khi đặt lịch",
+                      }),
+                    });
+                    setCancelBookingSuccess(true);
+                  } catch (err: any) {
+                    alert(err.message || "Không thể hủy lịch hẹn. Vui lòng mở trang Chi tiết lịch hẹn để thực hiện.");
+                  } finally {
+                    setIsCancellingBooking(false);
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>cancel</span>
+                {isCancellingBooking ? "Đang hủy lịch hẹn..." : "Hủy lịch hẹn này"}
+              </button>
+            )}
+
+            <button type="button" className="sos-cancel-link" onClick={() => router.push("/home")}>
+              Về trang chủ
+            </button>
           </section>
         )}
       </div>

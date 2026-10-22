@@ -51,6 +51,10 @@ interface RepairDetail {
   customerPhone?: string;
   deviceInfo?: string;
   images: string[];
+  bookingDate?: string;
+  bookingSlot?: string;
+  cancelReason?: string;
+  isSos?: boolean;
 }
 
 function getStatusLabel(status: string, rawStatus?: string) {
@@ -290,6 +294,10 @@ export function HistoryDetail() {
               customerPhone: "",
               deviceInfo: found.device || "Xe lăn / Scooter điện",
               images: [],
+              bookingDate: found.bookingDate || found.booking_date,
+              bookingSlot: found.bookingSlot || found.booking_slot,
+              cancelReason: found.cancelReason || found.cancel_reason,
+              isSos: Boolean(found.isSos || found.is_sos),
             };
           }
         }
@@ -552,6 +560,10 @@ export function HistoryDetail() {
                 ? `${res.device.manufacturer || ""} ${res.device.model_name || ""}`.trim()
                 : (res.issue_type ? `Xe lăn / Scooter điện (${res.issue_type})` : "Xe lăn / Scooter điện"),
               images: (res.images || []).map((img: any) => img.image_url),
+              bookingDate: res.booking_date || undefined,
+              bookingSlot: res.booking_slot || undefined,
+              cancelReason: res.cancel_reason || undefined,
+              isSos: Boolean(res.is_sos),
             });
             setError("");
           }
@@ -596,6 +608,72 @@ export function HistoryDetail() {
     { value: "Không cần thiết", label: "Chưa cần thay thế các hạng mục linh kiện này" },
     { value: "OTHER", label: "Lý do khác (nhập bên dưới)" },
   ];
+
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReasonKey, setCancelReasonKey] = useState("BUSY_RESCHEDULE");
+  const [customCancelText, setCustomCancelText] = useState("");
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [cancelToast, setCancelToast] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState("");
+
+  const cancelReasonOptions = [
+    { key: "BUSY_RESCHEDULE", label: "Lịch bận đột xuất / Cần đổi ngày giờ khác" },
+    { key: "FIXED_SELF", label: "Xe đã hoạt động lại bình thường / Đã tự khắc phục" },
+    { key: "WRONG_INFO", label: "Đặt nhầm thông tin hoặc loại sự cố" },
+    { key: "FOUND_OTHER", label: "Đã tìm được giải pháp sửa chữa khác" },
+    { key: "WAIT_TOO_LONG", label: "Thời gian chờ đợi không phù hợp" },
+    { key: "OTHER", label: "Lý do khác (vui lòng nhập bên dưới)" },
+  ];
+
+  const handleCancelOrder = async () => {
+    if (!detail) return;
+    setIsCancellingOrder(true);
+    setCancelError("");
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const selectedOption = cancelReasonOptions.find((r) => r.key === cancelReasonKey);
+      const finalReason =
+        cancelReasonKey === "OTHER"
+          ? (customCancelText.trim() || "Khách hàng hủy đơn đặt lịch")
+          : (selectedOption?.label || "Khách hàng hủy đơn đặt lịch");
+
+      await fetchApi<any>(`/repair-requests/${detail.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "CANCELLED",
+          cancel_reason: finalReason,
+        }),
+      });
+
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              rawStatus: "CANCELLED",
+              status: "cancelled",
+              cancelReason: finalReason,
+            }
+          : null
+      );
+
+      setIsCancelModalOpen(false);
+      setCancelToast("Đã hủy đơn thành công.");
+      setTimeout(() => setCancelToast(null), 4000);
+      await refreshDetailRef.current?.();
+    } catch (err: any) {
+      const errMsg = err?.message || "Không thể hủy đơn hàng. Vui lòng thử lại.";
+      setCancelError(errMsg);
+      alert(errMsg);
+    } finally {
+      setIsCancellingOrder(false);
+    }
+  };
+
+  const rawStatus = (detail?.rawStatus || detail?.status || "").toUpperCase();
+  const canCancelOrder = Boolean(
+    detail &&
+    !["COMPLETED", "PAID", "CANCELLED", "EN_ROUTE", "ARRIVED", "REPAIRING"].includes(rawStatus)
+  );
 
   const handleApproveQuote = async (approved: boolean) => {
     setIsApprovingQuote(true);
@@ -1100,6 +1178,25 @@ export function HistoryDetail() {
       </div>
 
       <div className="rd-scroll-content">
+        {cancelToast && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-800 flex items-center gap-2 mb-3 shadow-2xs animate-in fade-in">
+            <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
+            <span>{cancelToast}</span>
+          </div>
+        )}
+
+        {detail.rawStatus === "CANCELLED" && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-3 space-y-1.5 shadow-2xs">
+            <div className="flex items-center gap-2 text-rose-900 font-bold text-sm">
+              <span className="material-symbols-outlined text-rose-600" style={{ fontSize: 20 }}>cancel</span>
+              <span>Đơn sửa chữa đã được hủy</span>
+            </div>
+            <p className="text-xs text-rose-800">
+              Lý do: <span className="font-semibold">{detail.cancelReason || "Khách hàng đã hủy đơn"}</span>
+            </p>
+          </div>
+        )}
+
         <div className="rd-order-section">
           <div className="rd-title-row">
             <h2 className="rd-repair-title">{detail.title}</h2>
@@ -1164,16 +1261,40 @@ export function HistoryDetail() {
         )}
 
         {["WAITING_FOR_APPROVAL", "ESTIMATE_SUBMITTED", "DIAGNOSED"].includes(detail.rawStatus) && (
-          <div className="bg-brand-50/60 border border-brand-200 rounded-3xl p-5 mb-4 shadow-sm space-y-4">
-            <div className="flex items-start gap-2.5">
-              <span className="material-symbols-outlined text-brand-800" style={{ fontSize: 26 }}>
-                {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-brand-950">
+          <div className={`rounded-3xl p-5 mb-4 shadow-sm space-y-4 border ${
+            detail.isSupplementaryQuote
+              ? "bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 border-amber-200"
+              : "bg-gradient-to-b from-brand-50/70 via-white to-brand-50/30 border-brand-200"
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+                detail.isSupplementaryQuote
+                  ? "bg-amber-500 text-white"
+                  : "bg-brand-600 text-white"
+              }`}>
+                <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+                  {detail.isSupplementaryQuote ? "notification_important" : "receipt_long"}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  {detail.isSupplementaryQuote ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80">
+                      <span className="material-symbols-outlined text-xs" aria-hidden="true">add_alert</span>
+                      Chi phí phát sinh
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-100 text-brand-900 border border-brand-300/80">
+                      <span className="material-symbols-outlined text-xs" aria-hidden="true">assignment</span>
+                      Báo giá ban đầu
+                    </span>
+                  )}
+                  <span className="text-[11px] font-medium text-slate-500">Chờ bạn phê duyệt</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 leading-snug">
                   {detail.isSupplementaryQuote ? "Yêu Cầu Duyệt Chi Phí Phát Sinh Bổ Sung" : "Bảng Báo Giá Chi Tiết Từ Kỹ Thuật Viên"}
                 </h3>
-                <p className="text-xs text-brand-800/80 mt-0.5">
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                   {detail.isSupplementaryQuote
                     ? "Kỹ thuật viên đã kiểm tra và ghi nhận các hạng mục linh kiện/vật tư phát sinh trong quá trình sửa chữa. Vui lòng xác nhận để tiếp tục."
                     : "KTV đã kiểm tra thiết bị và gửi bảng kê chi phí linh kiện & tiền công. Vui lòng xác nhận để KTV bắt đầu sửa chữa."}
@@ -1182,8 +1303,8 @@ export function HistoryDetail() {
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
-                <span className="material-symbols-outlined text-brand-700 text-sm">settings</span>
+              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-brand-700 text-sm" aria-hidden="true">settings</span>
                 <span>{detail.isSupplementaryQuote ? "Linh kiện & Hạng mục phát sinh" : "Linh kiện & Vật tư thay thế"}</span>
               </div>
               {detail.parts && detail.parts.length > 0 ? (
@@ -1191,19 +1312,24 @@ export function HistoryDetail() {
                   {detail.parts.map((p, idx) => (
                     <div
                       key={idx}
-                      className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs"
+                      className="bg-white rounded-2xl p-3.5 border border-slate-200/80 hover:border-brand-200 flex items-center justify-between shadow-2xs transition"
                     >
-                      <div>
-                        <div className="font-bold text-xs text-slate-900">{p.name}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Đơn giá: {formatCurrency(p.unitPrice)}
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+                          <span className="material-symbols-outlined text-base" aria-hidden="true">extension</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs text-slate-900">{p.name}</div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Đơn giá: {formatCurrency(p.unitPrice)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block">
+                      <div className="text-right shrink-0">
+                        <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block tabular-nums">
                           SL: {p.quantity}
                         </div>
-                        <div className="text-xs font-black text-brand-950 mt-1">
+                        <div className="text-xs font-black text-slate-900 mt-1 tabular-nums">
                           {formatCurrency(p.subtotal)}
                         </div>
                       </div>
@@ -1211,79 +1337,144 @@ export function HistoryDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-brand-100 text-center">
+                <div className="bg-white rounded-2xl p-3 text-xs text-slate-500 italic border border-slate-200 text-center">
                   Không thay thế linh kiện (chỉ thực hiện kiểm tra, bảo dưỡng & căn chỉnh)
                 </div>
               )}
             </div>
 
-            <div className="bg-white rounded-2xl p-3.5 border border-brand-100 flex items-center justify-between shadow-2xs">
-              <div>
-                <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Kiểm tra & lắp ráp tại chỗ</div>
+            <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">engineering</span>
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-slate-900">Tiền công kỹ thuật viên</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Kiểm tra & lắp ráp tại chỗ</div>
+                </div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-black text-brand-950">
+                <div className="text-xs font-black text-slate-900 tabular-nums">
                   {formatCurrency(detail.laborCost !== undefined ? detail.laborCost : 0)}
                 </div>
               </div>
             </div>
 
             {quoteData?.diagnosis_note && (
-              <div className="bg-white/80 p-3 rounded-2xl text-xs text-slate-700 border border-brand-100">
-                <span className="font-bold text-brand-950">{detail.isSupplementaryQuote ? "Ghi chú phát sinh:" : "Ghi chú sửa chữa:"}</span> {quoteData.diagnosis_note}
+              <div className="bg-white p-3.5 rounded-2xl text-xs text-slate-700 border border-slate-200/80 flex items-start gap-2 shadow-2xs">
+                <span className="material-symbols-outlined text-brand-600 text-sm mt-0.5 shrink-0" aria-hidden="true">chat</span>
+                <div>
+                  <span className="font-bold text-slate-900">
+                    {detail.isSupplementaryQuote ? "Lý do phát sinh:" : "Ghi chú sửa chữa:"}
+                  </span>{" "}
+                  <span className="text-slate-600">{quoteData.diagnosis_note}</span>
+                </div>
               </div>
             )}
 
-            <div className="bg-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2">
+            <div className="bg-gradient-to-br from-slate-900 via-brand-950 to-brand-900 text-white rounded-2xl p-4 shadow-md space-y-2.5">
               {detail.isSupplementaryQuote && (
-                <div className="space-y-1.5 pb-2 border-b border-brand-800/80 text-xs">
-                  <div className="flex justify-between items-center text-brand-200">
-                    <span>Báo giá đã duyệt trước đó:</span>
-                    <span className="font-bold text-white">{formatCurrency(detail.approvedEstimate || 0)}</span>
+                <div className="space-y-2 pb-2.5 border-b border-white/10 text-xs">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-slate-400 text-sm" aria-hidden="true">check_circle</span>
+                      Báo giá đã duyệt trước đó:
+                    </span>
+                    <span className="font-bold text-white tabular-nums">
+                      {formatCurrency(detail.approvedEstimate || 0)}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center text-amber-300 font-bold">
-                    <span>Chi phí phát sinh bổ sung:</span>
-                    <span className="text-amber-300 font-black text-sm">+{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-amber-400 text-sm" aria-hidden="true">add_circle</span>
+                      Chi phí phát sinh bổ sung:
+                    </span>
+                    <span className="text-amber-300 font-black text-sm tabular-nums">
+                      +{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}
+                    </span>
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-brand-200">
-                  {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
-                </span>
-                <span className="text-lg font-black text-amber-300">
-                  {formatCurrency(detail.isSupplementaryQuote
-                    ? ((detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0))
-                    : detail.total)}
+              <div className="flex justify-between items-center pt-0.5">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-brand-200 block">
+                    {detail.isSupplementaryQuote ? "Tổng chi phí sau khi duyệt phát sinh" : "Tổng chi phí báo giá"}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {detail.isSupplementaryQuote ? "Đã bao gồm chi phí phát sinh mới" : "Chi phí trọn gói nghiệm thu"}
+                  </span>
+                </div>
+                <span className="text-xl font-black text-amber-300 tabular-nums">
+                  {formatCurrency(
+                    detail.isSupplementaryQuote
+                      ? (detail.approvedEstimate || 0) + (detail.additionalAmount || quoteData?.estimated_price || 0)
+                      : detail.total
+                  )}
                 </span>
               </div>
-              <div className="text-[11px] text-brand-200/90 italic">
+
+              <div className="text-[11px] text-slate-400 italic pt-1 border-t border-white/10">
                 ⓘ Chi phí gồm {detail.parts && detail.parts.length > 0 ? `${detail.parts.length} linh kiện (${formatCurrency(detail.partsCost || 0)})` : "0 linh kiện"} + tiền công kỹ thuật ({formatCurrency(detail.laborCost || 0)}).
               </div>
             </div>
 
-            <div className="flex gap-2 pt-1">
-              <button
-                disabled={isApprovingQuote}
-                onClick={() => setIsRejectModalOpen(true)}
-                className="flex-1 py-3 bg-white border border-rose-200 text-rose-600 font-bold text-xs rounded-xl hover:bg-rose-50 transition cursor-pointer"
-              >
-                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối báo giá"}
-              </button>
+            <div className="space-y-2 pt-1.5">
               <button
                 disabled={isApprovingQuote}
                 onClick={() => handleApproveQuote(true)}
-                className="flex-1 py-3 bg-brand-900 hover:bg-brand-950 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-brand-900 to-brand-800 hover:from-brand-950 hover:to-brand-900 active:scale-[0.99] text-white font-bold text-sm rounded-2xl transition shadow-md flex items-center justify-between cursor-pointer disabled:opacity-60"
               >
-                {isApprovingQuote ? "Đang xử lý..." : detail.isSupplementaryQuote ? `Duyệt phát sinh (+${formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)})` : "Duyệt báo giá ngay ✓"}
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-400 text-lg" aria-hidden="true">
+                    check_circle
+                  </span>
+                  <span>
+                    {isApprovingQuote
+                      ? "Đang xử lý..."
+                      : detail.isSupplementaryQuote
+                        ? "Duyệt phát sinh"
+                        : "Duyệt báo giá ngay ✓"}
+                  </span>
+                </span>
+                {detail.isSupplementaryQuote && !isApprovingQuote && (
+                  <span className="bg-white/15 px-3 py-1 rounded-xl text-xs font-black text-amber-300 tabular-nums tracking-wide">
+                    +{formatCurrency(detail.additionalAmount || quoteData?.estimated_price || 0)}
+                  </span>
+                )}
+              </button>
+
+              <button
+                disabled={isApprovingQuote}
+                onClick={() => setIsRejectModalOpen(true)}
+                className="w-full py-2.5 bg-white border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 hover:bg-rose-50/50 active:scale-[0.99] font-bold text-xs rounded-2xl transition cursor-pointer text-center disabled:opacity-60 shadow-2xs"
+              >
+                {detail.isSupplementaryQuote ? "Từ chối phát sinh" : "Từ chối báo giá"}
               </button>
             </div>
           </div>
         )}
 
         <div className="rd-info-card">
+          {(detail.bookingDate || detail.bookingSlot) && (
+            <>
+              <div className="rd-info-row">
+                <div className="rd-info-icon-wrap">
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>
+                    calendar_month
+                  </span>
+                </div>
+                <div className="rd-info-content">
+                  <span className="rd-info-label">Lịch hẹn sửa chữa</span>
+                  <span className="rd-info-value font-bold text-slate-900">
+                    {detail.bookingSlot ? `Khung giờ: ${detail.bookingSlot}` : ""}
+                    {detail.bookingDate ? ` • Ngày: ${detail.bookingDate}` : ""}
+                  </span>
+                </div>
+              </div>
+              <div className="rd-info-divider" />
+            </>
+          )}
           <div className="rd-info-row">
             <div className="rd-info-icon-wrap">
               <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2479ad" }}>
@@ -1291,7 +1482,7 @@ export function HistoryDetail() {
               </span>
             </div>
             <div className="rd-info-content">
-              <span className="rd-info-label">Thời gian</span>
+              <span className="rd-info-label">Thời gian tạo đơn</span>
               <span className="rd-info-value">{detail.dateTime}</span>
             </div>
           </div>
@@ -1896,9 +2087,23 @@ export function HistoryDetail() {
             </span>
             Gửi yêu cầu hỗ trợ (1900 6868)
           </button>
+          {canCancelOrder && (
+            <button
+              type="button"
+              className="rd-action-danger"
+              id="btn-cancel-repair-request"
+              onClick={() => setIsCancelModalOpen(true)}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                cancel
+              </span>
+              {detail.isSos ? "Hủy yêu cầu cứu hộ" : "Hủy lịch hẹn sửa chữa"}
+            </button>
+          )}
         </div>
+      </div>
 
-        {showQrModal && (
+      {showQrModal && (
           <div
             style={{
               position: "fixed",
@@ -2274,7 +2479,116 @@ export function HistoryDetail() {
             </div>
           </div>
         )}
-      </div>
+
+        {isCancelModalOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 24,
+                padding: 24,
+                maxWidth: 420,
+                width: "100%",
+                boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              }}
+              className="space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                    <span className="material-symbols-outlined text-base">event_busy</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {detail.isSos ? "Hủy yêu cầu cứu hộ" : "Hủy lịch hẹn sửa chữa"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {detail.isSos
+                  ? "Bạn có chắc chắn muốn hủy yêu cầu cứu hộ này? Vui lòng chọn lý do:"
+                  : "Bạn có chắc chắn muốn hủy lịch hẹn này? Vui lòng chọn lý do để hệ thống ghi nhận:"}
+              </p>
+
+              <div className="space-y-2 text-xs">
+                {cancelReasonOptions.map((opt) => (
+                  <label
+                    key={opt.key}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                      cancelReasonKey === opt.key
+                        ? "border-rose-300 bg-rose-50/50 text-rose-900 font-semibold"
+                        : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancelOrderReason"
+                      value={opt.key}
+                      checked={cancelReasonKey === opt.key}
+                      onChange={(e) => setCancelReasonKey(e.target.value)}
+                      className="mt-0.5 accent-rose-600"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {cancelReasonKey === "OTHER" && (
+                <textarea
+                  value={customCancelText}
+                  onChange={(e) => setCustomCancelText(e.target.value)}
+                  placeholder="Nhập lý do hủy cụ thể..."
+                  className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-rose-500 focus:outline-none resize-none h-20"
+                />
+              )}
+
+              {cancelError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm">error</span>
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isCancellingOrder}
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Giữ lại lịch
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancellingOrder || (cancelReasonKey === "OTHER" && !customCancelText.trim())}
+                  onClick={handleCancelOrder}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                >
+                  {isCancellingOrder ? "Đang xử lý..." : "Xác nhận hủy đơn"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

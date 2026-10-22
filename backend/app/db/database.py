@@ -6,7 +6,7 @@ from supabase import create_client, Client, ClientOptions
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
 
 # Cấu hình httpx Client với HTTP/1.1 (http2=False) để khắc phục triệt để lỗi Server disconnected
 # do Cloudflare/Supabase ngắt kết nối idle HTTP/2

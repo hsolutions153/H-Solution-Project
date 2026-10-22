@@ -67,7 +67,7 @@ def _final_amount(repair: dict) -> Decimal:
     if repair.get('status') not in {'ESTIMATE_APPROVED', 'REPAIRING', 'COMPLETED'}:
         raise AppException(ErrorCode.PAYMENT_AMOUNT_UNDETERMINED, message='Vui lòng chờ kỹ thuật viên nghiệm thu chi phí sửa chữa trước khi thanh toán.')
     amt = repair.get('total_amount')
-    if amt is None or (isinstance(amt, (int, float, str)) and float(amt) == 0):
+    if amt is None or (repair.get('status') != 'COMPLETED' and isinstance(amt, (int, float, str)) and float(amt) == 0):
         try:
             accepted_quote = repository.get_accepted_quote(repair['id'])
             if accepted_quote and accepted_quote.get('estimated_price') is not None:
@@ -141,6 +141,20 @@ def _settle(payment: dict, transaction_code: str, changed_by: str | None = None)
         'old_status': payment['payment_status'], 'new_status': 'PAID',
         'amount': str(payment['amount']), 'transaction_code': transaction_code, 'changed_by': changed_by,
     })
+    # Thông báo cho Khách hàng, Kỹ thuật viên và Admin
+    try:
+        from app.notifications import service as notif_service
+        notif_service.notify_payment_success(
+            repair_id=payment.get('repair_id', ''),
+            customer_id=repair.get('customer_id', ''),
+            technician_id=repair.get('technician_id'),
+            amount=payment.get('amount', 0),
+            method=payment.get('payment_method', 'ONLINE'),
+        )
+    except Exception as notif_err:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to trigger payment notification: {notif_err}")
+
     # Thanh toán không thay đổi trạng thái hoặc chi phí cuối của đơn sửa chữa
     return updated
 

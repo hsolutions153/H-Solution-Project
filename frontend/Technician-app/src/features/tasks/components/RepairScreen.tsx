@@ -209,36 +209,11 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     }
   };
 
-  const handleFinishWithoutPayment = async () => {
-    if (!settlementData || !task?.id) return;
-    setIsConfirmingPayment(true);
-    try {
-      await fetchApi<any>(`/repair-requests/${task.id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status: "COMPLETED",
-          final_cost: settlementData.finalCost,
-        }),
-      });
-      if (task?.id) {
-        try {
-          sessionStorage.removeItem(timerKey(task.id));
-          sessionStorage.removeItem(noteKey(task.id));
-        } catch {}
-      }
-      setIsSettlementModalOpen(false);
-      if (onComplete) {
-        onComplete({
-          ...settlementData.completedData,
-          paymentStatus: paymentInfo?.payment?.payment_status || "UNPAID",
-          paymentMethod: paymentInfo?.payment?.payment_method || undefined,
-        });
-      }
-    } catch (err: any) {
-      alert(err.message || "Không thể cập nhật trạng thái đơn.");
-    } finally {
-      setIsConfirmingPayment(false);
-    }
+  // Đóng màn nghiệm thu chỉ ẩn đi; đơn vẫn chờ khách thanh toán, KTV có thể mở lại
+  // bằng nút "Hoàn tất sửa chữa".
+  const handleCloseSettlement = () => {
+    if (isConfirmingPayment || paymentSuccessMessage) return;
+    setIsSettlementModalOpen(false);
   };
 
   const PRESET_PARTS = [
@@ -518,6 +493,12 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       return;
     }
 
+    // Đã chốt chi phí và upload ảnh trước đó: chỉ mở lại màn chờ khách thanh toán
+    if (settlementData && settlementData.finalCost === finalCost) {
+      setIsSettlementModalOpen(true);
+      return;
+    }
+
     setIsUploading(true);
     let uploadedUrls: string[] = [];
     let lastResponse: any = null;
@@ -555,8 +536,32 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             }
           }
         }
+
+        // 2. Chốt chi phí thực tế. Đơn có phí giữ trạng thái sửa chữa cho đến khi
+        //    khách thanh toán và KTV gạt xác nhận; đơn 0 đ hoàn tất ngay.
+        if (finalCost > 0) {
+          lastResponse = await fetchApi<any>(`/repair-requests/${task.id}/final-cost`, {
+            method: "POST",
+            body: JSON.stringify({ final_cost: finalCost }),
+          });
+        } else {
+          const statusRes = await fetchApi<any>(`/repair-requests/${task.id}/status`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              status: "COMPLETED",
+              final_cost: finalCost,
+            }),
+          });
+          if (statusRes?.status !== "COMPLETED") {
+            throw new Error("Đơn chưa được hoàn tất. Vui lòng thử lại.");
+          }
+          lastResponse = statusRes;
+        }
       } catch (err: any) {
-        console.warn("Lỗi khi upload ảnh nghiệm thu:", err);
+        console.error("Lỗi khi hoàn tất đơn:", err);
+        alert(err.message || "Không thể hoàn tất đơn sửa chữa. Vui lòng kiểm tra lại báo giá đã duyệt.");
+        setIsUploading(false);
+        return;
       } finally {
         setIsUploading(false);
       }
@@ -1066,7 +1071,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
       <Modal
         open={isSettlementModalOpen}
-        onClose={handleFinishWithoutPayment}
+        onClose={handleCloseSettlement}
         variant="sheet"
         title="Nghiệm thu & Hoàn tất"
       >
@@ -1107,6 +1112,10 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   <span>Chờ khách thanh toán trên app...</span>
                 </div>
               )}
+
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                Đơn chỉ được hoàn tất sau khi khách chuyển khoản hoặc trả tiền mặt và bạn gạt xác nhận đã nhận tiền.
+              </p>
 
               <div className="pt-1">
                 <SlideToConfirm

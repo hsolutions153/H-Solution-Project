@@ -259,8 +259,7 @@ export const OrderDetailModal = ({
     orderDetail.issue_type ||
     "Sự cố kỹ thuật";
 
-  const isFinished =
-    orderDetail.status === "COMPLETED" || orderDetail.status === "CANCELLED";
+  const isFinished = orderDetail.status === "COMPLETED" || orderDetail.status === "CANCELLED";
 
   const canAssignTechnician = (() => {
     const st = (orderDetail.status || "").toUpperCase();
@@ -269,6 +268,10 @@ export const OrderDetailModal = ({
 
   const handleAssign = async () => {
     if (!selectedTechId || isFinished || !canAssignTechnician) {
+      if (orderDetail.status === "CANCELLED") {
+        onToast("Đơn hàng đã bị hủy, không thể phân công KTV nữa!");
+        return;
+      }
       if (!canAssignTechnician) {
         onToast("Đơn ở trạng thái này không thể phân công thợ!");
       }
@@ -1161,7 +1164,11 @@ export const OrderDetailModal = ({
                           ) : (
                             <UserCheck className="w-4 h-4" />
                           )}
-                          <span>{orderDetail.technician_id ? "Xác nhận đổi thợ" : "Xác nhận phân công"}</span>
+                          <span>
+                            {orderDetail.technician_id
+                              ? "Xác nhận đổi thợ"
+                              : "Xác nhận phân công"}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -1224,7 +1231,14 @@ export const OrderDetailModal = ({
                         </div>
                       ) : (
                         <div className="text-xs text-slate-400 italic text-center py-2">
-                          Đơn hàng không có kỹ thuật viên phụ trách.
+                          {orderDetail.status === "CANCELLED" ? (
+                            <span className="text-rose-600 font-semibold not-italic flex items-center justify-center gap-1.5">
+                              <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                              <span>Đơn hàng đã được khách hàng hủy ({String(orderDetail.cancel_reason || "Khách hàng hủy đơn")}). Không thể phân công kỹ thuật viên.</span>
+                            </span>
+                          ) : (
+                            "Đơn hàng không có kỹ thuật viên phụ trách."
+                          )}
                         </div>
                       )}
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">

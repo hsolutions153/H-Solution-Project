@@ -82,7 +82,9 @@ def _role_id(code: str) -> str:
 
 
 def _is_role(current_user: dict, code: str) -> bool:
-    if current_user.get("role") == code:
+    user_role = str(current_user.get("role") or "").strip().upper()
+    target_code = str(code or "").strip().upper()
+    if user_role and (user_role == target_code or (target_code == "CUSTOMER" and user_role in {"CUSTOMER", "USER"})):
         return True
     try:
         return current_user.get("role_id") == _role_id(code)
@@ -98,79 +100,109 @@ def _image_id() -> str:
     return secrets.token_hex(5).upper()
 
 
+_TECH_CACHE: dict[str, tuple[float, dict]] = {}
+_USER_CACHE: dict[str, tuple[float, dict]] = {}
+_DEVICE_CACHE: dict[str, tuple[float, dict]] = {}
+TECH_CACHE_TTL_SECONDS = 300
+TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 300
+EARTH_RADIUS_KM = 6371.0088
+
+
 def _attach_images_to_list(items: list[dict]) -> list[dict]:
     if not items:
         return []
+    import time
+    from concurrent.futures import ThreadPoolExecutor
     from app.db.database import supabase
-    from app.auth import repository as auth_repo
 
+    now = time.time()
     repair_ids = [item["id"] for item in items]
-    images = repository.get_repair_images_by_repair_ids(repair_ids)
+    customer_ids = {item["customer_id"] for item in items if item.get("customer_id")}
+    device_ids = {item["device_id"] for item in items if item.get("device_id")}
+    technician_ids = {item["technician_id"] for item in items if item.get("technician_id")}
+
+    missing_cids = [cid for cid in customer_ids if cid not in _USER_CACHE or (now - _USER_CACHE[cid][0] >= TECH_CACHE_TTL_SECONDS)]
+    missing_dids = [did for did in device_ids if did not in _DEVICE_CACHE or (now - _DEVICE_CACHE[did][0] >= TECH_CACHE_TTL_SECONDS)]
+
+    def _fetch_users():
+        if not missing_cids:
+            return None
+        try:
+            return supabase.table("users").select("id,full_name,phone,email,address").in_("id", missing_cids).execute()
+        except Exception:
+            return None
+
+    def _fetch_devices():
+        if not missing_dids:
+            return None
+        try:
+            return supabase.table("customer_devices").select("id,device_type,manufacturer,model_name").in_("id", missing_dids).execute()
+        except Exception:
+            return None
+
+    def _fetch_payments():
+        if not repair_ids:
+            return None
+        try:
+            return supabase.table("payments").select("id,repair_id,payment_method,payment_status").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
+        except Exception:
+            return None
+
+    def _fetch_quotes():
+        if not repair_ids:
+            return None
+        try:
+            return supabase.table("repair_quotes").select("id,repair_id,estimated_price,parts_cost,labor_fee,status,reject_reason,diagnosis_note,created_at").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        f_images = executor.submit(repository.get_repair_images_by_repair_ids, repair_ids)
+        f_users = executor.submit(_fetch_users)
+        f_devices = executor.submit(_fetch_devices)
+        f_techs = executor.submit(_get_technicians_map, technician_ids)
+        f_payments = executor.submit(_fetch_payments)
+        f_quotes = executor.submit(_fetch_quotes)
+
+        images = f_images.result() or []
+        users_resp = f_users.result()
+        devices_resp = f_devices.result()
+        techs_map = f_techs.result() or {}
+        payments_resp = f_payments.result()
+        quotes_resp = f_quotes.result()
+
+    if users_resp and users_resp.data:
+        for u in users_resp.data:
+            _USER_CACHE[u["id"]] = (now, u)
+
+    if devices_resp and devices_resp.data:
+        for d in devices_resp.data:
+            _DEVICE_CACHE[d["id"]] = (now, d)
 
     images_by_repair = defaultdict(list)
     for img in images:
         images_by_repair[img["repair_id"]].append(img)
 
-    customer_ids = {item["customer_id"] for item in items if item.get("customer_id")}
-    device_ids = {item["device_id"] for item in items if item.get("device_id")}
-
-    customers_map = {}
-    if customer_ids:
-        try:
-            users_resp = supabase.table("users").select("id,full_name,phone,email,address").in_("id", list(customer_ids)).execute()
-            if users_resp and users_resp.data:
-                customers_map = {u["id"]: u for u in users_resp.data}
-        except Exception:
-            pass
-
-        for cid in customer_ids:
-            if cid not in customers_map:
-                u = auth_repo.get_user_by_id(cid)
-                if u:
-                    customers_map[cid] = u
-
-    devices_map = {}
-    if device_ids:
-        try:
-            devices_resp = supabase.table("customer_devices").select("id,device_type,manufacturer,model_name").in_("id", list(device_ids)).execute()
-            if devices_resp and devices_resp.data:
-                devices_map = {d["id"]: d for d in devices_resp.data}
-        except Exception:
-            pass
-
-    technician_ids = {item["technician_id"] for item in items if item.get("technician_id")}
-    techs_map = _get_technicians_map(technician_ids)
-
     payments_map = {}
-    if repair_ids:
-        try:
-            payments_resp = supabase.table("payments").select("id,repair_id,payment_method,payment_status").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
-            if payments_resp and payments_resp.data:
-                for p in payments_resp.data:
-                    rid = p.get("repair_id")
-                    if rid and rid not in payments_map:
-                        payments_map[rid] = p
-        except Exception:
-            pass
+    if payments_resp and payments_resp.data:
+        for p in payments_resp.data:
+            rid = p.get("repair_id")
+            if rid and rid not in payments_map:
+                payments_map[rid] = p
 
     quotes_map = defaultdict(list)
-    if repair_ids:
-        try:
-            quotes_resp = supabase.table("repair_quotes").select("id,repair_id,estimated_price,parts_cost,labor_fee,status,reject_reason,diagnosis_note,created_at").in_("repair_id", repair_ids).order("created_at", desc=True).execute()
-            if quotes_resp and quotes_resp.data:
-                for q in quotes_resp.data:
-                    rid = q.get("repair_id")
-                    if rid:
-                        quotes_map[rid].append(q)
-        except Exception:
-            pass
+    if quotes_resp and quotes_resp.data:
+        for q in quotes_resp.data:
+            rid = q.get("repair_id")
+            if rid:
+                quotes_map[rid].append(q)
 
     for item in items:
         item["images"] = images_by_repair.get(item["id"], [])
         if item.get("customer_id"):
-            item["customer"] = customers_map.get(item["customer_id"])
+            item["customer"] = _USER_CACHE.get(item["customer_id"], (None, None))[1]
         if item.get("device_id"):
-            item["device"] = devices_map.get(item["device_id"])
+            item["device"] = _DEVICE_CACHE.get(item["device_id"], (None, None))[1]
         if item.get("technician_id"):
             item["technician"] = techs_map.get(item["technician_id"])
 
@@ -191,13 +223,6 @@ def _attach_images_to_list(items: list[dict]) -> list[dict]:
                 item["total_amount"] = float(q["estimated_price"])
 
     return items
-
-
-_TECH_CACHE: dict[str, tuple[float, dict]] = {}
-_USER_CACHE: dict[str, tuple[float, dict]] = {}
-TECH_CACHE_TTL_SECONDS = 300
-TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 300
-EARTH_RADIUS_KM = 6371.0088
 
 
 def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
@@ -614,6 +639,14 @@ def create_request(current_user: dict, data):
         except Exception as img_err:
             logger.warning(f"Failed to create repair image record: {img_err}")
 
+    try:
+        from app.notifications import service as notif_service
+        notif_service.notify_request_created(record)
+        if tech_id:
+            notif_service.notify_request_assigned(record, tech_id)
+    except Exception as notif_err:
+        logger.warning(f"Failed to trigger notifications for create_request: {notif_err}")
+
     return fetch_request(request_id, current_user)
 
 
@@ -938,10 +971,67 @@ def _respond_to_pending_quote(request_id: str, payload: dict, fields: dict):
     return query.execute()
 
 
+def _get_payment(request_id: str):
+    from app.payments import repository as payment_repository
+    return payment_repository.get_payment_by_repair_id(request_id)
+
+
+def _validated_final_cost(request_id: str, submitted_cost: float | None) -> float:
+    """Chi phí thực tế phải không vượt tổng báo giá đã duyệt và không còn báo giá chờ duyệt."""
+    try:
+        quotes = repository.get_quotes_by_repair_id(request_id) or []
+    except Exception as check_err:
+        logger.warning(f"Error checking quote vs final cost: {check_err}")
+        raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+    if any(q.get("status") == "PENDING" for q in quotes):
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
+    accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
+    if not accepted_quotes:
+        raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
+    est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
+    final_cost = submitted_cost if submitted_cost is not None else est_price
+    if final_cost > est_price:
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+        )
+    return final_cost
+
+
+def submit_final_cost(request_id: str, data: dict, current_user: dict):
+    """KTV chốt chi phí thực tế khi sửa xong; đơn giữ nguyên trạng thái chờ khách thanh toán."""
+    request = repository.get_repair_request_by_id(request_id)
+    if not request:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    if not (_is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") == current_user["sub"]):
+        raise AppException(ErrorCode.FORBIDDEN)
+    if request.get("status") not in {"ESTIMATE_APPROVED", "REPAIRING"}:
+        raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Chỉ chốt chi phí khi đơn đang sửa chữa.")
+
+    from app.core.validation import validated_payload
+    from app.repair_requests.schemas import FinalCostRequest
+    payload = validated_payload(FinalCostRequest, data)
+    final_cost = _validated_final_cost(request_id, float(payload["final_cost"]))
+
+    payment = _get_payment(request_id)
+    if payment and payment.get("payment_status") in {"PENDING", "PAID"} and not math.isclose(
+        float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01
+    ):
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=f"Khách hàng đã báo thanh toán {float(payment.get('amount') or 0):,.0f} đ nên không thể đổi chi phí thực tế.",
+        )
+
+    if not repository.update_repair_request(request_id, {"total_amount": final_cost, "updated_by": current_user["sub"]}):
+        raise AppException(ErrorCode.DATABASE_ERROR)
+    return fetch_request(request_id, current_user)
+
+
 def update_request_status(request_id: str, current_user: dict, data):
     request = repository.get_repair_request_by_id(request_id)
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    actual_id = request["id"]
     from app.core.validation import validated_payload
     from app.repair_requests.schemas import RepairRequestStatusUpdate
     payload = validated_payload(RepairRequestStatusUpdate, data)
@@ -950,11 +1040,16 @@ def update_request_status(request_id: str, current_user: dict, data):
         raise AppException(ErrorCode.VALIDATION_ERROR, message="Trạng thái yêu cầu không hợp lệ")
 
     is_admin = _is_role(current_user, ADMIN_ROLE_CODE)
-    is_customer = _is_role(current_user, CUSTOMER_ROLE_CODE) and request["customer_id"] == current_user["sub"]
+    is_customer = (
+        (_is_role(current_user, CUSTOMER_ROLE_CODE) or _is_role(current_user, "USER"))
+        and str(request.get("customer_id")) == str(current_user.get("sub"))
+    )
 
-    # Nếu trạng thái không thay đổi, coi như thành công ngay lập tức (Idempotent)
+    # Nếu trạng thái không thay đổi và không có chi phí/thông tin cập nhật kèm theo, coi như thành công ngay lập tức (Idempotent)
     if new_status == request["status"]:
-        return fetch_request(request_id, current_user)
+        submitted_cost = _submitted_final_cost(payload)
+        if submitted_cost is None and not payload.get("cancel_reason"):
+            return fetch_request(actual_id, current_user)
 
     if _is_role(current_user, TECHNICIAN_ROLE_CODE) and request.get("technician_id") != current_user["sub"]:
         raise AppException(
@@ -971,8 +1066,25 @@ def update_request_status(request_id: str, current_user: dict, data):
         )
     elif is_customer:
         allowed = (
-            (request["status"] in {"REQUESTED", "CONFIRMED", "ASSIGNED"} and new_status == "CANCELLED")
-            or (request["status"] in {"ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"} and new_status in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED", "CANCELLED"})
+            (
+                request["status"] in {
+                    "REQUESTED",
+                    "PENDING",
+                    "CONFIRMED",
+                    "ASSIGNED",
+                    "ACCEPTED",
+                    "DIAGNOSING",
+                    "DIAGNOSED",
+                    "ESTIMATE_SUBMITTED",
+                    "WAITING_FOR_APPROVAL",
+                    "ESTIMATE_REJECTED",
+                }
+                and new_status == "CANCELLED"
+            )
+            or (
+                request["status"] in {"ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL"}
+                and new_status in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED"}
+            )
         )
     elif is_technician:
         allowed = new_status in TECHNICIAN_TRANSITIONS.get(request["status"], set())
@@ -998,83 +1110,119 @@ def update_request_status(request_id: str, current_user: dict, data):
     if new_status == "REPAIRING" and request["status"] in {
         "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED"
     }:
-        quotes = repository.get_quotes_by_repair_id(request_id) or []
+        quotes = repository.get_quotes_by_repair_id(actual_id) or []
         if not any(quote.get("status") == "ACCEPTED" for quote in quotes):
             raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
 
     now = datetime.now(timezone.utc).isoformat()
-    if new_status == "REJECTED":
+    # Kỹ thuật viên từ chối nhận việc (REJECTED) hoặc hủy nhận việc (CANCELLED) khi chưa hoàn thành
+    if new_status == "REJECTED" or (is_technician and new_status == "CANCELLED" and request.get("status") not in {"COMPLETED", "PAID"}):
         # 1. Thu thập tất cả ID của KTV đã từng xử lý hoặc từ chối đơn này để loại trừ
         excluded_tech_ids = {current_user["sub"]}
         if request.get("technician_id"):
             excluded_tech_ids.add(request["technician_id"])
 
         try:
-            histories = repository.get_status_history(request_id)
+            histories = repository.get_status_history(actual_id)
             for h in histories:
                 if h.get("changed_by") and h.get("status") in {"REJECTED", "ASSIGNED"}:
                     excluded_tech_ids.add(h["changed_by"])
         except Exception as h_err:
             logger.warning(f"Error fetching history for exclusion: {h_err}")
 
-        # 2. Ghi nhận lịch sử KTV hiện tại từ chối
-        reject_note = payload.get("cancel_reason") or "Kỹ thuật viên từ chối nhận đơn"
+        # 2. Ghi nhận lịch sử KTV hiện tại từ chối hoặc hủy nhận ca
+        action_name = "hủy nhận đơn" if new_status == "CANCELLED" else "từ chối nhận đơn"
+        reject_note = payload.get("cancel_reason") or f"Kỹ thuật viên {action_name}"
         repository.add_status_history(
             {
                 "id": _request_id(),
-                "repair_id": request_id,
+                "repair_id": actual_id,
                 "status": "REQUESTED",
                 "changed_by": current_user["sub"],
-                "note": f"[KTV từ chối] {reject_note}",
+                "note": f"[KTV {action_name}] {reject_note}",
             }
         )
 
-        # 3. Tự động tìm KTV tiếp theo khả dụng và không trùng với KTV trước
+        # 3. Tự động tìm KTV tiếp theo khả dụng (nếu là đơn khẩn cấp SOS)
+        is_sos_request = request.get("is_sos") or (request.get("latitude") and request.get("longitude"))
         next_tech_id = _find_best_sos_technician(
             customer_lat=request.get("latitude"),
             customer_lng=request.get("longitude"),
             device_type=repository.get_device_type(request.get("device_id")),
             exclude_tech_ids=excluded_tech_ids,
-        )
+        ) if is_sos_request else None
+
+        from app.notifications import service as notif_service
 
         if next_tech_id:
             update_data = {
                 "status": "ASSIGNED",
                 "technician_id": next_tech_id,
                 "assigned_at": now,
+                "cancelled_at": None,
+                "cancel_reason": None,
                 "updated_by": current_user["sub"],
             }
-            repository.update_repair_request(request_id, update_data)
+            updated_record = repository.update_repair_request(actual_id, update_data)
             repository.add_status_history(
                 {
                     "id": _request_id(),
-                    "repair_id": request_id,
+                    "repair_id": actual_id,
                     "status": "ASSIGNED",
                     "changed_by": current_user["sub"],
-                    "note": f"Hệ thống tự động tái phân công cho KTV mới ({next_tech_id}) sau khi KTV trước từ chối",
+                    "note": f"Hệ thống tự động tái phân công cho KTV mới sau khi KTV trước {action_name}",
                 }
             )
-            logger.info(f"Auto-reassigned request {request_id} from {current_user['sub']} to {next_tech_id}")
+            logger.info(f"Auto-reassigned request {actual_id} from {current_user['sub']} to {next_tech_id}")
+            try:
+                notif_service.notify_request_assigned(updated_record, next_tech_id)
+                notif_service.notify_admins(
+                    title=f"KTV {action_name} #{request.get('request_code') or actual_id[:8]}",
+                    body=f"KTV đã {action_name} ({reject_note}). Hệ thống đã tự động gán cho KTV mới.",
+                    type_code="REQUEST_REASSIGNED",
+                    data={"repair_id": actual_id, "url": "/dashboard"},
+                )
+            except Exception as n_err:
+                logger.warning(f"Failed to send notifications on auto-reassign: {n_err}")
         else:
-            # Không còn KTV nào khác -> Chuyển về REQUESTED chờ điều phối thủ công
+            # Không có KTV khác khả dụng -> Chuyển về REQUESTED chờ Admin điều phối thủ công
             update_data = {
                 "status": "REQUESTED",
                 "technician_id": None,
+                "assigned_at": None,
+                "cancelled_at": None,
+                "cancel_reason": None,
                 "updated_by": current_user["sub"],
             }
-            repository.update_repair_request(request_id, update_data)
+            updated_record = repository.update_repair_request(actual_id, update_data)
             repository.add_status_history(
                 {
                     "id": _request_id(),
-                    "repair_id": request_id,
+                    "repair_id": actual_id,
                     "status": "REQUESTED",
                     "changed_by": current_user["sub"],
-                    "note": "Hiện không có KTV khả dụng khác, đơn chuyển về hàng đợi chờ Admin điều phối",
+                    "note": f"KTV {action_name}. Đơn chuyển về hàng đợi để Admin điều phối KTV khác.",
                 }
             )
-            logger.info(f"No available replacement technician for request {request_id}")
+            logger.info(f"Request {actual_id} reverted to REQUESTED after technician {action_name}")
+            try:
+                notif_service.notify_admins(
+                    title=f"Cần điều phối: KTV đã {action_name} #{request.get('request_code') or actual_id[:8]}",
+                    body=f"KTV đã {action_name} ({reject_note}). Đơn đã chuyển về trạng thái chờ phân công, vui lòng gán thợ khác.",
+                    type_code="REQUEST_UNASSIGNED",
+                    data={"repair_id": actual_id, "url": "/dashboard"},
+                )
+                notif_service.notify_status_changed(
+                    request_dict=request,
+                    new_status="REJECTED",
+                    old_status=request.get("status"),
+                    note=reject_note,
+                )
+            except Exception as n_err:
+                logger.warning(f"Failed to send notifications on revert to requested: {n_err}")
 
-        return fetch_request(request_id, current_user)
+        # Trả về đối tượng request với quyền admin để tránh lỗi FORBIDDEN do KTV vừa từ chối
+        return fetch_request(actual_id, {"sub": current_user["sub"], "role": ADMIN_ROLE_CODE})
     else:
         update_data = {
             "status": new_status,
@@ -1133,38 +1281,30 @@ def update_request_status(request_id: str, current_user: dict, data):
         elif new_status == "REPAIRING":
             update_data["repairing_at"] = now
         elif new_status == "COMPLETED":
-            total_amt = _submitted_final_cost(payload)
-            try:
-                quotes = repository.get_quotes_by_repair_id(request_id) or []
-                if any(q.get("status") == "PENDING" for q in quotes):
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED, message="Báo giá bổ sung đang chờ khách hàng duyệt. Chưa thể hoàn tất sửa chữa.")
-                accepted_quotes = [q for q in quotes if q.get("status") == "ACCEPTED"]
-                if not accepted_quotes:
-                    raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
-                est_price = sum(float(q.get("estimated_price") or 0) for q in accepted_quotes)
-                final_cost = total_amt if total_amt is not None else est_price
-                if final_cost > est_price:
+            final_cost = _validated_final_cost(request_id, _submitted_final_cost(payload))
+            # Đơn có phí chỉ được hoàn tất sau khi thanh toán đã được xác nhận
+            if final_cost > 0:
+                payment = _get_payment(request_id)
+                if not payment or payment.get("payment_status") != "PAID":
                     raise AppException(
-                        ErrorCode.VALIDATION_ERROR,
-                        message=f"Chi phí thực tế ({final_cost:,.0f} đ) vượt quá báo giá đã duyệt ({est_price:,.0f} đ). Vui lòng gửi báo giá bổ sung để khách hàng phê duyệt trước khi hoàn tất.",
+                        ErrorCode.INVALID_STATUS_TRANSITION,
+                        message="Khách hàng chưa thanh toán. Đơn chỉ được hoàn tất sau khi khách chuyển khoản hoặc trả tiền mặt và bạn đã xác nhận nhận tiền.",
                     )
-                update_data["total_amount"] = final_cost
-            except AppException:
-                raise
-            except Exception as check_err:
-                logger.warning(f"Error checking quote vs final cost: {check_err}")
-                raise AppException(ErrorCode.DATABASE_ERROR) from check_err
+                if not math.isclose(float(payment.get("amount") or 0), final_cost, rel_tol=0, abs_tol=0.01):
+                    raise AppException(ErrorCode.VALIDATION_ERROR, message="Chi phí thực tế không khớp với số tiền khách đã thanh toán.")
+            update_data["total_amount"] = final_cost
 
-            update_data["completed_at"] = now
+            update_data["completed_at"] = request.get("completed_at") or now
         elif new_status == "CANCELLED":
+            cancel_msg = payload.get("cancel_reason") or ("Khách hàng hủy đơn đặt lịch" if is_customer else "Yêu cầu đã bị hủy")
             update_data["cancelled_at"] = now
-            update_data["cancel_reason"] = payload.get("cancel_reason")
+            update_data["cancel_reason"] = cancel_msg
 
         total_amt = _submitted_final_cost(payload)
         if total_amt is not None and new_status not in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED"}:
             update_data["total_amount"] = float(total_amt)
 
-        updated_request = repository.update_repair_request(request_id, update_data)
+        updated_request = repository.update_repair_request(actual_id, update_data)
         if not updated_request:
             raise AppException(ErrorCode.DATABASE_ERROR)
 
@@ -1186,7 +1326,9 @@ def update_request_status(request_id: str, current_user: dict, data):
 
         history_note = payload.get("cancel_reason")
         if not history_note:
-            if new_status == "ACCEPTED":
+            if new_status == "CANCELLED":
+                history_note = "Khách hàng hủy đơn đặt lịch" if is_customer else "Yêu cầu đã bị hủy"
+            elif new_status == "ACCEPTED":
                 history_note = "Kỹ thuật viên chấp nhận yêu cầu"
             elif new_status == "ESTIMATE_APPROVED":
                 history_note = "Khách hàng đã phê duyệt báo giá"
@@ -1196,13 +1338,25 @@ def update_request_status(request_id: str, current_user: dict, data):
         repository.add_status_history(
             {
                 "id": _request_id(),
-                "repair_id": request_id,
+                "repair_id": actual_id,
                 "status": new_status,
                 "changed_by": current_user["sub"],
                 "note": history_note,
             }
         )
-        return fetch_request(request_id, current_user)
+
+        try:
+            from app.notifications import service as notif_service
+            if new_status == "ESTIMATE_APPROVED":
+                notif_service.notify_quote_response(updated_request, {}, approved=True)
+            elif new_status == "ESTIMATE_REJECTED":
+                notif_service.notify_quote_response(updated_request, {}, approved=False, reject_reason=payload.get("reject_reason"))
+            else:
+                notif_service.notify_status_changed(updated_request, new_status, old_status=request.get("status"), note=history_note)
+        except Exception as notif_err:
+            logger.warning(f"Failed to trigger notifications for update_request_status: {notif_err}")
+
+        return fetch_request(actual_id, current_user)
 
 
 def add_after_repair_image(request_id: str, file: UploadFile, current_user: dict):
@@ -1477,15 +1631,23 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
         logger.warning(f"Failed to update repair status on quote create: {stat_err}")
         raise AppException(ErrorCode.DATABASE_ERROR) from stat_err
 
-    if created_quote:
-        created_quote["items"] = created_items
-    return created_quote or {
+    result_quote = created_quote or {
         "id": quote_id,
         "repair_id": request_id,
         **fields,
         "status": "PENDING",
         "items": created_items
     }
+
+    try:
+        from app.notifications import service as notif_service
+        notif_service.notify_quote_submitted(request, result_quote)
+    except Exception as notif_err:
+        logger.warning(f"Failed to trigger notify_quote_submitted: {notif_err}")
+
+    if created_quote:
+        created_quote["items"] = created_items
+    return result_quote
 
 
 def update_quote_for_request(request_id: str, quote_id: str, data: dict, current_user: dict):
@@ -1594,6 +1756,12 @@ def submit_technician_rating(request_id: str, data: dict, current_user: dict):
     except Exception as error:
         logger.warning("Failed to save technician review: %s", error)
         raise AppException(ErrorCode.DATABASE_ERROR) from error
+
+    try:
+        from app.notifications import service as notif_service
+        notif_service.notify_review_received(request_id, tech_id, rating, data.get("comment"))
+    except Exception as notif_err:
+        logger.warning(f"Failed to trigger review notification: {notif_err}")
 
     return {
         "success": True,
