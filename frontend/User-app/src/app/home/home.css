@@ -4819,7 +4819,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 32px;
+  padding-bottom: 120px;
   animation: fadeSlideUp 0.35s ease-out;
 }
 
@@ -5248,6 +5248,32 @@
 }
 
 .rd-action-secondary:active {
+  transform: scale(0.98);
+}
+
+.rd-action-danger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 1.5px solid #fecdd3;
+  background: #fff1f2;
+  color: #e11d48;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rd-action-danger:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #be123c;
+}
+
+.rd-action-danger:active {
   transform: scale(0.98);
 }
 

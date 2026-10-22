@@ -251,6 +251,8 @@ def assign_order(order_id: str, technician_id: str, assigned_at: str, assigned_b
                 "technician_id": technician_id,
                 "status": "ASSIGNED",
                 "assigned_at": assigned_at,
+                "cancelled_at": None,
+                "cancel_reason": None,
                 "updated_by": assigned_by,
             }
         )

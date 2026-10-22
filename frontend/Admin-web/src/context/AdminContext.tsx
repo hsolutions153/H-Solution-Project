@@ -16,6 +16,9 @@ interface AdminContextType {
   showCreateOrder: boolean;
   openCreateOrder: () => void;
   closeCreateOrder: () => void;
+  selectedOrderId: string | null;
+  openOrderDetail: (orderId: string) => void;
+  closeOrderDetail: () => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
   sidebarCollapsed: boolean;
@@ -38,6 +41,7 @@ function subscribeSidebar(listener: () => void) {
 export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const sidebarCollapsed = useSyncExternalStore(
     subscribeSidebar, () => localStorage.getItem(sidebarKey) === "true", () => false,
@@ -57,6 +61,15 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const openOrderDetail = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setActiveTab("orders");
+  };
+
+  const closeOrderDetail = () => {
+    setSelectedOrderId(null);
+  };
+
   return (
     <AdminContext.Provider
       value={{
@@ -65,6 +78,9 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
         showCreateOrder,
         openCreateOrder: () => setShowCreateOrder(true),
         closeCreateOrder: () => setShowCreateOrder(false),
+        selectedOrderId,
+        openOrderDetail,
+        closeOrderDetail,
         toastMessage,
         showToast,
         sidebarCollapsed,

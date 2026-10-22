@@ -202,6 +202,55 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   }, [tasks]);
 
   useEffect(() => {
+    const checkAndOpenTask = async (taskId: string) => {
+      let targetTask = tasks.find((t) => t.id === taskId || t.code === taskId);
+      if (!targetTask) {
+        try {
+          const { fetchApi } = await import("@/lib/api-client");
+          const raw = await fetchApi<any>(`/repair-requests/${taskId}`);
+          if (raw) {
+            targetTask = mapApiTask(raw);
+            setTasks((prev) => [targetTask!, ...prev.filter((p) => p.id !== targetTask!.id)]);
+          }
+        } catch (err) {
+          console.warn("Lỗi tải chi tiết đơn từ thông báo:", err);
+        }
+      }
+
+      if (targetTask) {
+        setSelectedTask(targetTask);
+        sessionStorage.removeItem("technician_pending_task_id");
+        if (targetTask.status === "WAITING_ACCEPT") {
+          setIsModalOpen(true);
+        } else {
+          sessionStorage.setItem("selectedTask", JSON.stringify(targetTask));
+          sessionStorage.setItem("currentView", "detail");
+          setCurrentView("detail");
+        }
+      }
+    };
+
+    // Kiểm tra pending task từ sessionStorage (khi drawer vừa dispatch)
+    const pendingId = sessionStorage.getItem("technician_pending_task_id");
+    if (pendingId) {
+      checkAndOpenTask(pendingId);
+    }
+
+    const handleCustomOpen = (e: Event) => {
+      const customEvent = e as CustomEvent<{ taskId?: string }>;
+      const tid = customEvent.detail?.taskId;
+      if (tid) {
+        checkAndOpenTask(tid);
+      }
+    };
+
+    window.addEventListener("OPEN_TECHNICIAN_TASK", handleCustomOpen);
+    return () => {
+      window.removeEventListener("OPEN_TECHNICIAN_TASK", handleCustomOpen);
+    };
+  }, [tasks]);
+
+  useEffect(() => {
     sessionStorage.setItem("tasksList", JSON.stringify(tasks));
   }, [tasks]);
 
@@ -225,10 +274,15 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
 
   useEffect(() => {
     let isMounted = true;
+    let inFlight = false;
+
     async function loadTechnicianTasks() {
+      if (inFlight || (typeof document !== "undefined" && document.hidden)) return;
+      inFlight = true;
       try {
-        const { fetchApiPages } = await import("@/lib/api-client");
-        const res = await fetchApiPages<any>("/repair-requests/technician/me");
+        const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+        if (!getAuthToken()) return;
+        const res = await fetchApi<{ items: any[] }>("/repair-requests/technician/me?limit=50");
         if (res && Array.isArray(res.items)) {
           const apiTasks: Task[] = res.items.map(mapApiTask);
 
@@ -271,23 +325,25 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.status === 401 || err?.status === 403) return;
         console.warn("Lỗi tải danh sách công việc:", err);
+      } finally {
+        inFlight = false;
       }
     }
 
-    // Assignment SOS cần xuất hiện gần như ngay sau khi backend gán thợ.
-    // Polling 2.5s trước đây tạo cảm giác bị trễ; dùng chu kỳ 1s và kiểm tra
-    // ngay khi tab được focus lại để không phải chờ thêm một vòng.
     loadTechnicianTasks();
-    const interval = setInterval(loadTechnicianTasks, 1000);
+    const interval = setInterval(loadTechnicianTasks, 3000);
     const handleFocus = () => loadTechnicianTasks();
     window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
     };
   }, []);
 
@@ -360,7 +416,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           body: JSON.stringify({ status: "REJECTED", cancel_reason: cancelReason }),
         });
       } catch (err) {
-        console.error("Lỗi khi từ chối đơn:", err);
+        console.warn("Đơn không còn thuộc KTV hoặc đã hết hạn nhận:", err);
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
       }
     })();
   };
@@ -401,7 +458,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         backendStatus = "REPAIRING";
       } else if (status === "COMPLETED" || statusText === "Hoàn thành") {
         backendStatus = "COMPLETED";
-      } else if (status === "CANCELLED" || (status as string) === "REJECTED") {
+      } else if ((status as string) === "REJECTED") {
+        backendStatus = "REJECTED";
+      } else if (status === "CANCELLED") {
         backendStatus = "CANCELLED";
       }
     }

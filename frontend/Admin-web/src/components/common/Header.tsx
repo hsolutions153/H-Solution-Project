@@ -1,6 +1,7 @@
 import { useAdmin } from "@/context/AdminContext";
 import { useUserInfo } from "@/lib/use-user-info";
-import { Bell, HelpCircle, User } from "lucide-react";
+import { HelpCircle, User } from "lucide-react";
+import { AdminNotificationPopover } from "@/components/common/AdminNotificationPopover";
 
 export interface HeaderProps {
   title?: string;
@@ -19,15 +20,7 @@ export const Header = ({ title = "Bảng điều khiển" }: HeaderProps) => {
 
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => showToast("Hệ thống thông báo đang hoạt động bình thường.")}
-            className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full relative cursor-pointer"
-            title="Thông báo"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
-          </button>
+          <AdminNotificationPopover />
           <button
             type="button"
             onClick={() =>

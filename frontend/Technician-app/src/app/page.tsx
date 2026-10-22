@@ -31,19 +31,50 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    import("@/lib/api-client").then(({ getAuthToken, getUserInfo, removeAuthToken }) => {
+    import("@/lib/api-client").then(({ getAuthToken, getUserInfo, removeAuthToken, fetchApi }) => {
       const token = getAuthToken();
       const user = getUserInfo();
-      if (token) {
-        if (user && user.role && user.role !== "TECHNICIAN") {
-          // Token thuộc về Admin hoặc Customer từ các app khác, xóa để tránh kẹt lỗi 403
-          removeAuthToken();
-          setIsLoggedIn(false);
-        } else {
-          setIsLoggedIn(true);
-        }
+      if (!token) {
+        setIsLoggedIn(false);
+        return;
       }
+      if (user && user.role && user.role !== "TECHNICIAN") {
+        // Token thuộc về Admin hoặc Customer từ các app khác, xóa để tránh kẹt lỗi 403
+        removeAuthToken();
+        setIsLoggedIn(false);
+        return;
+      }
+
+      // Có token KTV -> Hiển thị giao diện ngay lập tức (0ms delay)
+      setIsLoggedIn(true);
+
+      // Xác thực ngầm token với server
+      fetchApi("/technicians/me")
+        .catch((err) => {
+          if (err?.status === 401 || err?.status === 403) {
+            removeAuthToken();
+            setIsLoggedIn(false);
+          }
+        });
     });
+
+    const handleAuthLogout = () => {
+      sessionStorage.removeItem("currentView");
+      sessionStorage.removeItem("selectedTask");
+      sessionStorage.removeItem("subStep");
+      setIsLoggedIn(false);
+      setCurrentView("login");
+    };
+    window.addEventListener("AUTH_LOGOUT", handleAuthLogout);
+
+    const handleOpenTask = () => {
+      setActiveTab("tasks");
+    };
+    window.addEventListener("OPEN_TECHNICIAN_TASK", handleOpenTask);
+    return () => {
+      window.removeEventListener("AUTH_LOGOUT", handleAuthLogout);
+      window.removeEventListener("OPEN_TECHNICIAN_TASK", handleOpenTask);
+    };
   }, []);
 
   if (!isMounted) return null;

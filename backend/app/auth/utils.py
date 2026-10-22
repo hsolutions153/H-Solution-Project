@@ -12,7 +12,7 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-change-it")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 ACCESS_TOKEN_TYPE = "access-token"
 REFRESH_TOKEN_TYPE = "refresh-token"

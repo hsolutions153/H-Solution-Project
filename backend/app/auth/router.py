@@ -8,6 +8,8 @@ from app.auth.schemas import (
     GoogleAuthRequest,
     LoginRequest,
     RefreshResponse,
+    RegisterOtpRequest,
+    RegisterOtpResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
     SignupRequest,
@@ -22,8 +24,10 @@ from app.auth.service import (
     refresh_access_token,
     register_customer,
     request_password_reset,
+    request_registration_otp,
     reset_password,
     verify_password_reset_code,
+    verify_registration_otp,
 )
 
 from app.auth.utils import REFRESH_TOKEN_EXPIRE_DAYS
@@ -61,6 +65,17 @@ def _set_refresh_cookie(response: Response, raw_token: str, role: str) -> None:
 
 def _clear_refresh_cookie(response: Response, role: str) -> None:
     response.delete_cookie(key=_cookie_name(role), path=REFRESH_COOKIE_PATH)
+
+
+@router.post("/register/send-otp", response_model=RegisterOtpResponse)
+def send_register_otp(payload: RegisterOtpRequest):
+    return request_registration_otp(str(payload.phone), str(payload.email) if payload.email else None)
+
+
+@router.post("/register/verify-otp", response_model=ResetPasswordResponse)
+def verify_register_otp(payload: VerifyOtpRequest):
+    verify_registration_otp(str(payload.phone), payload.otp_code)
+    return {"message": "Mã xác minh hợp lệ"}
 
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)

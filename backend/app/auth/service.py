@@ -156,10 +156,18 @@ def register_customer(data):
     normalized_phone = data.phone.strip() if data.phone and data.phone.strip() else None
     normalized_address = data.address.strip() if data.address and data.address.strip() else None
 
+    if not normalized_phone:
+        raise AppException(ErrorCode.VALIDATION_ERROR, message="Số điện thoại là bắt buộc để đăng ký tài khoản")
+
     if repository.get_user_by_email(normalized_email):
         raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
-    if normalized_phone and repository.get_user_by_phone(normalized_phone):
+    if repository.get_user_by_phone(normalized_phone):
         raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    otp = repository.get_valid_otp(normalized_phone, now_iso)
+    if not otp or not secrets.compare_digest(otp["otp_code"], data.otp_code.strip()):
+        raise AppException(ErrorCode.OTP_INVALID, message="Mã OTP không chính xác hoặc đã hết hạn")
 
     customer_role = repository.get_role_by_code(CUSTOMER_ROLE_CODE)
     if not customer_role:
@@ -179,7 +187,70 @@ def register_customer(data):
     new_user = repository.create_user(user_data)
     if not new_user:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+
+    repository.mark_otp_used(otp["id"], now_iso)
     return {"message": "Đăng ký tài khoản thành công", "user_id": new_user["id"]}
+
+
+def request_registration_otp(phone: str, email: str | None = None):
+    normalized_phone = phone.strip()
+    if repository.get_user_by_phone(normalized_phone):
+        raise AppException(ErrorCode.PHONE_ALREADY_EXISTS)
+    if email:
+        normalized_email = email.strip().lower()
+        if repository.get_user_by_email(normalized_email):
+            raise AppException(ErrorCode.EMAIL_ALREADY_EXISTS)
+
+    now = datetime.now(timezone.utc)
+    latest = repository.get_latest_otp(normalized_phone)
+    if isinstance(latest, list) and len(latest) > 0:
+        latest = latest[0]
+    if latest and latest.get("created_at"):
+        raw_created_at = str(latest["created_at"])
+        if "T" not in raw_created_at and " " in raw_created_at:
+            raw_created_at = raw_created_at.replace(" ", "T", 1)
+        raw_created_at = raw_created_at.replace("Z", "").replace("z", "")
+        created_at = datetime.fromisoformat(raw_created_at)
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        if (now - created_at).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Vui lòng chờ ít phút trước khi yêu cầu mã OTP mới")
+
+    otp_code = f"{secrets.randbelow(1_000_000):06d}"
+    repository.invalidate_unused_otps(normalized_phone, now.isoformat())
+    created = repository.create_otp(
+        {
+            "id": _generate_user_id(),
+            "phone": normalized_phone,
+            "otp_code": otp_code,
+            "expires_at": (now + timedelta(minutes=OTP_EXPIRE_MINUTES)).isoformat(),
+        }
+    )
+    if not created:
+        raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
+
+    try:
+        send_password_reset_code(normalized_phone, otp_code)
+    except AppException:
+        repository.mark_otp_used(created["id"], now.isoformat())
+        raise
+
+    expires_in_seconds = OTP_EXPIRE_MINUTES * 60
+    response = {
+        "message": f"Mã OTP đã được gửi đến số điện thoại {normalized_phone}",
+        "expires_in_seconds": expires_in_seconds,
+    }
+    if OTP_EXPOSE_IN_RESPONSE and os.getenv("APP_ENV", "development").lower() != "production":
+        response["otp_code"] = otp_code
+    return response
+
+
+def verify_registration_otp(phone: str, otp_code: str):
+    normalized_phone = phone.strip()
+    otp = repository.get_valid_otp(normalized_phone, datetime.now(timezone.utc).isoformat())
+    if not otp or not secrets.compare_digest(otp["otp_code"], otp_code.strip()):
+        raise AppException(ErrorCode.OTP_INVALID)
+    return otp
 
 
 def authenticate_or_register_google_user(payload):
