@@ -1,0 +1,23 @@
+{
+  "name": "h-solution-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "H-Solution - Scooter & Wheelchair Repair Platform",
+  "workspaces": [
+    "frontend/shared",
+    "frontend/User-app",
+    "frontend/Technician-app",
+    "frontend/Admin-web",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=user-app",
+    "dev:user": "npm run dev --workspace=user-app",
+    "dev:tech": "npm run dev --workspace=technician-app",
+    "dev:admin": "npm run dev --workspace=admin-web"
+  },
+  "allowScripts": {
+    "sharp@0.35.5": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

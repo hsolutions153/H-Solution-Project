@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "@h-mobility/ui/tokens.css";
+@source "../../../shared/src";
+
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
