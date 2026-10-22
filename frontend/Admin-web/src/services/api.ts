@@ -1,4 +1,4 @@
-const BASE_URL = "";
+const BASE_URL = "/api";
 
 export const api = {
   async get<T = unknown>(
