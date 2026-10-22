@@ -13,6 +13,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException):
+        if exc.error_code == 401:
+            logger.warning(f"[Auth 401] {request.method} {request.url.path} -> {exc.code}: {exc.message}")
+
         content = {
             "code": exc.code,
             "message": exc.message,
@@ -88,6 +91,14 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "message": message,
                 "details": [{"field": "root", "message": message, "type": "database_constraint"}],
             })
+        if exc.code == "42501":
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={
+                    "code": ErrorCode.DATABASE_ERROR.value,
+                    "message": "Không đủ quyền ghi dữ liệu (Lỗi RLS 42501 trên Supabase). Cần cấu hình SUPABASE_SERVICE_KEY trong backend/.env hoặc tắt RLS/cấp policy cho bảng.",
+                },
+            )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

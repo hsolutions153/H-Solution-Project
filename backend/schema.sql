@@ -326,3 +326,18 @@ CREATE TABLE public.technician_bank_accounts (
   CONSTRAINT technician_bank_accounts_pkey PRIMARY KEY (id),
   CONSTRAINT fk_bank_technician FOREIGN KEY (technician_id) REFERENCES public.technician_profiles(user_id)
 );
+CREATE TABLE public.notifications (
+  id character varying(36) NOT NULL,
+  user_id character varying(10) NOT NULL,
+  title character varying(255) NOT NULL,
+  body text NOT NULL,
+  type character varying(50) NOT NULL,
+  role character varying(20) NOT NULL DEFAULT 'USER'::character varying,
+  data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_read boolean NOT NULL DEFAULT false,
+  read_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by character varying(20) NOT NULL DEFAULT 'SYSTEM'::character varying,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);

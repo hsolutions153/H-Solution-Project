@@ -23,6 +23,11 @@ def fetch_order(order_id: str):
 
 def assign_technician(order_id: str, technician_id: str, assigned_by: str):
     order = fetch_order(order_id)
+    if order.get("status") == "CANCELLED":
+        raise AppException(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message="Đơn hàng đã bị hủy, không thể phân công kỹ thuật viên nữa."
+        )
     if order["status"] not in ASSIGNABLE_STATUSES:
         raise AppException(ErrorCode.INVALID_STATUS_TRANSITION, message="Đơn hàng này không còn ở trạng thái có thể phân công")
 
@@ -36,20 +41,30 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
 
     from app.repair_requests.service import _has_fresh_technician_location
     if not _has_fresh_technician_location(technician):
-        raise AppException(ErrorCode.VALIDATION_ERROR, message="Vị trí GPS của KTV đã quá hạn; yêu cầu KTV cập nhật lại.")
+        if technician.get("last_latitude") is None or technician.get("last_longitude") is None:
+            raise AppException(ErrorCode.VALIDATION_ERROR, message="Kỹ thuật viên chưa cập nhật vị trí GPS.")
 
     assigned_at = datetime.now(timezone.utc).isoformat()
     repository.assign_order(order_id, technician_id, assigned_at, assigned_by)
+    action_note = "Quản trị viên phân công kỹ thuật viên"
     repository.add_status_history(
         {
             "id": secrets.token_hex(5).upper(),
             "repair_id": order_id,
             "status": "ASSIGNED",
             "changed_by": assigned_by,
-            "note": "Quản trị viên phân công kỹ thuật viên",
+            "note": action_note,
         }
     )
-    return fetch_order(order_id)
+    updated_order = fetch_order(order_id)
+    try:
+        from app.notifications import service as notif_service
+        notif_service.notify_request_assigned(updated_order, technician_id)
+    except Exception as notif_err:
+        import logging
+        logging.getLogger("h_solution").warning(f"Failed to trigger notifications for assign_technician: {notif_err}")
+
+    return updated_order
 
 
 def get_dashboard_metrics():
