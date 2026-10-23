@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/home/page-header";
 import { HistoryDetailSkeleton } from "@/components/motion/skeleton";
 import { useReveal } from "@/components/motion/use-reveal";
 import { useState, useEffect, useRef } from "react";
+import { showAppNotice } from "@/components/common/app-notice";
 
 interface JobItem {
   title: string;
@@ -663,7 +664,7 @@ export function HistoryDetail() {
     } catch (err: any) {
       const errMsg = err?.message || "Không thể hủy đơn hàng. Vui lòng thử lại.";
       setCancelError(errMsg);
-      alert(errMsg);
+      showAppNotice(errMsg);
     } finally {
       setIsCancellingOrder(false);
     }
@@ -723,7 +724,7 @@ export function HistoryDetail() {
       });
       await refreshDetailRef.current?.();
     } catch (err: any) {
-      alert(err.message || "Lỗi khi xử lý phản hồi báo giá");
+      showAppNotice(err.message || "Lỗi khi xử lý phản hồi báo giá");
       // Báo giá có thể vừa được KTV cập nhật: tải lại để khách xem bản mới nhất
       await refreshDetailRef.current?.();
     } finally {
@@ -734,7 +735,7 @@ export function HistoryDetail() {
   const handleDownloadInvoicePdf = () => {
     if (!detail) return;
     if (String(detail.paymentStatus || "").toUpperCase() !== "PAID") {
-      alert("Hóa đơn chỉ có thể tải sau khi thanh toán được xác nhận.");
+      showAppNotice("Hóa đơn chỉ có thể tải sau khi thanh toán được xác nhận.");
       return;
     }
 

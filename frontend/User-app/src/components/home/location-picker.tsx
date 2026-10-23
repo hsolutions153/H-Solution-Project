@@ -37,6 +37,7 @@ export function LocationPicker({ latitude, longitude, onChange }: LocationPicker
       if (!existing) {
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement("script");
+          script.id = "user-mapbox-gl-script";
           script.src = "https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js";
           script.onload = () => resolve();
           script.onerror = () => reject(new Error("Không thể tải bản đồ."));
@@ -85,6 +86,13 @@ export function LocationPicker({ latitude, longitude, onChange }: LocationPicker
     // Khởi tạo bản đồ Mapbox 1 lần duy nhất khi mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current) return;
+    const nextCenter = [longitude, latitude];
+    markerRef.current.setLngLat(nextCenter);
+    mapRef.current.setCenter(nextCenter);
+  }, [latitude, longitude]);
 
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">

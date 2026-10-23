@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Task } from '@/types/task';
 import { MapPin, TriangleAlert, CalendarCheck, CarFront, CircleCheck, Timer } from 'lucide-react';
 import { Button } from '@h-mobility/ui';
@@ -11,6 +11,7 @@ interface NewAssignmentModalProps {
   task: Task | null;
   onClose: () => void;
   onAccept: (taskId: string) => void;
+  isAccepting?: boolean;
   onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối thủ công
   onTimeout?: (taskId: string) => void; // Tự động xử lý khi hết 2 phút
 }
@@ -25,6 +26,7 @@ export const NewAssignmentModal = ({
   task,
   onClose,
   onAccept,
+  isAccepting = false,
   onReject,
   onTimeout,
 }: NewAssignmentModalProps) => {
@@ -33,6 +35,10 @@ export const NewAssignmentModal = ({
   const [routeError, setRouteError] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const taskId = task?.id;
+  // Callback từ màn cha được tạo mới mỗi lần render (polling 3 giây/lần). Giữ
+  // chúng trong ref để bộ đếm không bị reset về 2 phút sau mỗi lần render.
+  const expireRef = useRef({ onReject, onTimeout });
+  expireRef.current = { onReject, onTimeout };
 
   useEffect(() => {
     if (!isOpen || !taskId) return;
@@ -44,10 +50,11 @@ export const NewAssignmentModal = ({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          if (onTimeout) {
-            onTimeout(taskId);
+          const { onReject: reject, onTimeout: timeout } = expireRef.current;
+          if (timeout) {
+            timeout(taskId);
           } else {
-            onReject(taskId);
+            reject(taskId);
           }
           return 0;
         }
@@ -56,7 +63,7 @@ export const NewAssignmentModal = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, taskId, onReject, onTimeout]);
+  }, [isOpen, taskId]);
 
   useEffect(() => {
     if (!isOpen || !taskId) return;
@@ -71,8 +78,10 @@ export const NewAssignmentModal = ({
         const { fetchApi } = await import("@/lib/api-client");
         const result = await fetchApi<RouteEstimate>(`/repair-requests/${taskId}/route`);
         if (!cancelled) setRoute(result);
-      } catch (error) {
-        console.warn("Không thể tính lộ trình Mapbox:", error);
+      } catch (error: any) {
+        if (error?.status !== 403) {
+          console.warn("Không thể tính lộ trình Mapbox:", error);
+        }
         if (!cancelled) setRouteError(true);
       } finally {
         if (!cancelled) setIsLoadingRoute(false);
@@ -154,11 +163,11 @@ export const NewAssignmentModal = ({
       </div>
 
       <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">
-        <Button size="lg" variant="secondary" onClick={() => onReject(task.id)}>
+        <Button size="lg" variant="secondary" disabled={isAccepting} onClick={() => onReject(task.id)}>
           Từ chối
         </Button>
-        <Button size="lg" icon={<CircleCheck className="size-5" />} onClick={() => onAccept(task.id)}>
-          Chấp nhận
+        <Button size="lg" disabled={isAccepting} icon={<CircleCheck className="size-5" />} onClick={() => onAccept(task.id)}>
+          {isAccepting ? "Đang nhận đơn…" : "Chấp nhận"}
         </Button>
       </div>
     </Modal>

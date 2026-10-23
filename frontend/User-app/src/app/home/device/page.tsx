@@ -10,6 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback,useEffect,useState } from "react";
+import { showAppNotice } from "@/components/common/app-notice";
 
 export default function DevicesPage() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function DevicesPage() {
       setDeviceToDelete(null);
       router.refresh();
     } catch (err: any) {
-      alert(err.message || "Không thể xóa phương tiện. Vui lòng thử lại.");
+      showAppNotice(err.message || "Không thể xóa phương tiện. Vui lòng thử lại.");
       setDevices(previous);
     } finally {
       setDeletingId(null);

@@ -60,7 +60,7 @@ def _payload(data):
 
 
 def _scheduled_start_at(request: dict) -> datetime | None:
-    """Return the scheduled start in VN time for a non-SOS appointment."""
+    # Trả về giờ bắt đầu lịch hẹn theo giờ Việt Nam.
     if request.get("is_sos"):
         return None
     text = str(request.get("issue_description") or request.get("description") or "")
@@ -81,16 +81,13 @@ def _scheduled_start_at(request: dict) -> datetime | None:
 
 
 def _is_future_appointment(request: dict, now: datetime) -> bool:
-    """Lịch hẹn chưa tới khung di chuyển (trước giờ hẹn hơn 30 phút)."""
+    # Kiểm tra lịch hẹn còn cách hơn 30 phút.
     scheduled_start = _scheduled_start_at(request)
     return scheduled_start is not None and now < scheduled_start - timedelta(minutes=30)
 
 
 def _ensure_technician_not_busy(technician_id: str, request: dict) -> None:
-    """KTV chỉ được làm một đơn tại một thời điểm.
-
-    Lịch hẹn tương lai vẫn được nhận trước và không tính là đơn đang làm.
-    """
+    # KTV chỉ làm một đơn; lịch hẹn còn xa chưa tính là đang bận.
     now_vn = datetime.now(VN_TZ)
     if _is_future_appointment(request, now_vn):
         return
@@ -389,12 +386,13 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
         )
         techs = resp.data if resp and resp.data else []
 
-        now = datetime.now(timezone.utc)
+        # is_online là trạng thái chủ động của KTV. Không tự chuyển offline khi
+        # KTV đóng app; chỉ nút Online/Offline mới thay đổi cờ này. GPS gần nhất
+        # vẫn được dùng để xếp khoảng cách nếu còn dữ liệu.
         techs = [
             technician for technician in techs
             if technician.get("user_id") not in excluded
             and _skill_matches_device(technician, device_type)
-            and _has_fresh_technician_location(technician, now)
         ]
         if techs:
             # Tài khoản bị khóa/xóa không được nhận việc dù hồ sơ vẫn online.
@@ -410,20 +408,27 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
             logger.info("No eligible SOS technician: active account, online, KYC-approved, matching skill and fresh GPS are required")
             return None
 
-        active_statuses = [
-            "ASSIGNED", "ACCEPTED", "EN_ROUTE", "ARRIVED",
-            "DIAGNOSING", "ESTIMATE_SUBMITTED", "ESTIMATE_APPROVED", "REPAIRING"
-        ]
+        active_statuses = sorted(TECHNICIAN_IN_PROGRESS_STATUSES | {"ASSIGNED"})
         job_counts = {}
+        busy_tech_ids = set()
         try:
-            active_jobs_resp = supabase.table("repair_requests").select("technician_id").in_("status", active_statuses).execute()
+            active_jobs_resp = (
+                supabase.table("repair_requests")
+                .select("id,technician_id,status,is_sos,issue_description,description")
+                .in_("status", active_statuses)
+                .execute()
+            )
             if active_jobs_resp and active_jobs_resp.data:
                 for job in active_jobs_resp.data:
                     tid = job.get("technician_id")
                     if tid:
                         job_counts[tid] = job_counts.get(tid, 0) + 1
+                        if not _is_future_appointment(job, datetime.now(VN_TZ)):
+                            busy_tech_ids.add(tid)
         except Exception as j_err:
             logger.warning(f"Failed to fetch active jobs count: {j_err}")
+
+        techs = [t for t in techs if t.get("user_id") not in busy_tech_ids]
 
         c_lat = float(customer_lat) if customer_lat is not None else None
         c_lng = float(customer_lng) if customer_lng is not None else None
@@ -455,9 +460,7 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
 
 
 def _declined_technician_ids(repair_id: str) -> set:
-    """KTV đã từ chối/quá hạn/được chuyển khỏi đơn. Lượt từ chối được lưu với status
-    REQUESTED (DB không có REJECTED) nên phải xét cả REQUESTED lẫn ASSIGNED.
-    Ném lỗi khi không đọc được lịch sử để caller không giao lại nhầm KTV."""
+    # Lấy các KTV đã từ chối, quá hạn hoặc bị chuyển khỏi đơn.
     return {
         h["changed_by"]
         for h in repository.get_status_history(repair_id) or []
@@ -478,8 +481,7 @@ def _parse_utc(raw_ts):
 
 
 def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
-    """Điều phối lại đơn SOS: ASSIGNED quá thời gian chờ, hoặc REQUESTED chưa có KTV
-    (lúc tạo/từ chối không còn ai khả dụng) khi đã có KTV khả dụng sau đó."""
+    # Điều phối lại đơn SOS quá hạn hoặc chưa có KTV.
     from app.db.database import supabase
     from datetime import timedelta
 
@@ -781,7 +783,8 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
     try:
         response = requests.get(
             "https://api.mapbox.com/search/geocode/v6/reverse",
-            params={"longitude": longitude, "latitude": latitude, "country": "vn", "language": "vi", "access_token": token},
+            # Không giới hạn quốc gia để hỗ trợ tọa độ trên toàn thế giới.
+            params={"longitude": longitude, "latitude": latitude, "language": "vi", "access_token": token},
             timeout=8,
         )
         response.raise_for_status()
@@ -792,7 +795,10 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
         context = properties.get("context") or {}
         address = properties.get("name_preferred") or properties.get("name") or properties.get("full_address") or ""
         ward = (context.get("neighborhood") or context.get("locality") or {}).get("name") or ""
-        province = (context.get("place") or context.get("region") or {}).get("name") or ""
+        province = (
+            (context.get("place") or context.get("region") or context.get("district") or context.get("country") or {}).get("name")
+            or ""
+        )
         return {"address": address, "ward": ward, "province": province, "latitude": latitude, "longitude": longitude}
     except (requests.RequestException, KeyError, TypeError, ValueError) as error:
         logger.warning("Mapbox reverse geocoding failed: %s", error)
@@ -800,7 +806,7 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
 
 
 def fetch_route_for_technician(request_id: str, current_user: dict):
-    """Return the current driving route for the assigned technician only."""
+    # Lấy lộ trình hiện tại của KTV được phân công.
     if not _is_role(current_user, TECHNICIAN_ROLE_CODE):
         raise AppException(ErrorCode.FORBIDDEN)
 
@@ -1043,11 +1049,7 @@ def fetch_request_status_sync(request_id: str, current_user: dict):
 
 
 def _respond_to_pending_quote(request_id: str, payload: dict, fields: dict):
-    """Ghi phản hồi của khách vào báo giá PENDING.
-
-    Nếu client gửi kèm quote_id/quote_updated_at của bản khách đang xem, từ chối khi
-    KTV đã sửa báo giá sau thời điểm đó để khách không duyệt nhầm số tiền chưa thấy.
-    """
+    # Ghi phản hồi vào báo giá đang chờ và chống duyệt bản cũ.
     from app.db.database import supabase
     query = supabase.table("repair_quotes").update(fields).eq("repair_id", request_id).eq("status", "PENDING")
     quote_id = payload.get("quote_id")
@@ -1070,7 +1072,7 @@ def _get_payment(request_id: str):
 
 
 def _validated_final_cost(request_id: str, submitted_cost: float | None) -> float:
-    """Chi phí thực tế phải không vượt tổng báo giá đã duyệt và không còn báo giá chờ duyệt."""
+    # Kiểm tra chi phí thực tế không vượt báo giá đã duyệt.
     try:
         quotes = repository.get_quotes_by_repair_id(request_id) or []
     except Exception as check_err:
@@ -1092,7 +1094,7 @@ def _validated_final_cost(request_id: str, submitted_cost: float | None) -> floa
 
 
 def submit_final_cost(request_id: str, data: dict, current_user: dict):
-    """KTV chốt chi phí thực tế khi sửa xong; đơn giữ nguyên trạng thái chờ khách thanh toán."""
+    # KTV chốt chi phí; đơn chuyển sang chờ khách thanh toán.
     request = repository.get_repair_request_by_id(request_id)
     if not request:
         raise AppException(ErrorCode.REQUEST_NOT_FOUND)
@@ -1398,8 +1400,24 @@ def update_request_status(request_id: str, current_user: dict, data):
         if total_amt is not None and new_status not in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED"}:
             update_data["total_amount"] = float(total_amt)
 
-        updated_request = repository.update_repair_request(actual_id, update_data)
+        # Tránh race condition khi KTV gửi đồng thời nhiều request nhận đơn.
+        update_expected = None
+        if is_technician:
+            update_expected = {
+                "status": request["status"],
+                "technician_id": current_user["sub"],
+            }
+        updated_request = repository.update_repair_request(
+            actual_id,
+            update_data,
+            expected=update_expected,
+        )
         if not updated_request:
+            if is_technician:
+                raise AppException(
+                    ErrorCode.INVALID_STATUS_TRANSITION,
+                    message="Đơn vừa được cập nhật bởi một thao tác khác. Vui lòng tải lại danh sách đơn.",
+                )
             raise AppException(ErrorCode.DATABASE_ERROR)
 
         if new_status == "COMPLETED" and updated_request.get("technician_id"):
@@ -1577,7 +1595,7 @@ def _authorize_quote_author(request_id: str, current_user: dict) -> dict:
 
 
 def _prepare_quote(data: dict, is_supplementary: bool) -> tuple[dict, list[dict]]:
-    """Kiểm tra payload báo giá và tính chi phí; dùng chung cho tạo mới và cập nhật."""
+    # Kiểm tra dữ liệu và tính chi phí báo giá.
     from app.core.validation import validated_payload
     from app.repair_requests.schemas import QuoteCreateRequest
     data = validated_payload(QuoteCreateRequest, data)
@@ -1745,7 +1763,7 @@ def create_quote_for_request(request_id: str, data: dict, current_user: dict):
 
 
 def update_quote_for_request(request_id: str, quote_id: str, data: dict, current_user: dict):
-    """KTV sửa trực tiếp báo giá đang chờ duyệt; khách hàng sẽ thấy và duyệt bản mới."""
+    # KTV sửa báo giá đang chờ duyệt.
     _authorize_quote_author(request_id, current_user)
 
     quotes = repository.get_quotes_by_repair_id(request_id) or []

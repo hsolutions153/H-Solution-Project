@@ -1,7 +1,4 @@
-"""Regression coverage for customer estimate approval and additional costs.
-
-Run from backend: python -m unittest discover -s tests -v
-"""
+# Kiểm tra duyệt báo giá và chi phí phát sinh.
 
 from copy import deepcopy
 from types import SimpleNamespace

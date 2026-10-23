@@ -63,12 +63,15 @@ def create_notification(data: dict) -> dict:
 def get_notifications_by_user(
     user_id: str,
     *,
+    role: str | None = None,
     is_read: bool | None = None,
     page: int = 1,
     limit: int = 20,
 ) -> tuple[list[dict], int]:
     try:
         query = supabase.table(NOTIFICATIONS_TABLE).select("*", count="exact").eq("user_id", user_id)
+        if role:
+            query = query.eq("role", role)
         if is_read is not None:
             query = query.eq("is_read", is_read)
         
@@ -86,6 +89,8 @@ def get_notifications_by_user(
 
     # Fallback memory
     user_items = [x for x in _MEMORY_NOTIFICATIONS if x["user_id"] == user_id]
+    if role:
+        user_items = [x for x in user_items if x.get("role") == role]
     if is_read is not None:
         user_items = [x for x in user_items if x["is_read"] == is_read]
     
@@ -95,15 +100,17 @@ def get_notifications_by_user(
     return [_format_record(x) for x in paginated], total
 
 
-def count_unread_by_user(user_id: str) -> int:
+def count_unread_by_user(user_id: str, role: str | None = None) -> int:
     try:
-        res = (
+        query = (
             supabase.table(NOTIFICATIONS_TABLE)
             .select("id", count="exact")
             .eq("user_id", user_id)
             .eq("is_read", False)
-            .execute()
         )
+        if role:
+            query = query.eq("role", role)
+        res = query.execute()
         if res and res.count is not None:
             return res.count
     except Exception as exc:
@@ -113,19 +120,26 @@ def count_unread_by_user(user_id: str) -> int:
         else:
             logger.error("Lỗi khi đếm thông báo chưa đọc từ DB: %s", exc)
 
-    return len([x for x in _MEMORY_NOTIFICATIONS if x["user_id"] == user_id and not x["is_read"]])
+    return len([
+        x for x in _MEMORY_NOTIFICATIONS
+        if x["user_id"] == user_id
+        and (not role or x.get("role") == role)
+        and not x["is_read"]
+    ])
 
 
-def mark_notification_as_read(notification_id: str, user_id: str) -> bool:
+def mark_notification_as_read(notification_id: str, user_id: str, role: str | None = None) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     try:
-        res = (
+        query = (
             supabase.table(NOTIFICATIONS_TABLE)
             .update({"is_read": True, "read_at": now})
             .eq("id", notification_id)
             .eq("user_id", user_id)
-            .execute()
         )
+        if role:
+            query = query.eq("role", role)
+        res = query.execute()
         if res and res.data:
             return True
     except Exception as exc:
@@ -137,23 +151,25 @@ def mark_notification_as_read(notification_id: str, user_id: str) -> bool:
 
     # Fallback memory
     for item in _MEMORY_NOTIFICATIONS:
-        if item["id"] == notification_id and item["user_id"] == user_id:
+        if item["id"] == notification_id and item["user_id"] == user_id and (not role or item.get("role") == role):
             item["is_read"] = True
             item["read_at"] = now
             return True
     return False
 
 
-def mark_all_notifications_as_read(user_id: str) -> int:
+def mark_all_notifications_as_read(user_id: str, role: str | None = None) -> int:
     now = datetime.now(timezone.utc).isoformat()
     try:
-        res = (
+        query = (
             supabase.table(NOTIFICATIONS_TABLE)
             .update({"is_read": True, "read_at": now})
             .eq("user_id", user_id)
             .eq("is_read", False)
-            .execute()
         )
+        if role:
+            query = query.eq("role", role)
+        res = query.execute()
         if res and res.data:
             return len(res.data)
     except Exception as exc:
@@ -166,7 +182,7 @@ def mark_all_notifications_as_read(user_id: str) -> int:
     # Fallback memory
     count = 0
     for item in _MEMORY_NOTIFICATIONS:
-        if item["user_id"] == user_id and not item["is_read"]:
+        if item["user_id"] == user_id and (not role or item.get("role") == role) and not item["is_read"]:
             item["is_read"] = True
             item["read_at"] = now
             count += 1
@@ -174,7 +190,6 @@ def mark_all_notifications_as_read(user_id: str) -> int:
 
 
 def get_all_admin_user_ids() -> list[str]:
-    """Lấy danh sách user_id của tất cả Quản trị viên (ADMIN)"""
     try:
         # Lấy từ roles và users
         res = supabase.table(USERS_TABLE).select("id,role:roles(code)").eq("is_active", True).execute()

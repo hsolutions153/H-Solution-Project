@@ -1,4 +1,4 @@
-"""Review submission and profile reads must use the same source of ratings."""
+# Kiểm tra lưu đánh giá và đọc điểm KTV từ cùng một nguồn.
 
 from copy import deepcopy
 from types import SimpleNamespace

@@ -11,6 +11,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use,useEffect,useState } from "react";
+import { showAppNotice } from "@/components/common/app-notice";
 
 export default function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
       });
       setDevice((d: any) => ({ ...d, isDefault: true }));
     } catch (err: any) {
-      alert(err.message || "Không thể đặt làm thiết bị mặc định.");
+      showAppNotice(err.message || "Không thể đặt làm thiết bị mặc định.");
     } finally {
       setIsSettingDefault(false);
     }
@@ -52,7 +53,7 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
       router.push("/home/device");
       router.refresh();
     } catch (err: any) {
-      alert(err.message || "Không thể xóa thiết bị. Vui lòng thử lại.");
+      showAppNotice(err.message || "Không thể xóa thiết bị. Vui lòng thử lại.");
       setIsDeleting(false);
     }
   };

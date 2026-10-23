@@ -147,8 +147,7 @@ def get_repair_requests(*, customer_id: str | None, technician_id: str | None, r
 
 
 def update_repair_request(request_id: str, data: dict, expected: dict | None = None):
-    """Cập nhật đơn. `expected` (nếu có) chỉ ghi khi các cột vẫn giữ giá trị đã đọc;
-    trả None khi đơn đã bị thay đổi đồng thời (0 bản ghi khớp)."""
+    # Cập nhật đơn có kiểm tra giá trị cũ để tránh ghi đè đồng thời.
     STATUS_MAP = {
         "REJECTED": "REQUESTED",
         "PENDING": "REQUESTED",

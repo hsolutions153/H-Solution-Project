@@ -169,7 +169,6 @@ export default function HomePage() {
         phone={resetPhone}
         otpCode={resetOtp}
         onResetSuccess={() => {
-          alert("Đặt lại mật khẩu thành công!");
           setResetOtp(""); setResetPhone(""); setDevelopmentCode(undefined);
           setCurrentView("login");
         }}

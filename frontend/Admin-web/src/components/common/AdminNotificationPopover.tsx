@@ -77,7 +77,9 @@ export const AdminNotificationPopover = () => {
     try {
       const { fetchApi, getAuthToken } = await import("@/lib/api-client");
       if (!getAuthToken()) return;
-      const res = await fetchApi<{ unread_count: number }>("/notifications/unread-count");
+      // Dùng cùng endpoint danh sách thông báo để tương thích với backend/revision
+      // chưa có route unread-count riêng. Endpoint này đã trả unread_count.
+      const res = await fetchApi<{ unread_count: number }>("/notifications/me?limit=1");
       if (res && typeof res.unread_count === "number") {
         setUnreadCount(res.unread_count);
       }

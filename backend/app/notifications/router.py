@@ -17,7 +17,6 @@ def get_my_notifications(
     limit: int = Query(default=20, ge=1, le=100, description="Số lượng mỗi trang"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Lấy danh sách thông báo của người dùng hiện tại (Khách hàng, Kỹ thuật viên hoặc Admin)."""
     return service.list_my_notifications(
         current_user,
         is_read=is_read,
@@ -30,7 +29,7 @@ def get_my_notifications(
 def get_unread_count(
     current_user: dict = Depends(get_current_user),
 ):
-    """Lấy số lượng thông báo chưa đọc để hiển thị badge chuông."""
+    # Lấy số thông báo chưa đọc cho badge.
     return service.get_my_unread_count(current_user)
 
 
@@ -39,7 +38,7 @@ def mark_notification_as_read(
     notification_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Đánh dấu một thông báo cụ thể là đã đọc."""
+    # Đánh dấu một thông báo là đã đọc.
     return service.mark_my_notification_read(notification_id, current_user)
 
 
@@ -47,5 +46,5 @@ def mark_notification_as_read(
 def mark_all_notifications_as_read(
     current_user: dict = Depends(get_current_user),
 ):
-    """Đánh dấu tất cả thông báo của người dùng là đã đọc."""
+    # Đánh dấu toàn bộ thông báo là đã đọc.
     return service.mark_all_my_notifications_read(current_user)

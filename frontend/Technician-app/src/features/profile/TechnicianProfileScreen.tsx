@@ -584,7 +584,9 @@ export function TechnicianProfileScreen() {
                 <span className="break-all">{user.email || "Chưa cập nhật"}</span>
               </InfoRow>
               <InfoRow icon={<Wrench />} label="Kỹ năng chuyên môn">
-                {profile.skills === "SCOOTER"
+                {profile.skills === "BOTH"
+                  ? "Chuyên Scooter điện & thiết bị hỗ trợ di chuyển"
+                  : profile.skills === "SCOOTER"
                   ? "Chuyên Scooter điện"
                   : profile.skills === "WHEELCHAIR"
                   ? "Chuyên xe hỗ trợ"

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _bootstrap_notifications_for_user(user_id: str, role_id: str):
-    """Tự động đồng bộ thông báo mẫu/lịch sử cho người dùng chưa có thông báo"""
+    # Đồng bộ thông báo mẫu cho người dùng chưa có dữ liệu.
     try:
         from app.db.database import supabase
         # 1. Khách hàng
@@ -135,16 +135,17 @@ def list_my_notifications(
     limit: int = 20,
 ) -> NotificationListResponse:
     user_id = current_user["sub"]
+    role = current_user.get("role")
     items_raw, total = repository.get_notifications_by_user(
-        user_id, is_read=is_read, page=page, limit=limit
+        user_id, role=role, is_read=is_read, page=page, limit=limit
     )
     if total == 0:
         _bootstrap_notifications_for_user(user_id, current_user.get("role_id", ""))
         items_raw, total = repository.get_notifications_by_user(
-            user_id, is_read=is_read, page=page, limit=limit
+            user_id, role=role, is_read=is_read, page=page, limit=limit
         )
 
-    unread_count = repository.count_unread_by_user(user_id)
+    unread_count = repository.count_unread_by_user(user_id, role=role)
     items = [NotificationResponse(**x) for x in items_raw]
     return NotificationListResponse(
         items=items,
@@ -157,18 +158,19 @@ def list_my_notifications(
 
 def get_my_unread_count(current_user: dict) -> NotificationUnreadCountResponse:
     user_id = current_user["sub"]
-    count = repository.count_unread_by_user(user_id)
+    role = current_user.get("role")
+    count = repository.count_unread_by_user(user_id, role=role)
     if count == 0:
-        items_raw, total = repository.get_notifications_by_user(user_id, limit=1)
+        items_raw, total = repository.get_notifications_by_user(user_id, role=role, limit=1)
         if total == 0:
             _bootstrap_notifications_for_user(user_id, current_user.get("role_id", ""))
-            count = repository.count_unread_by_user(user_id)
+            count = repository.count_unread_by_user(user_id, role=role)
     return NotificationUnreadCountResponse(unread_count=count)
 
 
 def mark_my_notification_read(notification_id: str, current_user: dict) -> NotificationMarkReadResponse:
     user_id = current_user["sub"]
-    success = repository.mark_notification_as_read(notification_id, user_id)
+    success = repository.mark_notification_as_read(notification_id, user_id, role=current_user.get("role"))
     return NotificationMarkReadResponse(
         success=success,
         message="Đã đánh dấu đã đọc" if success else "Không tìm thấy thông báo hoặc đã đọc",
@@ -177,7 +179,7 @@ def mark_my_notification_read(notification_id: str, current_user: dict) -> Notif
 
 def mark_all_my_notifications_read(current_user: dict) -> NotificationMarkReadResponse:
     user_id = current_user["sub"]
-    count = repository.mark_all_notifications_as_read(user_id)
+    count = repository.mark_all_notifications_as_read(user_id, role=current_user.get("role"))
     return NotificationMarkReadResponse(
         success=True,
         message=f"Đã đánh dấu {count} thông báo là đã đọc",

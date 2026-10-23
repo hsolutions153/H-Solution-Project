@@ -14,6 +14,7 @@ import { EmptyState } from "@h-mobility/ui";
 import { ClipboardList, Plus, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { mapApiTask, parseAppointment } from "./mapApiTask";
+import { showAppNotice } from "@/components/AppNotice";
 
 export type DateFilterType = "all" | "today" | "7days" | "month";
 
@@ -175,9 +176,16 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   });
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [statusError, setStatusError] = useState("");
   // Đếm các lần cập nhật trạng thái đang gửi lên máy chủ. Polling bỏ qua kết quả
   // tải về trong lúc đó, nếu không trạng thái cũ sẽ ghi đè trạng thái vừa chuyển.
   const statusMutationRef = useRef({ inFlight: 0, seq: 0 });
+  // Các đơn KTV đã bấm từ chối (hoặc hết giờ). Backend cần vài giây để điều phối
+  // lại, trong lúc đó polling vẫn thấy WAITING_ACCEPT và mở lại modal nhận đơn.
+  const dismissedAssignmentIdsRef = useRef<Set<string>>(new Set());
+  // Chặn double-click và ngăn polling mở lại modal trong lúc nhận đơn.
+  const acceptingTaskIdRef = useRef<string | null>(null);
+  const [acceptingTaskId, setAcceptingTaskId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
@@ -215,8 +223,14 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
             targetTask = mapApiTask(raw);
             setTasks((prev) => [targetTask!, ...prev.filter((p) => p.id !== targetTask!.id)]);
           }
-        } catch (err) {
-          console.warn("Lỗi tải chi tiết đơn từ thông báo:", err);
+        } catch (err: any) {
+          if (err?.status === 403) {
+            // Đơn có thể đã được điều phối lại trong lúc thông báo cũ còn hiển thị.
+            // Đây là tình huống nghiệp vụ đã biết, không ghi rác vào console.
+            showAppNotice("Đơn đã được chuyển cho kỹ thuật viên khác hoặc không còn thuộc quyền xử lý của bạn.");
+          } else {
+            console.warn("Lỗi tải chi tiết đơn từ thông báo:", err);
+          }
         }
       }
 
@@ -224,6 +238,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         setSelectedTask(targetTask);
         sessionStorage.removeItem("technician_pending_task_id");
         if (targetTask.status === "WAITING_ACCEPT") {
+          if (dismissedAssignmentIdsRef.current.has(targetTask.id)) return;
           setIsModalOpen(true);
         } else {
           sessionStorage.setItem("selectedTask", JSON.stringify(targetTask));
@@ -290,7 +305,12 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         const mutation = statusMutationRef.current;
         if (mutation.inFlight > 0 || mutation.seq !== startSeq) return;
         if (res && Array.isArray(res.items)) {
-          const apiTasks: Task[] = res.items.map(mapApiTask);
+          const dismissed = dismissedAssignmentIdsRef.current;
+          const apiTasks: Task[] = res.items.map(mapApiTask).map((task: Task) =>
+            task.status === "WAITING_ACCEPT" && dismissed.has(task.id)
+              ? { ...task, status: "CANCELLED", statusText: "Đã từ chối" }
+              : task
+          );
 
           if (isMounted) {
             setTasks((prev) => {
@@ -353,35 +373,56 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     };
   }, []);
 
-  const handleAcceptAssignment = (taskId: string) => {
-    if (!selectedTask) return;
-    const updatedTask: Task = {
-      ...selectedTask,
-      status: "PENDING",
-      statusText: "Chưa bắt đầu",
-    };
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
-    setSelectedTask(updatedTask);
-    sessionStorage.setItem("selectedTask", JSON.stringify(updatedTask));
-    sessionStorage.setItem("currentView", "detail");
-    setIsModalOpen(false);
-    setCurrentView("detail");
-    if (view === "home") onNavigate?.("tasks");
+  const handleAcceptAssignment = async (taskId: string) => {
+    if (!selectedTask || acceptingTaskIdRef.current === taskId) return;
 
-    (async () => {
-      try {
-        const { fetchApi } = await import("@/lib/api-client");
-        await fetchApi(`/repair-requests/${taskId}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: "ACCEPTED" }),
-        });
-      } catch (err) {
-        console.error("Lỗi khi tiếp nhận đơn:", err);
-      }
-    })();
+    acceptingTaskIdRef.current = taskId;
+    setAcceptingTaskId(taskId);
+    const mutation = statusMutationRef.current;
+    mutation.inFlight += 1;
+    mutation.seq += 1;
+    try {
+      const { fetchApi } = await import("@/lib/api-client");
+      const acceptedRequest = await fetchApi<any>(`/repair-requests/${taskId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "ACCEPTED" }),
+      });
+      const updatedTask = mapApiTask(acceptedRequest);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+      setSelectedTask(updatedTask);
+      sessionStorage.setItem("selectedTask", JSON.stringify(updatedTask));
+      sessionStorage.setItem("currentView", "detail");
+      setIsModalOpen(false);
+      setCurrentView("detail");
+      if (view === "home") onNavigate?.("tasks");
+    } catch (err: any) {
+      // Không chuyển màn hình trước khi backend xác nhận. Nếu KTV đang có
+      // đơn chưa hoàn tất, lỗi phải xuất hiện ngay tại bước nhận đơn,
+      // không bị dồn tới lúc bấm "Bắt đầu di chuyển".
+      showAppNotice(
+        err?.message ||
+          "Bạn đang có đơn chưa hoàn tất nên chưa thể nhận thêm đơn mới."
+      );
+      void (async () => {
+        try {
+          const { fetchApi } = await import("@/lib/api-client");
+          const refreshed = await fetchApi<{ items: any[] }>("/repair-requests/technician/me?limit=50");
+          setTasks(refreshed.items.map(mapApiTask));
+        } catch {
+          // Polling tiếp theo sẽ tự đồng bộ lại danh sách.
+        }
+      })();
+    } finally {
+      mutation.inFlight -= 1;
+      mutation.seq += 1;
+      acceptingTaskIdRef.current = null;
+      setAcceptingTaskId(null);
+    }
   };
 
   const handleRejectAssignment = (taskId: string) => {
+    // Chặn polling mở lại modal nhận đơn trong lúc KTV đang chọn lý do từ chối.
+    dismissedAssignmentIdsRef.current.add(taskId);
     setIsModalOpen(false);
     setRejectTaskId(taskId);
     setIsRejectModalOpen(true);
@@ -402,6 +443,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     reason: string,
     note: string
   ) => {
+    dismissedAssignmentIdsRef.current.add(taskId);
+    setIsModalOpen(false);
     setTasks((prev) =>
       prev.map((task) =>
         task.id === taskId
@@ -414,6 +457,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     setSelectedTask(null);
 
     const cancelReason = [reason, note].filter(Boolean).join(" - ");
+    // Polling bỏ qua kết quả tải về khi request này còn đang gửi, giống các lần
+    // cập nhật trạng thái khác, để không hiện lại trạng thái WAITING_ACCEPT cũ.
+    const mutation = statusMutationRef.current;
+    mutation.inFlight += 1;
+    mutation.seq += 1;
     (async () => {
       try {
         const { fetchApi } = await import("@/lib/api-client");
@@ -424,6 +472,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       } catch (err) {
         console.warn("Đơn không còn thuộc KTV hoặc đã hết hạn nhận:", err);
         setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      } finally {
+        mutation.inFlight -= 1;
+        mutation.seq += 1;
       }
     })();
   };
@@ -434,6 +485,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     statusText: string,
     explicitBackendStatus?: string
   ) => {
+    setStatusError("");
     const previousTask = tasks.find((task) => task.id === taskId);
     setTasks((prev) =>
       prev.map((task) =>
@@ -509,7 +561,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
               return restored;
             });
           }
-          alert(err?.message || "Không thể cập nhật trạng thái đơn. Vui lòng thử lại.");
+          setStatusError(err?.message || "Không thể cập nhật trạng thái đơn. Vui lòng thử lại.");
         } finally {
           mutation.inFlight -= 1;
           mutation.seq += 1;
@@ -584,22 +636,37 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
 
   if (view === "tasks" && currentView === "detail") {
     return (
-      <TaskDetailScreen
-        task={selectedTask}
-        onCompleteRepair={(completedHistoryTask) => {
-          if (onCompleteRepair) {
-            onCompleteRepair(completedHistoryTask);
-          }
-        }}
-        onBack={() => {
-          sessionStorage.removeItem("selectedTask");
-          sessionStorage.removeItem("currentView");
-          sessionStorage.removeItem("subStep");
-          setCurrentView("list");
-          setSelectedTask(null);
-        }}
-        onUpdateStatus={handleUpdateTaskStatus}
-      />
+      <>
+        <TaskDetailScreen
+          task={selectedTask}
+          onCompleteRepair={(completedHistoryTask) => {
+            if (onCompleteRepair) {
+              onCompleteRepair(completedHistoryTask);
+            }
+          }}
+          onBack={() => {
+            sessionStorage.removeItem("selectedTask");
+            sessionStorage.removeItem("currentView");
+            sessionStorage.removeItem("subStep");
+            setCurrentView("list");
+            setSelectedTask(null);
+          }}
+          onUpdateStatus={handleUpdateTaskStatus}
+        />
+        {statusError && (
+          <div className="fixed inset-x-4 bottom-5 z-[60] mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-raised" role="alert">
+            <p className="min-w-0 flex-1 leading-relaxed">{statusError}</p>
+            <button
+              type="button"
+              className="shrink-0 rounded-md p-1 text-amber-700 transition-colors hover:bg-amber-100"
+              onClick={() => setStatusError("")}
+              aria-label="Đóng thông báo lỗi"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -625,6 +692,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       <NewAssignmentModal
         isOpen={isModalOpen}
         task={selectedTask}
+        isAccepting={acceptingTaskId === selectedTask?.id}
         onClose={() => setIsModalOpen(false)}
         onAccept={handleAcceptAssignment}
         onReject={handleRejectAssignment}
@@ -635,8 +703,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         isOpen={isRejectModalOpen}
         taskId={rejectTaskId}
         onClose={() => {
+          // KTV đổi ý không từ chối: cho phép modal nhận đơn hiện lại.
+          if (rejectTaskId) dismissedAssignmentIdsRef.current.delete(rejectTaskId);
           setIsRejectModalOpen(false);
           setRejectTaskId(null);
+          if (selectedTask?.id === rejectTaskId && selectedTask?.status === "WAITING_ACCEPT") {
+            setIsModalOpen(true);
+          }
         }}
         onConfirmReject={handleConfirmReject}
       />

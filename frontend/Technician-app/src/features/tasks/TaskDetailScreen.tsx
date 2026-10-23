@@ -7,6 +7,8 @@ import { QuoteStatusScreen } from "./components/QuoteStatusScreen";
 import { RepairScreen } from "./components/RepairScreen";
 import { Button, Card, StatusBadge } from "@h-mobility/ui";
 import { ActionBar, ScreenHeader } from "@/components/ui";
+import { showAppNotice } from "@/components/AppNotice";
+import { getCachedPresence } from "@/lib/presence";
 import {
   MapPin,
   Stethoscope,
@@ -60,7 +62,8 @@ function RoutePreviewMap({ taskId }: { taskId: string }) {
         await fetchApi("/technicians/me/presence", {
           method: "PATCH",
           body: JSON.stringify({
-            is_online: true,
+            // Mở bản đồ chỉ cập nhật GPS, không tự đổi trạng thái nhận việc.
+            is_online: getCachedPresence() ?? true,
             last_latitude: coordinates.latitude,
             last_longitude: coordinates.longitude,
           }),
@@ -73,8 +76,16 @@ function RoutePreviewMap({ taskId }: { taskId: string }) {
           setRoute(nextRoute);
           setMapToken(token.access_token);
         }
-      } catch (previewError) {
-        if (!cancelled) setError(previewError instanceof Error ? previewError.message : "Không thể tải bản đồ lộ trình.");
+      } catch (previewError: any) {
+        if (!cancelled) {
+          setError(
+            previewError?.status === 403
+              ? "Đơn đã được chuyển cho kỹ thuật viên khác hoặc không còn thuộc quyền xử lý của bạn."
+              : previewError instanceof Error
+                ? previewError.message
+                : "Không thể tải bản đồ lộ trình."
+          );
+        }
       }
     };
     void loadPreview();
@@ -207,7 +218,7 @@ export const TaskDetailScreen = ({
               onUpdateStatus(activeTask.id, "WAITING_FOR_APPROVAL", "Đã gửi báo giá", "WAITING_FOR_APPROVAL");
               setSubStep("QUOTE_STATUS");
             } else {
-              alert("Đã lưu nháp báo giá thành công!");
+              showAppNotice("Đã lưu nháp báo giá thành công!");
             }
           }}
         />

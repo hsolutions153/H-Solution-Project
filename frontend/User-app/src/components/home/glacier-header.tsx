@@ -19,9 +19,11 @@ export function GlacierHeader({ title, showProfileLink = true }: GlacierHeaderPr
   const fetchUnreadCount = useCallback(async () => {
     if (!getAuthToken()) return;
     try {
-      const res = await fetchApi<{ unread_count: number }>("/notifications/unread-count");
+      const res = await fetchApi<{ unread_count?: number; notifications?: unknown[] }>("/notifications/me?limit=1");
       if (res && typeof res.unread_count === "number") {
         setUnreadCount(res.unread_count);
+      } else if (res && Array.isArray(res.notifications)) {
+        setUnreadCount(res.notifications.length);
       }
     } catch {
       // Ignore background fetch error

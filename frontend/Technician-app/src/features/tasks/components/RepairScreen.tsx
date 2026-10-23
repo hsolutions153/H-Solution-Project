@@ -5,6 +5,7 @@ import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
 import { Badge, Button, Card, Field, FieldError, cn, inputClasses, rules, useFieldErrors } from "@h-mobility/ui";
 import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses, selectClasses, textareaClasses } from "@/components/ui";
+import { showAppNotice } from "@/components/AppNotice";
 import { SlideToConfirm } from "./SlideToConfirm";
 import {
   Play,
@@ -203,7 +204,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         }
       }, 1500);
     } catch (err: any) {
-      alert(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
+      showAppNotice(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
     } finally {
       setIsConfirmingPayment(false);
     }
@@ -363,7 +364,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     if (files && files[0]) {
       const file = files[0];
       if (file.size > 50 * 1024 * 1024) {
-        alert("Ảnh vượt quá dung lượng tối đa 50MB. Vui lòng chọn ảnh khác.");
+      showAppNotice("Ảnh vượt quá dung lượng tối đa 50MB. Vui lòng chọn ảnh khác.");
         if (e.target) e.target.value = "";
         return;
       }
@@ -471,7 +472,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       }
     } catch (err: any) {
       if (!fromApi(err, { diagnosis_note: "supplementaryNote" })) {
-        alert(err.message || "Lỗi khi tạo báo giá bổ sung");
+      showAppNotice(err.message || "Lỗi khi tạo báo giá bổ sung");
       }
     } finally {
       setIsSubmittingSupplementary(false);
@@ -559,7 +560,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         }
       } catch (err: any) {
         console.error("Lỗi khi hoàn tất đơn:", err);
-        alert(err.message || "Không thể hoàn tất đơn sửa chữa. Vui lòng kiểm tra lại báo giá đã duyệt.");
+      showAppNotice(err.message || "Không thể hoàn tất đơn sửa chữa. Vui lòng kiểm tra lại báo giá đã duyệt.");
         setIsUploading(false);
         return;
       } finally {

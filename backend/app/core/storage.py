@@ -72,7 +72,7 @@ MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
 
 
 def validate_image_upload(file: UploadFile, *, max_size: int) -> str:
-    """Check size and actual format rather than trusting a filename or MIME header."""
+    # Kiểm tra kích thước và định dạng thật của tệp.
     file.file.seek(0, 2)
     size = file.file.tell()
     file.file.seek(0)

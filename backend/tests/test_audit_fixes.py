@@ -1,4 +1,4 @@
-"""Security, payment and password reset regressions; no live services or database."""
+# Kiểm tra hồi quy bảo mật, thanh toán và đặt lại mật khẩu.
 import json
 import os
 import time
