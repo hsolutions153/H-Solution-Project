@@ -18,7 +18,7 @@ export function AppNotice() {
 
   if (!message) return null;
   return (
-    <div className="fixed inset-x-4 bottom-5 z-[70] mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-lg" role="alert">
+    <div className="fixed inset-x-4 bottom-5 z-[70] mx-auto flex max-w-[32rem] items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-lg" role="alert">
       <p className="min-w-0 flex-1 leading-relaxed">{message}</p>
       <button type="button" className="shrink-0 rounded-md px-1 text-rose-700 hover:bg-rose-100" onClick={() => setMessage("")} aria-label="Đóng thông báo">
         ×

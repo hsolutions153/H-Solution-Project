@@ -795,7 +795,7 @@ export default function BookingPage() {
 
             {showCancelBookingDialog && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-5" role="presentation">
-                <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
+                <div className="w-full max-w-[24rem] rounded-2xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
                   <h2 id="cancel-booking-title" className="text-base font-bold text-ink">Hủy lịch hẹn?</h2>
                   <p className="mt-2 text-sm leading-relaxed text-slate-600">Bạn có chắc chắn muốn hủy lịch hẹn sửa chữa này không?</p>
                   <div className="mt-5 flex gap-3">

@@ -1046,7 +1046,7 @@ export default function SosPage() {
           }}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+            className="w-full max-w-[24rem] rounded-2xl bg-white p-5 shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="cancel-sos-dialog-title"

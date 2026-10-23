@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Task } from '@/types/task';
 import { MapPin, TriangleAlert, CalendarCheck, CarFront, CircleCheck, Timer } from 'lucide-react';
 import { Button } from '@h-mobility/ui';
@@ -33,6 +33,10 @@ export const NewAssignmentModal = ({
   const [routeError, setRouteError] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const taskId = task?.id;
+  // Callback từ màn cha được tạo mới mỗi lần render (polling 3 giây/lần). Giữ
+  // chúng trong ref để bộ đếm không bị reset về 2 phút sau mỗi lần render.
+  const expireRef = useRef({ onReject, onTimeout });
+  expireRef.current = { onReject, onTimeout };
 
   useEffect(() => {
     if (!isOpen || !taskId) return;
@@ -44,10 +48,11 @@ export const NewAssignmentModal = ({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          if (onTimeout) {
-            onTimeout(taskId);
+          const { onReject: reject, onTimeout: timeout } = expireRef.current;
+          if (timeout) {
+            timeout(taskId);
           } else {
-            onReject(taskId);
+            reject(taskId);
           }
           return 0;
         }
@@ -56,7 +61,7 @@ export const NewAssignmentModal = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, taskId, onReject, onTimeout]);
+  }, [isOpen, taskId]);
 
   useEffect(() => {
     if (!isOpen || !taskId) return;

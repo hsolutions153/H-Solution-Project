@@ -180,6 +180,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   // Đếm các lần cập nhật trạng thái đang gửi lên máy chủ. Polling bỏ qua kết quả
   // tải về trong lúc đó, nếu không trạng thái cũ sẽ ghi đè trạng thái vừa chuyển.
   const statusMutationRef = useRef({ inFlight: 0, seq: 0 });
+  // Các đơn KTV đã bấm từ chối (hoặc hết giờ). Backend cần vài giây để điều phối
+  // lại, trong lúc đó polling vẫn thấy WAITING_ACCEPT và mở lại modal nhận đơn.
+  const dismissedAssignmentIdsRef = useRef<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
@@ -232,6 +235,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         setSelectedTask(targetTask);
         sessionStorage.removeItem("technician_pending_task_id");
         if (targetTask.status === "WAITING_ACCEPT") {
+          if (dismissedAssignmentIdsRef.current.has(targetTask.id)) return;
           setIsModalOpen(true);
         } else {
           sessionStorage.setItem("selectedTask", JSON.stringify(targetTask));
@@ -298,7 +302,12 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         const mutation = statusMutationRef.current;
         if (mutation.inFlight > 0 || mutation.seq !== startSeq) return;
         if (res && Array.isArray(res.items)) {
-          const apiTasks: Task[] = res.items.map(mapApiTask);
+          const dismissed = dismissedAssignmentIdsRef.current;
+          const apiTasks: Task[] = res.items.map(mapApiTask).map((task: Task) =>
+            task.status === "WAITING_ACCEPT" && dismissed.has(task.id)
+              ? { ...task, status: "CANCELLED", statusText: "Đã từ chối" }
+              : task
+          );
 
           if (isMounted) {
             setTasks((prev) => {
@@ -398,6 +407,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   };
 
   const handleRejectAssignment = (taskId: string) => {
+    // Chặn polling mở lại modal nhận đơn trong lúc KTV đang chọn lý do từ chối.
+    dismissedAssignmentIdsRef.current.add(taskId);
     setIsModalOpen(false);
     setRejectTaskId(taskId);
     setIsRejectModalOpen(true);
@@ -418,6 +429,8 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     reason: string,
     note: string
   ) => {
+    dismissedAssignmentIdsRef.current.add(taskId);
+    setIsModalOpen(false);
     setTasks((prev) =>
       prev.map((task) =>
         task.id === taskId
@@ -430,6 +443,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     setSelectedTask(null);
 
     const cancelReason = [reason, note].filter(Boolean).join(" - ");
+    // Polling bỏ qua kết quả tải về khi request này còn đang gửi, giống các lần
+    // cập nhật trạng thái khác, để không hiện lại trạng thái WAITING_ACCEPT cũ.
+    const mutation = statusMutationRef.current;
+    mutation.inFlight += 1;
+    mutation.seq += 1;
     (async () => {
       try {
         const { fetchApi } = await import("@/lib/api-client");
@@ -440,6 +458,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       } catch (err) {
         console.warn("Đơn không còn thuộc KTV hoặc đã hết hạn nhận:", err);
         setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      } finally {
+        mutation.inFlight -= 1;
+        mutation.seq += 1;
       }
     })();
   };
@@ -667,8 +688,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
         isOpen={isRejectModalOpen}
         taskId={rejectTaskId}
         onClose={() => {
+          // KTV đổi ý không từ chối: cho phép modal nhận đơn hiện lại.
+          if (rejectTaskId) dismissedAssignmentIdsRef.current.delete(rejectTaskId);
           setIsRejectModalOpen(false);
           setRejectTaskId(null);
+          if (selectedTask?.id === rejectTaskId && selectedTask?.status === "WAITING_ACCEPT") {
+            setIsModalOpen(true);
+          }
         }}
         onConfirmReject={handleConfirmReject}
       />
