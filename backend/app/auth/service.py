@@ -11,6 +11,8 @@ from app.auth.utils import (
     create_refresh_token,
     get_refresh_token_payload,
     hash_password,
+    invalidate_account_cache,
+    password_version,
     verify_password,
 )
 from app.core.exceptions import AppException, ErrorCode
@@ -76,7 +78,8 @@ def refresh_access_token(raw_refresh_token: str):
     # Xoay vòng: thu hồi token cũ, cấp token mới
     repository.revoke_refresh_token(stored["id"], now.isoformat())
     access_token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "role_id": role["id"], "role": role["code"]}
+        data={"sub": user["id"], "email": user["email"], "role_id": role["id"], "role": role["code"],
+              "pwv": password_version(user.get("password_hash"))}
     )
     return {
         "access_token": access_token,
@@ -125,7 +128,8 @@ def authenticate_user(email_or_phone: str, password: str):
         raise AppException(ErrorCode.ROLE_NOT_CONFIGURED)
 
     access_token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "role_id": role_id, "role": role_code}
+        data={"sub": user["id"], "email": user["email"], "role_id": role_id, "role": role_code,
+              "pwv": password_version(user.get("password_hash"))}
     )
     user_addr = (user.get("address") or "").strip()
     user_phone = (user.get("phone") or "").strip()
@@ -309,7 +313,8 @@ def authenticate_or_register_google_user(payload):
     is_new_user = is_new or (not is_profile_complete)
 
     access_token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "role_id": user_role_id, "role": user_role_code}
+        data={"sub": user["id"], "email": user["email"], "role_id": user_role_id, "role": user_role_code,
+              "pwv": password_version(user.get("password_hash"))}
     )
     return {
         "access_token": access_token,
@@ -397,5 +402,9 @@ def reset_password(phone: str, otp_code: str, new_password: str):
     updated = repository.update_user_password(user["id"], hash_password(new_password))
     if not updated:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
-    repository.mark_otp_used(otp["id"], datetime.now(timezone.utc).isoformat())
+    now = datetime.now(timezone.utc).isoformat()
+    repository.mark_otp_used(otp["id"], now)
+    # Đổi mật khẩu phải đăng xuất mọi phiên cũ (refresh token + access token qua pwv).
+    repository.revoke_all_user_refresh_tokens(user["id"], now)
+    invalidate_account_cache(user["id"])
     return {"message": "Đặt lại mật khẩu thành công"}

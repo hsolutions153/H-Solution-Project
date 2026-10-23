@@ -564,6 +564,45 @@ class QuoteApprovalTests(unittest.TestCase):
         response = self.submit_final_cost(1000000)
         self.assertEqual(response.status_code, 403, response.text)
 
+    def as_assigned_technician(self):
+        self.request["technician_id"] = "TECH000001"
+        self.customer = {"sub": "TECH000001", "role": "TECHNICIAN"}
+
+    def test_technician_cannot_approve_or_reject_quote_for_customer(self):
+        self.as_assigned_technician()
+        for status in ("ESTIMATE_APPROVED", "ESTIMATE_REJECTED"):
+            response = self.client.patch("/repair-requests/REPAIR0001/status", json={"status": status})
+            self.assertEqual(response.status_code, 400, response.text)
+        self.assertEqual(self.request["repair_quotes"][0]["status"], "PENDING")
+        self.assertEqual(self.request["status"], "WAITING_FOR_APPROVAL")
+
+    def test_repair_cannot_start_from_arrived_or_diagnosing_without_accepted_quote(self):
+        self.as_assigned_technician()
+        for status in ("ARRIVED", "DIAGNOSING"):
+            self.request.update(status=status, repair_quotes=[])
+            with patch("app.repair_requests.service._ensure_technician_not_busy"):
+                response = self.client.patch("/repair-requests/REPAIR0001/status", json={"status": "REPAIRING"})
+            self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(self.request["status"], status)
+
+    def test_repair_starts_after_customer_accepted_quote(self):
+        self.as_assigned_technician()
+        self.request.update(status="ESTIMATE_APPROVED", repair_quotes=[self.quote("INITIAL001", "ACCEPTED", 450000)])
+        response = self.client.patch("/repair-requests/REPAIR0001/status", json={"status": "REPAIRING"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.request["status"], "REPAIRING")
+
+    def test_quotes_are_hidden_from_unrelated_users(self):
+        for user in ({"sub": "CUSTOMER02", "role": "CUSTOMER"}, {"sub": "TECH000009", "role": "TECHNICIAN"}):
+            self.customer = user
+            response = self.client.get("/repair-requests/REPAIR0001/quotes")
+            self.assertEqual(response.status_code, 403, response.text)
+
+    def test_quotes_visible_to_owner_and_assigned_technician(self):
+        self.assertEqual(self.client.get("/repair-requests/REPAIR0001/quotes").status_code, 200)
+        self.as_assigned_technician()
+        self.assertEqual(self.client.get("/repair-requests/REPAIR0001/quotes").status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

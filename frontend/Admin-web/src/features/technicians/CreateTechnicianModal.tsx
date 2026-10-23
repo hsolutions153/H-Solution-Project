@@ -2,6 +2,7 @@
 
 import { Award,Lock,Mail,Phone,RefreshCw,UserPlus,X } from "lucide-react";
 import React,{ useState } from "react";
+import { generateInitialPassword } from "@/lib/password";
 import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 
 export interface CreateTechnicianModalProps {
@@ -16,7 +17,7 @@ export const CreateTechnicianModal = ({
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("Abc123456@");
+  const [password, setPassword] = useState(generateInitialPassword);
   const [idCardNumber, setIdCardNumber] = useState("");
   const [specialization, setSpecialization] = useState(
     "Kỹ thuật viên Sửa chữa H-Solution"
@@ -177,7 +178,7 @@ export const CreateTechnicianModal = ({
                   setPassword(e.target.value);
                   clearError("password");
                 }}
-                placeholder="Mặc định: Abc123456@"
+                placeholder="Mật khẩu khởi tạo (đã tạo ngẫu nhiên)"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-brand-800 outline-none font-mono"
               />
               <FieldError id="password-error" message={errors.password} />

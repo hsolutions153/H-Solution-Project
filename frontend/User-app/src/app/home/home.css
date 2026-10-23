@@ -1484,6 +1484,7 @@
 }
 
 .sos-issue-card {
+  position: relative;
   min-height: 102px;
   border-radius: 14px;
   border: 1.5px solid #d7dee8;
@@ -1510,15 +1511,64 @@
   justify-content: center;
   color: #156495;
   font-size: 22px;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .sos-issue-card:hover {
   border-color: #b2d5ea;
+  background: #f7fbfe;
 }
 
-.sos-issue-card--active {
+.sos-issue-card:active {
+  transform: scale(0.98);
+}
+
+.sos-issue-card:focus-visible {
+  outline: 3px solid #b2d5ea;
+  outline-offset: 2px;
+}
+
+/* Ô đang chọn: nền xanh nhạt + viền đậm (inset, không làm ô nhảy kích thước)
+   + icon tô đặc + dấu tick, để phân biệt rõ với các ô còn lại. */
+.sos-issue-card--active,
+.sos-issue-card--active:hover {
   border-color: #156495;
-  box-shadow: 0 3px 14px rgba(11, 108, 174, 0.15);
+  background: #e8f3fa;
+  color: #156495;
+  box-shadow: inset 0 0 0 1px #156495, 0 4px 14px rgba(21, 100, 149, 0.18);
+}
+
+.sos-issue-card--active .material-symbols-outlined {
+  background: #156495;
+  color: #ffffff;
+}
+
+.sos-issue-card--active::after {
+  content: "check";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #156495;
+  color: #ffffff;
+  font-family: "Material Symbols Outlined";
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sos-issue-card,
+  .sos-issue-card .material-symbols-outlined {
+    transition: none;
+  }
+
+  .sos-issue-card:active {
+    transform: none;
+  }
 }
 
 .sos-section-title {
