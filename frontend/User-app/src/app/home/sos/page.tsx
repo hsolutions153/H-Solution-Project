@@ -560,6 +560,7 @@ export default function SosPage() {
                 key={issue.id}
                 type="button"
                 className={`sos-issue-card ${selectedIssue === issue.id ? "sos-issue-card--active" : ""}`}
+                aria-pressed={selectedIssue === issue.id}
                 onClick={() => handleSelectIssue(issue.id)}
               >
                 <span className="material-symbols-outlined">{issue.icon}</span>
