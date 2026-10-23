@@ -91,6 +91,33 @@ def create_repair_request(data: dict):
     return response.data[0] if response and response.data else None
 
 
+def find_recent_open_request(customer_id: str, device_id: str, is_sos: bool, created_after: str):
+    response = (
+        supabase.table(REPAIR_REQUESTS_TABLE)
+        .select("*")
+        .eq("customer_id", customer_id)
+        .eq("device_id", device_id)
+        .eq("is_sos", is_sos)
+        .not_.in_("status", ["COMPLETED", "CANCELLED"])
+        .gte("created_at", created_after)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response and response.data else None
+
+
+def get_technician_requests_in_statuses(technician_id: str, statuses: list[str]):
+    response = (
+        supabase.table(REPAIR_REQUESTS_TABLE)
+        .select("*")
+        .eq("technician_id", technician_id)
+        .in_("status", statuses)
+        .execute()
+    )
+    return (response.data or []) if response else []
+
+
 def get_repair_request_by_id(request_id: str):
     response = (
         supabase.table(REPAIR_REQUESTS_TABLE)

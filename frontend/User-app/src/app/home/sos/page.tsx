@@ -48,6 +48,9 @@ export default function SosPage() {
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState("");
   const [cameraFlash, setCameraFlash] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Ref chặn ngay lần bấm thứ 2 trước khi React kịp render lại nút disabled.
+  const submittingRef = useRef(false);
 
   const [connectingDots, setConnectingDots] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected">("connecting");
@@ -401,12 +404,15 @@ export default function SosPage() {
   };
 
   const handleContinueFromLocation = async () => {
+    if (submittingRef.current) return;
     if (!province.trim() || !ward.trim() || !streetAddress.trim()) {
       setFormError("Vui lòng nhập đầy đủ tỉnh/thành phố, phường/xã và số nhà – tên đường.");
       return;
     }
 
     setFormError("");
+    submittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
       const { fetchApi, getAuthToken } = await import("@/lib/api-client");
@@ -495,6 +501,9 @@ export default function SosPage() {
       } else {
         setFormError(err.message || "Tạo yêu cầu thất bại. Vui lòng kiểm tra kết nối và thử lại.");
       }
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -790,8 +799,8 @@ export default function SosPage() {
 
             {formError && <p className="sos-form-error">{formError}</p>}
 
-            <button className="sos-manual-submit" disabled={!canContinueLocation} onClick={handleContinueFromLocation}>
-              Tiếp tục
+            <button className="sos-manual-submit" disabled={!canContinueLocation || isSubmitting} onClick={handleContinueFromLocation}>
+              {isSubmitting ? "Đang gửi yêu cầu..." : "Tiếp tục"}
             </button>
 
             <button className="sos-cancel-link" onClick={handleCancel}>

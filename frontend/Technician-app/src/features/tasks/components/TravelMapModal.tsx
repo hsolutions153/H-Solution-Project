@@ -249,6 +249,14 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
         {status === "WAITING_MOVE" && <Button size="lg" fullWidth icon={<CirclePlay className="size-5" />} onClick={handleNextStep}>Bắt đầu di chuyển</Button>}
         {status === "MOVING" && <Button size="lg" fullWidth icon={<CheckCircle2 className="size-5" />} onClick={handleNextStep}>Đã đến nơi</Button>}
         {status === "ARRIVED" && <Button size="lg" fullWidth icon={<Stethoscope className="size-5" />} onClick={handleNextStep}>Bắt đầu công việc</Button>}
+        {!STATUS_LABEL[status] && (
+          <>
+            <p role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-center text-[13px] font-medium text-amber-800">
+              Đơn chưa ở bước di chuyển ({task.statusText}). Vui lòng quay lại chi tiết công việc để tiếp tục.
+            </p>
+            <Button size="lg" fullWidth variant="secondary" onClick={onClose}>Quay lại chi tiết</Button>
+          </>
+        )}
       </div>
     </div>
   );

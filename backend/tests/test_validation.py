@@ -6,6 +6,8 @@ from io import BytesIO
 import unittest
 from unittest.mock import patch
 
+from tests.notification_isolation import setUpModule, tearDownModule  # noqa: F401
+
 from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -53,18 +55,19 @@ class InputContractTests(OfflineTest):
             (CustomerCreate, common),
             (UserCreate, {**common, "role_id": "CUSTOMER"}),
             (TechnicianCreate, common),
-            (SignupRequest, {"name": "Test", **{k: v for k, v in common.items() if k != "full_name"}}),
+            (SignupRequest, {"name": "Test", "otp_code": "123456", **{k: v for k, v in common.items() if k != "full_name"}}),
         ):
             schema.model_validate(valid)
             name = "name" if schema is SignupRequest else "full_name"
             for field, invalid in ((name, "   "), ("phone", "abc"), ("phone", "09١٢٣٤٥٦٧٨"),
                                    ("email", "not-email"), ("password", "1"),
-                                   ("password", "😀" * 25), ("password", " " * 8)):
+                                   ("password", "😀" * 25), ("password", " " * 8)) + (
+                                   (("otp_code", "12345"), ("otp_code", "abcdef")) if schema is SignupRequest else ()):
                 with self.subTest(schema=schema.__name__, field=field, invalid=invalid), self.assertRaises(ValidationError):
                     schema.model_validate({**valid, field: invalid})
 
     def test_names_are_trimmed_and_passwords_are_preserved(self):
-        model = SignupRequest(name="  Test  ", email="test@example.com", password="  secret  ", phone=" 0912345678 ")
+        model = SignupRequest(name="  Test  ", email="test@example.com", password="  secret  ", phone=" 0912345678 ", otp_code="123456")
         self.assertEqual(model.name, "Test")
         self.assertEqual(model.phone, "0912345678")
         self.assertEqual(model.password, "  secret  ")

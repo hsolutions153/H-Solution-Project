@@ -72,13 +72,21 @@ export function TechnicianProfileScreen() {
   const fetchProfile = async () => {
     setFetchError(null);
     try {
-      const { fetchApi } = await import("@/lib/api-client");
+      const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+      if (!getAuthToken()) {
+        setLoading(false);
+        return;
+      }
       const me = await fetchApi<any>("/technicians/me");
       setProfile(me);
       if (typeof me?.is_online === "boolean") {
         setCachedPresence(me.is_online);
       }
     } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        setLoading(false);
+        return;
+      }
       console.error("Lỗi tải thông tin cá nhân KTV:", err);
       setFetchError(err?.message || "Không thể kết nối đến máy chủ.");
     } finally {
@@ -94,7 +102,8 @@ export function TechnicianProfileScreen() {
       if (refreshing || document.hidden) return;
       refreshing = true;
       try {
-        const { fetchApi } = await import("@/lib/api-client");
+        const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+        if (!getAuthToken()) return;
         const me = await fetchApi<any>("/technicians/me");
         if (alive) setProfile((previous: any) => previous ? {
           ...previous,

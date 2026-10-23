@@ -3,6 +3,7 @@ from app.core.validation import Identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.auth.utils import get_current_user
+from app.customers.service import require_admin
 from app.repair_requests.schemas import (
     FinalCostRequest,
     QuoteCreateRequest,
@@ -190,4 +191,16 @@ def rate_technician(
     current_user: dict = Depends(get_current_user),
 ):
     return submit_technician_rating(request_id, data.model_dump(), current_user)
+
+
+@router.patch("/{request_id}/assign", dependencies=[Depends(require_admin)])
+def assign_technician_endpoint(
+    request_id: Identifier,
+    payload: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    from app.orders.service import assign_technician
+    tech_id = payload.get("technician_id")
+    order = assign_technician(request_id, tech_id, current_user["sub"])
+    return {"message": "Phân công kỹ thuật viên thành công", "order": order}
 

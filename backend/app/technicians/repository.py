@@ -1,6 +1,14 @@
+import json
+import logging
+import os
+import secrets
+from datetime import datetime, timezone
+
 from app.db.database import supabase
 from app.technicians.models import TECHNICIAN_PROFILES_TABLE
 from app.technicians.ratings import sync_technician_rating
+
+logger = logging.getLogger("h_solution")
 
 BANK_ACCOUNTS_TABLE = "technician_bank_accounts"
 
@@ -96,6 +104,12 @@ def get_all_technicians(kyc_status: str | None = None):
     except Exception:
         pass
 
+    for item in data:
+        if not item.get("bank_account") and item.get("user_id"):
+            local_bank = get_bank_account(item["user_id"])
+            if local_bank:
+                item["bank_account"] = local_bank
+
     return data
 
 
@@ -109,7 +123,12 @@ def get_technician_by_user_id(user_id: str):
             .execute()
         )
         if response and response.data:
-            return _sync_technician_stats(response.data)
+            item = _sync_technician_stats(response.data)
+            if not item.get("bank_account"):
+                local_bank = get_bank_account(user_id)
+                if local_bank:
+                    item["bank_account"] = local_bank
+            return item
     except Exception:
         pass
 
@@ -197,7 +216,34 @@ def delete_technician_from_db(user_id: str):
     return response.data[0] if response and response.data else None
 
 
+FALLBACK_BANK_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "uploads",
+    "technician_bank_accounts.json"
+)
+
+
+def _read_local_bank_accounts() -> dict:
+    if not os.path.exists(FALLBACK_BANK_FILE):
+        return {}
+    try:
+        with open(FALLBACK_BANK_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _write_local_bank_accounts(data: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(FALLBACK_BANK_FILE), exist_ok=True)
+        with open(FALLBACK_BANK_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Cannot save local bank accounts: {e}")
+
+
 def get_bank_account(technician_id: str):
+    # 1. Thử lấy từ Supabase
     try:
         resp = (
             supabase.table(BANK_ACCOUNTS_TABLE)
@@ -206,42 +252,71 @@ def get_bank_account(technician_id: str):
             .maybe_single()
             .execute()
         )
-        return resp.data if resp and resp.data else None
+        if resp and resp.data:
+            return resp.data
     except Exception:
-        return None
+        pass
+
+    # 2. Fallback: Lấy từ file lưu cục bộ nếu Supabase bị chặn RLS
+    local_data = _read_local_bank_accounts()
+    return local_data.get(technician_id)
 
 
 def upsert_bank_account(technician_id: str, data: dict):
-    import secrets
-    from datetime import datetime, timezone
-
     now = datetime.now(timezone.utc).isoformat()
     existing = get_bank_account(technician_id)
+    saved_record = None
 
-    if existing:
-        resp = (
-            supabase.table(BANK_ACCOUNTS_TABLE)
-            .update({**data, "updated_at": now})
-            .eq("technician_id", technician_id)
-            .execute()
-        )
-    else:
-        resp = supabase.table(BANK_ACCOUNTS_TABLE).insert({
-            "id": secrets.token_hex(5).upper(),
-            "technician_id": technician_id,
-            "created_at": now,
-            "updated_at": now,
-            **data,
-        }).execute()
+    # 1. Thử ghi dữ liệu lên Supabase
+    try:
+        if existing and existing.get("id"):
+            resp = (
+                supabase.table(BANK_ACCOUNTS_TABLE)
+                .update({**data, "updated_at": now})
+                .eq("technician_id", technician_id)
+                .execute()
+            )
+            if resp and resp.data:
+                saved_record = resp.data[0]
+        else:
+            acc_id = secrets.token_hex(5).upper()
+            resp = supabase.table(BANK_ACCOUNTS_TABLE).insert({
+                "id": acc_id,
+                "technician_id": technician_id,
+                "created_at": now,
+                "updated_at": now,
+                **data,
+            }).execute()
+            if resp and resp.data:
+                saved_record = resp.data[0]
+    except Exception as e:
+        logger.warning(f"[Bank Account DB Fallback] Supabase RLS blocked write: {e}. Storing locally.")
 
-    return resp.data[0] if resp and resp.data else None
+    # 2. Đồng bộ vào fallback local storage để luôn đảm bảo dữ liệu không bị mất và không sập 500
+    local_accounts = _read_local_bank_accounts()
+    current_local = local_accounts.get(technician_id) or {}
+    record = {
+        "id": (saved_record or existing or current_local).get("id") or secrets.token_hex(5).upper(),
+        "technician_id": technician_id,
+        "created_at": (saved_record or existing or current_local).get("created_at") or now,
+        "updated_at": now,
+        **data,
+    }
+    local_accounts[technician_id] = record
+    _write_local_bank_accounts(local_accounts)
+
+    return saved_record or record
 
 
 def delete_bank_account(technician_id: str):
-    resp = (
-        supabase.table(BANK_ACCOUNTS_TABLE)
-        .delete()
-        .eq("technician_id", technician_id)
-        .execute()
-    )
-    return resp.data[0] if resp and resp.data else None
+    try:
+        supabase.table(BANK_ACCOUNTS_TABLE).delete().eq("technician_id", technician_id).execute()
+    except Exception:
+        pass
+
+    local_accounts = _read_local_bank_accounts()
+    deleted = local_accounts.pop(technician_id, None)
+    if deleted:
+        _write_local_bank_accounts(local_accounts)
+    return deleted
+

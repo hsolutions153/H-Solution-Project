@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Bell, LogOut } from 'lucide-react';
 import { BrandMark, Button } from '@h-mobility/ui';
 import { Modal } from '@/components/ui';
 import { AVATAR_UPDATED_EVENT } from '@/lib/avatar';
 import { PRESENCE_UPDATED_EVENT, getCachedPresence, setCachedPresence } from '@/lib/presence';
+import { TechnicianNotificationDrawer } from '@/components/notifications/TechnicianNotificationDrawer';
 
 interface HeaderProps {
   onLogout?: () => void; // Hàm nhận sự kiện đăng xuất
@@ -13,6 +14,8 @@ interface HeaderProps {
 
 export const Header = ({ onLogout }: HeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [techName, setTechName] = useState<string>("Kỹ thuật viên");
   const [isOnline, setIsOnline] = useState<boolean>(() => {
@@ -22,10 +25,30 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const { fetchApi, getAuthToken } = await import("@/lib/api-client");
+      if (!getAuthToken()) return;
+      const res = await fetchApi<{ unread_count: number }>("/notifications/unread-count");
+      if (res && typeof res.unread_count === "number") {
+        setUnreadCount(res.unread_count);
+      }
+    } catch {
+      // Ignore background error
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 20000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
   useEffect(() => {
     async function loadProfile() {
       try {
-        const { fetchApi, getUserInfo } = await import("@/lib/api-client");
+        const { fetchApi, getUserInfo, getAuthToken } = await import("@/lib/api-client");
+        if (!getAuthToken()) return;
         const cached = getUserInfo();
         if (cached && cached.name) {
           setTechName(cached.name);
@@ -41,7 +64,8 @@ export const Header = ({ onLogout }: HeaderProps) => {
           setIsOnline(me.is_online);
           setCachedPresence(me.is_online);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.status === 401 || err?.status === 403) return;
         console.warn("Lỗi tải thông tin KTV trên header:", err);
       }
     }
@@ -79,26 +103,30 @@ export const Header = ({ onLogout }: HeaderProps) => {
   const avatarChar = techName ? techName.charAt(0).toUpperCase() : "K";
 
   return (
-    <header className="relative z-20 flex items-center justify-between gap-3 bg-canvas px-4 pt-[calc(0.875rem+env(safe-area-inset-top))] pb-2.5">
-      <div className="flex min-w-0 items-center gap-2.5 select-none">
-        <BrandMark size={34} />
-        <span className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-base font-extrabold tracking-wide text-ink">V-HCare</span>
-          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-600">
-            Kỹ thuật viên cứu hộ 24/7
+    <>
+      <header className="relative z-20 flex items-center justify-between gap-3 bg-canvas px-4 pt-[calc(0.875rem+env(safe-area-inset-top))] pb-2.5">
+        <div className="flex min-w-0 items-center gap-2.5 select-none">
+          <BrandMark size={34} />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-base font-extrabold tracking-wide text-ink">V-HCare</span>
+            <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-600">
+              Kỹ thuật viên cứu hộ 24/7
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          aria-label="Thông báo"
-          className="relative flex size-10 items-center justify-center rounded-full bg-slate-200/70 text-ink transition-colors hover:bg-slate-200 cursor-pointer"
-        >
-          <Bell className="size-5" strokeWidth={2} />
-          <span className="absolute top-2 right-2 size-2 rounded-full bg-rose-500 ring-2 ring-canvas" aria-hidden />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            aria-label="Thông báo"
+            className="relative flex size-10 items-center justify-center rounded-full bg-slate-200/70 text-ink transition-colors hover:bg-slate-200 cursor-pointer"
+          >
+            <Bell className="size-5" strokeWidth={2} />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 size-2 rounded-full bg-rose-500 ring-2 ring-canvas" aria-hidden />
+            )}
+          </button>
 
         <div ref={menuRef} className="relative">
           <button
@@ -145,8 +173,9 @@ export const Header = ({ onLogout }: HeaderProps) => {
           )}
         </div>
       </div>
+    </header>
 
-      <Modal open={showLogoutModal} onClose={() => setShowLogoutModal(false)} hideClose>
+    <Modal open={showLogoutModal} onClose={() => setShowLogoutModal(false)} hideClose>
         <div className="text-center">
           <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
             <LogOut className="size-6" />
@@ -171,6 +200,12 @@ export const Header = ({ onLogout }: HeaderProps) => {
           </Button>
         </div>
       </Modal>
-    </header>
+
+      <TechnicianNotificationDrawer
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        onUnreadCountChange={setUnreadCount}
+      />
+    </>
   );
 };
