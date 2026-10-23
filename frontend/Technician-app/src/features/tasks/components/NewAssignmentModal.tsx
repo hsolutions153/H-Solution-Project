@@ -11,6 +11,7 @@ interface NewAssignmentModalProps {
   task: Task | null;
   onClose: () => void;
   onAccept: (taskId: string) => void;
+  isAccepting?: boolean;
   onReject: (taskId: string) => void; // Trigger mở Modal Xác nhận Từ chối thủ công
   onTimeout?: (taskId: string) => void; // Tự động xử lý khi hết 2 phút
 }
@@ -25,6 +26,7 @@ export const NewAssignmentModal = ({
   task,
   onClose,
   onAccept,
+  isAccepting = false,
   onReject,
   onTimeout,
 }: NewAssignmentModalProps) => {
@@ -161,11 +163,11 @@ export const NewAssignmentModal = ({
       </div>
 
       <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2.5">
-        <Button size="lg" variant="secondary" onClick={() => onReject(task.id)}>
+        <Button size="lg" variant="secondary" disabled={isAccepting} onClick={() => onReject(task.id)}>
           Từ chối
         </Button>
-        <Button size="lg" icon={<CircleCheck className="size-5" />} onClick={() => onAccept(task.id)}>
-          Chấp nhận
+        <Button size="lg" disabled={isAccepting} icon={<CircleCheck className="size-5" />} onClick={() => onAccept(task.id)}>
+          {isAccepting ? "Đang nhận đơn…" : "Chấp nhận"}
         </Button>
       </div>
     </Modal>

@@ -1400,8 +1400,24 @@ def update_request_status(request_id: str, current_user: dict, data):
         if total_amt is not None and new_status not in {"ESTIMATE_APPROVED", "ESTIMATE_REJECTED"}:
             update_data["total_amount"] = float(total_amt)
 
-        updated_request = repository.update_repair_request(actual_id, update_data)
+        # Tránh race condition khi KTV gửi đồng thời nhiều request nhận đơn.
+        update_expected = None
+        if is_technician:
+            update_expected = {
+                "status": request["status"],
+                "technician_id": current_user["sub"],
+            }
+        updated_request = repository.update_repair_request(
+            actual_id,
+            update_data,
+            expected=update_expected,
+        )
         if not updated_request:
+            if is_technician:
+                raise AppException(
+                    ErrorCode.INVALID_STATUS_TRANSITION,
+                    message="Đơn vừa được cập nhật bởi một thao tác khác. Vui lòng tải lại danh sách đơn.",
+                )
             raise AppException(ErrorCode.DATABASE_ERROR)
 
         if new_status == "COMPLETED" and updated_request.get("technician_id"):

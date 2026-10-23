@@ -183,6 +183,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   // Các đơn KTV đã bấm từ chối (hoặc hết giờ). Backend cần vài giây để điều phối
   // lại, trong lúc đó polling vẫn thấy WAITING_ACCEPT và mở lại modal nhận đơn.
   const dismissedAssignmentIdsRef = useRef<Set<string>>(new Set());
+  // Chặn double-click và ngăn polling mở lại modal trong lúc nhận đơn.
+  const acceptingTaskIdRef = useRef<string | null>(null);
+  const [acceptingTaskId, setAcceptingTaskId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectTaskId, setRejectTaskId] = useState<string | null>(null);
@@ -371,7 +374,13 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   }, []);
 
   const handleAcceptAssignment = async (taskId: string) => {
-    if (!selectedTask) return;
+    if (!selectedTask || acceptingTaskIdRef.current === taskId) return;
+
+    acceptingTaskIdRef.current = taskId;
+    setAcceptingTaskId(taskId);
+    const mutation = statusMutationRef.current;
+    mutation.inFlight += 1;
+    mutation.seq += 1;
     try {
       const { fetchApi } = await import("@/lib/api-client");
       const acceptedRequest = await fetchApi<any>(`/repair-requests/${taskId}/status`, {
@@ -403,6 +412,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           // Polling tiếp theo sẽ tự đồng bộ lại danh sách.
         }
       })();
+    } finally {
+      mutation.inFlight -= 1;
+      mutation.seq += 1;
+      acceptingTaskIdRef.current = null;
+      setAcceptingTaskId(null);
     }
   };
 
@@ -678,6 +692,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       <NewAssignmentModal
         isOpen={isModalOpen}
         task={selectedTask}
+        isAccepting={acceptingTaskId === selectedTask?.id}
         onClose={() => setIsModalOpen(false)}
         onAccept={handleAcceptAssignment}
         onReject={handleRejectAssignment}
