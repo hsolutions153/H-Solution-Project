@@ -158,6 +158,12 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
 
     if (!matchesSearch) return false;
 
+    if (activeTab === "this_month") {
+      // item.date có dạng dd/mm/yyyy (vi-VN)
+      const [, month, year] = (item.date || "").split("/").map(Number);
+      const now = new Date();
+      return month === now.getMonth() + 1 && year === now.getFullYear();
+    }
     if (activeTab === "maintenance") return item.type === "maintenance";
     if (activeTab === "repair") return item.type === "repair";
     return true;

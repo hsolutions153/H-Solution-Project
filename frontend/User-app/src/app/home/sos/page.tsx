@@ -515,8 +515,11 @@ export default function SosPage() {
           method: "PATCH",
           body: JSON.stringify({ status: "CANCELLED", cancel_reason: "Khách hàng hủy yêu cầu trên màn hình SOS" }),
         });
-      } catch (err) {
+      } catch (err: any) {
+        // Chưa hủy được trên máy chủ: giữ màn hình theo dõi, không để khách tưởng đã hủy.
         console.warn("Lỗi hủy yêu cầu cứu hộ:", err);
+        alert(err?.message || "Không thể hủy yêu cầu cứu hộ. Vui lòng thử lại.");
+        return;
       }
     }
     sessionStorage.removeItem("activeSosId");

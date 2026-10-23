@@ -396,8 +396,18 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
             and _skill_matches_device(technician, device_type)
             and _has_fresh_technician_location(technician, now)
         ]
+        if techs:
+            # Tài khoản bị khóa/xóa không được nhận việc dù hồ sơ vẫn online.
+            users_resp = (
+                supabase.table("users")
+                .select("id,is_active")
+                .in_("id", [t["user_id"] for t in techs])
+                .execute()
+            )
+            active_ids = {u["id"] for u in (users_resp.data or []) if u.get("is_active")}
+            techs = [t for t in techs if t["user_id"] in active_ids]
         if not techs:
-            logger.info("No eligible SOS technician: online, KYC-approved, matching skill and fresh GPS are required")
+            logger.info("No eligible SOS technician: active account, online, KYC-approved, matching skill and fresh GPS are required")
             return None
 
         active_statuses = [
@@ -444,8 +454,32 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
         return None
 
 
+def _declined_technician_ids(repair_id: str) -> set:
+    """KTV đã từ chối/quá hạn/được chuyển khỏi đơn. Lượt từ chối được lưu với status
+    REQUESTED (DB không có REJECTED) nên phải xét cả REQUESTED lẫn ASSIGNED.
+    Ném lỗi khi không đọc được lịch sử để caller không giao lại nhầm KTV."""
+    return {
+        h["changed_by"]
+        for h in repository.get_status_history(repair_id) or []
+        if h.get("changed_by") and h.get("status") in {"REJECTED", "REQUESTED", "ASSIGNED"}
+    }
+
+
+def _parse_utc(raw_ts):
+    if not raw_ts:
+        return None
+    if not isinstance(raw_ts, str):
+        return raw_ts
+    try:
+        parsed = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
-    # Tự động điều phối KTV mới nếu đơn ASSIGNED quá thời gian chờ
+    """Điều phối lại đơn SOS: ASSIGNED quá thời gian chờ, hoặc REQUESTED chưa có KTV
+    (lúc tạo/từ chối không còn ai khả dụng) khi đã có KTV khả dụng sau đó."""
     from app.db.database import supabase
     from datetime import timedelta
 
@@ -456,104 +490,112 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
         resp = (
             supabase.table(REPAIR_REQUESTS_TABLE)
             .select("*")
-            .eq("status", "ASSIGNED")
+            .in_("status", ["ASSIGNED", "REQUESTED"])
+            .eq("is_sos", True)
             .execute()
         )
-        assigned_requests = resp.data if resp and resp.data else []
+        candidates = resp.data if resp and resp.data else []
     except Exception as err:
-        logger.warning(f"Error querying ASSIGNED requests for timeout check: {err}")
+        logger.warning(f"Error querying SOS requests for dispatch check: {err}")
         return 0
 
     reassigned_count = 0
 
-    for req in assigned_requests:
-        # Chỉ áp dụng auto timeout 2 phút cho đơn cứu hộ khẩn cấp (SOS)
+    for req in candidates:
         if not req.get("is_sos"):
             continue
+        req_id = req["id"]
+        status = req.get("status")
+        current_tech_id = req.get("technician_id")
 
-        raw_ts = req.get("assigned_at") or req.get("updated_at") or req.get("created_at")
-        if not raw_ts:
+        if status == "ASSIGNED":
+            assigned_dt = _parse_utc(req.get("assigned_at") or req.get("updated_at") or req.get("created_at"))
+            if assigned_dt is None or assigned_dt >= cutoff:
+                continue
+        elif current_tech_id:
             continue
 
         try:
-            if isinstance(raw_ts, str):
-                ts_clean = raw_ts.replace("Z", "+00:00")
-                assigned_dt = datetime.fromisoformat(ts_clean)
-                if assigned_dt.tzinfo is None:
-                    assigned_dt = assigned_dt.replace(tzinfo=timezone.utc)
-            else:
-                assigned_dt = raw_ts
-        except Exception:
+            excluded_tech_ids = _declined_technician_ids(req_id)
+        except Exception as h_err:
+            logger.warning(f"Skip auto-dispatch for {req_id}: cannot read history ({h_err})")
+            continue
+        if current_tech_id:
+            excluded_tech_ids.add(current_tech_id)
+
+        next_tech_id = _find_best_sos_technician(
+            customer_lat=req.get("latitude"),
+            customer_lng=req.get("longitude"),
+            device_type=repository.get_device_type(req.get("device_id")),
+            exclude_tech_ids=excluded_tech_ids,
+        )
+        if status == "REQUESTED" and not next_tech_id:
+            continue  # Vẫn chưa có KTV khả dụng, thử lại ở lượt quét sau.
+
+        now_iso = now.isoformat()
+        changed_user_id = current_tech_id or req.get("customer_id")
+        if next_tech_id:
+            update_data = {
+                "technician_id": next_tech_id,
+                "status": "ASSIGNED",
+                "assigned_at": now_iso,
+                "updated_by": changed_user_id,
+            }
+        else:
+            update_data = {
+                "technician_id": None,
+                "status": "REQUESTED",
+                "assigned_at": None,
+                "updated_by": changed_user_id,
+            }
+
+        # Chỉ ghi nếu đơn vẫn đúng như lúc đọc: KTV có thể vừa nhận đơn hoặc admin vừa đổi phân công.
+        expected = {"status": status, "technician_id": current_tech_id}
+        if status == "ASSIGNED" and req.get("assigned_at"):
+            expected["assigned_at"] = req["assigned_at"]
+        updated_record = repository.update_repair_request(req_id, update_data, expected=expected)
+        if not updated_record:
+            logger.info(f"Skip stale auto-dispatch for {req_id}: request changed concurrently")
             continue
 
-        if assigned_dt < cutoff:
-            req_id = req["id"]
-            current_tech_id = req.get("technician_id")
-            excluded_tech_ids = set()
-            if current_tech_id:
-                excluded_tech_ids.add(current_tech_id)
+        if current_tech_id:
+            repository.add_status_history({
+                "id": _request_id(),
+                "repair_id": req_id,
+                "status": "REJECTED",
+                "changed_by": current_tech_id,
+                "note": f"KTV không phản hồi trong {timeout_seconds // 60} phút; hệ thống tự động từ chối phân công.",
+            })
 
-            # Ghi nhận timeout như một lần từ chối tự động trước khi phân công lại.
-            # Nhờ vậy lịch sử và cơ chế loại trừ KTV nhất quán với thao tác từ frontend.
-            if current_tech_id:
-                repository.add_status_history({
-                    "id": _request_id(),
-                    "repair_id": req_id,
-                    "status": "REJECTED",
-                    "changed_by": current_tech_id,
-                    "note": f"KTV không phản hồi trong {timeout_seconds // 60} phút; hệ thống tự động từ chối phân công.",
-                })
-
-            try:
-                histories = repository.get_status_history(req_id)
-                for h in histories:
-                    if h.get("changed_by") and h.get("status") in {"REJECTED", "ASSIGNED"}:
-                        excluded_tech_ids.add(h["changed_by"])
-            except Exception:
-                pass
-
-            next_tech_id = _find_best_sos_technician(
-                customer_lat=req.get("latitude"),
-                customer_lng=req.get("longitude"),
-                device_type=repository.get_device_type(req.get("device_id")),
-                exclude_tech_ids=excluded_tech_ids,
+        if next_tech_id:
+            note = (
+                f"KTV trước quá {timeout_seconds // 60} phút không phản hồi. Hệ thống tự động chuyển sang KTV mới: {next_tech_id}"
+                if current_tech_id else f"Đã có KTV khả dụng. Hệ thống tự động phân công cho KTV: {next_tech_id}"
             )
+            repository.add_status_history({
+                "id": _request_id(),
+                "repair_id": req_id,
+                "status": "ASSIGNED",
+                "changed_by": changed_user_id,
+                "note": note,
+            })
+            try:
+                from app.notifications import service as notif_service
+                notif_service.notify_request_assigned(updated_record, next_tech_id)
+            except Exception as n_err:
+                logger.warning(f"Failed to notify auto-dispatched technician for {req_id}: {n_err}")
+            logger.info(f"Auto-dispatched SOS request {req_id} from {current_tech_id} to {next_tech_id}")
+        else:
+            repository.add_status_history({
+                "id": _request_id(),
+                "repair_id": req_id,
+                "status": "REQUESTED",
+                "changed_by": changed_user_id,
+                "note": f"KTV trước quá {timeout_seconds // 60} phút không phản hồi, hiện hết KTV khả dụng khác (chuyển sang chờ Admin điều phối)",
+            })
+            logger.info(f"Timed out request {req_id} reverted to REQUESTED (no other techs available)")
 
-            now_iso = now.isoformat()
-            changed_user_id = current_tech_id or req.get("customer_id")
-            if next_tech_id:
-                update_data = {
-                    "technician_id": next_tech_id,
-                    "status": "ASSIGNED",
-                    "assigned_at": now_iso,
-                    "updated_by": changed_user_id,
-                }
-                repository.update_repair_request(req_id, update_data)
-                repository.add_status_history({
-                    "id": _request_id(),
-                    "repair_id": req_id,
-                    "status": "ASSIGNED",
-                    "changed_by": changed_user_id,
-                    "note": f"KTV trước quá {timeout_seconds // 60} phút không phản hồi. Hệ thống tự động chuyển sang KTV mới: {next_tech_id}",
-                })
-                logger.info(f"Auto-reassigned timed out request {req_id} from {current_tech_id} to {next_tech_id}")
-            else:
-                update_data = {
-                    "technician_id": None,
-                    "status": "REQUESTED",
-                    "updated_by": changed_user_id,
-                }
-                repository.update_repair_request(req_id, update_data)
-                repository.add_status_history({
-                    "id": _request_id(),
-                    "repair_id": req_id,
-                    "status": "REQUESTED",
-                    "changed_by": changed_user_id,
-                    "note": f"KTV trước quá {timeout_seconds // 60} phút không phản hồi, hiện hết KTV khả dụng khác (chuyển sang chờ Admin điều phối)",
-                })
-                logger.info(f"Timed out request {req_id} reverted to REQUESTED (no other techs available)")
-
-            reassigned_count += 1
+        reassigned_count += 1
 
     return reassigned_count
 
@@ -1161,9 +1203,8 @@ def update_request_status(request_id: str, current_user: dict, data):
                     message=f"Chưa đến giờ bắt đầu di chuyển. Bạn có thể bắt đầu từ {allowed_from}.",
                 )
 
-    if new_status == "REPAIRING" and request["status"] in {
-        "ESTIMATE_SUBMITTED", "WAITING_FOR_APPROVAL", "ESTIMATE_REJECTED"
-    }:
+    # Mọi đường vào REPAIRING (kể cả ARRIVED/DIAGNOSING) đều cần báo giá khách đã duyệt.
+    if new_status == "REPAIRING" and request["status"] != "REPAIRING":
         quotes = repository.get_quotes_by_repair_id(actual_id) or []
         if not any(quote.get("status") == "ACCEPTED" for quote in quotes):
             raise AppException(ErrorCode.QUOTE_NOT_ACCEPTED)
@@ -1176,12 +1217,11 @@ def update_request_status(request_id: str, current_user: dict, data):
         if request.get("technician_id"):
             excluded_tech_ids.add(request["technician_id"])
 
+        history_ok = True
         try:
-            histories = repository.get_status_history(actual_id)
-            for h in histories:
-                if h.get("changed_by") and h.get("status") in {"REJECTED", "ASSIGNED"}:
-                    excluded_tech_ids.add(h["changed_by"])
+            excluded_tech_ids |= _declined_technician_ids(actual_id)
         except Exception as h_err:
+            history_ok = False
             logger.warning(f"Error fetching history for exclusion: {h_err}")
 
         # 2. Ghi nhận lịch sử KTV hiện tại từ chối hoặc hủy nhận ca
@@ -1204,7 +1244,7 @@ def update_request_status(request_id: str, current_user: dict, data):
             customer_lng=request.get("longitude"),
             device_type=repository.get_device_type(request.get("device_id")),
             exclude_tech_ids=excluded_tech_ids,
-        ) if is_sos_request else None
+        ) if is_sos_request and history_ok else None  # Không rõ ai đã từ chối -> để Admin điều phối.
 
         from app.notifications import service as notif_service
 
@@ -1767,10 +1807,18 @@ def update_quote_for_request(request_id: str, quote_id: str, data: dict, current
 
 
 def fetch_quotes_for_request(request_id: str, current_user: dict):
-    from app.db.database import supabase
+    req = repository.get_repair_request_by_id(request_id)
+    if not req:
+        raise AppException(ErrorCode.REQUEST_NOT_FOUND)
+    can_view = (
+        _is_role(current_user, ADMIN_ROLE_CODE)
+        or (_is_role(current_user, CUSTOMER_ROLE_CODE) and req.get("customer_id") == current_user["sub"])
+        or (_is_role(current_user, TECHNICIAN_ROLE_CODE) and req.get("technician_id") == current_user["sub"])
+    )
+    if not can_view:
+        raise AppException(ErrorCode.FORBIDDEN)
+    actual_id = req["id"]
     try:
-        req = repository.get_repair_request_by_id(request_id)
-        actual_id = req["id"] if req else request_id
         quotes = repository.get_quotes_by_repair_id(actual_id) or []
         for q in quotes:
             items = repository.get_quote_items(q["id"]) or []

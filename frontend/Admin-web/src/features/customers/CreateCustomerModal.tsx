@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { generateInitialPassword } from "@/lib/password";
 import { FieldError, rules, useFieldErrors } from "@h-mobility/ui";
 import { X, UserPlus, Phone, Mail, MapPin, Lock } from "lucide-react";
 
@@ -16,7 +17,7 @@ export const CreateCustomerModal = ({
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("Abc123456@");
+  const [password, setPassword] = useState(generateInitialPassword);
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

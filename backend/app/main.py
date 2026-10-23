@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -16,9 +17,10 @@ async def lifespan(app: FastAPI):
         from app.repair_requests.service import reassign_timed_out_requests
         while True:
             try:
-                reassign_timed_out_requests(timeout_seconds=120)
-            except Exception:
-                pass
+                # Client Supabase là đồng bộ: chạy trong thread để không chặn event loop.
+                await asyncio.to_thread(reassign_timed_out_requests, timeout_seconds=120)
+            except Exception as err:
+                logging.getLogger(__name__).warning(f"Auto-timeout worker failed: {err}")
             await asyncio.sleep(10)
 
     worker_task = asyncio.create_task(auto_timeout_worker())
@@ -44,6 +46,8 @@ app.add_middleware(
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
         "http://127.0.0.1:3003",
+        # Domain triển khai/demo, cấu hình qua biến môi trường (phân tách bằng dấu phẩy).
+        *[origin.strip().rstrip("/") for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()],
     ],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,

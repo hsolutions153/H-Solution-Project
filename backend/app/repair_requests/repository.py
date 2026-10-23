@@ -146,7 +146,9 @@ def get_repair_requests(*, customer_id: str | None, technician_id: str | None, r
     return data, total
 
 
-def update_repair_request(request_id: str, data: dict):
+def update_repair_request(request_id: str, data: dict, expected: dict | None = None):
+    """Cập nhật đơn. `expected` (nếu có) chỉ ghi khi các cột vẫn giữ giá trị đã đọc;
+    trả None khi đơn đã bị thay đổi đồng thời (0 bản ghi khớp)."""
     STATUS_MAP = {
         "REJECTED": "REQUESTED",
         "PENDING": "REQUESTED",
@@ -158,7 +160,10 @@ def update_repair_request(request_id: str, data: dict):
         clean_data["status"] = STATUS_MAP[clean_data["status"]]
 
     try:
-        response = supabase.table(REPAIR_REQUESTS_TABLE).update(clean_data).eq("id", request_id).execute()
+        query = supabase.table(REPAIR_REQUESTS_TABLE).update(clean_data).eq("id", request_id)
+        for column, value in (expected or {}).items():
+            query = query.is_(column, "null") if value is None else query.eq(column, value)
+        response = query.execute()
         return response.data[0] if response and response.data else None
     except Exception as err:
         print(f"update_repair_request failed: {err}")
@@ -208,17 +213,15 @@ def add_status_history(data: dict):
 
 
 def get_status_history(repair_id: str):
-    try:
-        response = (
-            supabase.table(STATUS_HISTORY_TABLE)
-            .select("*")
-            .eq("repair_id", repair_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-        return response.data if response and hasattr(response, "data") else []
-    except Exception:
-        return []
+    # Bảng lịch sử dùng cột changed_at. Không nuốt lỗi: "không tải được" khác "chưa có lịch sử".
+    response = (
+        supabase.table(STATUS_HISTORY_TABLE)
+        .select("*")
+        .eq("repair_id", repair_id)
+        .order("changed_at", desc=False)
+        .execute()
+    )
+    return response.data if response and hasattr(response, "data") else []
 
 
 def create_repair_image(data: dict):
