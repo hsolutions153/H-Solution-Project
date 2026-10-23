@@ -783,7 +783,8 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
     try:
         response = requests.get(
             "https://api.mapbox.com/search/geocode/v6/reverse",
-            params={"longitude": longitude, "latitude": latitude, "country": "vn", "language": "vi", "access_token": token},
+            # Không giới hạn quốc gia để hỗ trợ tọa độ trên toàn thế giới.
+            params={"longitude": longitude, "latitude": latitude, "language": "vi", "access_token": token},
             timeout=8,
         )
         response.raise_for_status()
@@ -794,7 +795,10 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
         context = properties.get("context") or {}
         address = properties.get("name_preferred") or properties.get("name") or properties.get("full_address") or ""
         ward = (context.get("neighborhood") or context.get("locality") or {}).get("name") or ""
-        province = (context.get("place") or context.get("region") or {}).get("name") or ""
+        province = (
+            (context.get("place") or context.get("region") or context.get("district") or context.get("country") or {}).get("name")
+            or ""
+        )
         return {"address": address, "ward": ward, "province": province, "latitude": latitude, "longitude": longitude}
     except (requests.RequestException, KeyError, TypeError, ValueError) as error:
         logger.warning("Mapbox reverse geocoding failed: %s", error)
