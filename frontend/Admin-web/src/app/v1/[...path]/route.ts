@@ -1,5 +1,18 @@
 const METHODS_WITHOUT_BODY = new Set(["GET", "HEAD"]);
 
+function copyResponseHeaders(source: Headers): Headers {
+  const target = new Headers();
+  source.forEach((value, key) => {
+    if (key.toLowerCase() !== "set-cookie") target.set(key, value);
+  });
+  const getSetCookie = (source as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const cookies = getSetCookie ? getSetCookie.call(source) : (source.get("set-cookie") ? [source.get("set-cookie")!] : []);
+  for (const cookie of cookies) {
+    target.append("set-cookie", cookie.replace(/Path=\/api\/v1\/auth/gi, "Path=/v1/auth"));
+  }
+  return target;
+}
+
 function getBackendUrl(path: string, search: string): string {
   const rawUrl = process.env.API_URL;
   if (!rawUrl) throw new Error("API_URL is not configured");
@@ -20,7 +33,8 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     body: METHODS_WITHOUT_BODY.has(request.method) ? undefined : request.body,
     redirect: "manual",
   });
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  const responseHeaders = copyResponseHeaders(response.headers);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: responseHeaders });
 }
 
 export const GET = proxy;

@@ -30,12 +30,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   } = useAdmin();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-
-    if (!token || isLoggedIn !== "true") {
-      router.replace("/");
-    }
+    let active = true;
+    (async () => {
+      const { getAuthToken, refreshAccessToken } = await import("@/lib/api-client");
+      let token = getAuthToken();
+      if (!token) {
+        await refreshAccessToken();
+        token = getAuthToken();
+      }
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      if (active && (!token || isLoggedIn !== "true")) router.replace("/");
+    })();
+    return () => { active = false; };
   }, [router]);
 
   useEffect(() => {

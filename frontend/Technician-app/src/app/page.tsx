@@ -31,8 +31,12 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    import("@/lib/api-client").then(({ getAuthToken, getUserInfo, removeAuthToken, fetchApi }) => {
-      const token = getAuthToken();
+    import("@/lib/api-client").then(async ({ getAuthToken, getUserInfo, removeAuthToken, fetchApi, refreshAccessToken }) => {
+      let token = getAuthToken();
+      if (!token) {
+        await refreshAccessToken();
+        token = getAuthToken();
+      }
       const user = getUserInfo();
       if (!token) {
         setIsLoggedIn(false);
