@@ -1,4 +1,4 @@
-"""Keep technician scores in sync with the reviews submitted by customers."""
+# Đồng bộ điểm KTV với đánh giá của khách hàng.
 
 from app.db.database import supabase
 

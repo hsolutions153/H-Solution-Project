@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { showAppNotice } from "@/components/AppNotice";
 
 interface InvoiceModalProps {
   task: HistoryTask | null;
@@ -265,7 +266,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ task, open, onClose 
 
   const handlePrint = () => {
     if (!isPaid) {
-      alert("Hóa đơn chỉ có thể in hoặc lưu sau khi thanh toán được xác nhận.");
+      showAppNotice("Hóa đơn chỉ có thể in hoặc lưu sau khi thanh toán được xác nhận.");
       return;
     }
     if (!invoiceRef.current) {

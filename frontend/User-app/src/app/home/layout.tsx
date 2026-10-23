@@ -6,6 +6,7 @@ import { getAuthToken } from "@/lib/api-client";
 import { PageLoader } from "@/components/motion/page-loader";
 import "./home.css";
 import "./device/device.css";
+import { AppNotice } from "@/components/common/app-notice";
 
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -107,5 +108,5 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
     return <PageLoader label="Đang kiểm tra phiên đăng nhập..." />;
   }
 
-  return children;
+  return <>{children}<AppNotice /></>;
 }

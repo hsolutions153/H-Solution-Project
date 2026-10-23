@@ -1,4 +1,4 @@
-"""Shared validation for API input; response and signed webhook data stay untouched."""
+# Dùng chung để kiểm tra dữ liệu đầu vào API.
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, ClassVar
@@ -124,7 +124,7 @@ def validate_aliases(model, *groups):
 
 
 def validated_payload(schema, data, *, partial=False):
-    """Apply the API contract to direct/internal service calls as well."""
+    # Áp dụng cùng hợp đồng API cho lệnh gọi nội bộ.
     from pydantic import ValidationError
     from app.core.exceptions import AppException, ErrorCode
 

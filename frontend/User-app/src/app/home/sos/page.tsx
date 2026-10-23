@@ -56,6 +56,9 @@ export default function SosPage() {
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected">("connecting");
   const [smsStatus, setSmsStatus] = useState<"pending" | "sending" | "sent">("pending");
   const [assignedTech, setAssignedTech] = useState<any>(null);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancellingRequest, setIsCancellingRequest] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const [activeRequestId, setActiveRequestId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return sessionStorage.getItem("activeSosId") || null;
@@ -508,6 +511,8 @@ export default function SosPage() {
   };
 
   const handleCancel = async () => {
+    setIsCancellingRequest(true);
+    setCancelError("");
     if (activeRequestId) {
       try {
         const { fetchApi } = await import("@/lib/api-client");
@@ -518,12 +523,23 @@ export default function SosPage() {
       } catch (err: any) {
         // Chưa hủy được trên máy chủ: giữ màn hình theo dõi, không để khách tưởng đã hủy.
         console.warn("Lỗi hủy yêu cầu cứu hộ:", err);
-        alert(err?.message || "Không thể hủy yêu cầu cứu hộ. Vui lòng thử lại.");
+        setCancelError(err?.message || "Không thể hủy yêu cầu cứu hộ. Vui lòng thử lại.");
+        setIsCancellingRequest(false);
         return;
       }
     }
     sessionStorage.removeItem("activeSosId");
+    setIsCancelDialogOpen(false);
     router.push("/home");
+  };
+
+  const requestCancel = () => {
+    if (!activeRequestId && step !== "CALLING" && step !== "TECHNICIAN") {
+      void handleCancel();
+      return;
+    }
+    setCancelError("");
+    setIsCancelDialogOpen(true);
   };
 
   const selectedIssueLabel = ISSUE_OPTIONS.find((issue) => issue.id === selectedIssue)?.label || "Chưa xác định";
@@ -543,7 +559,7 @@ export default function SosPage() {
                 ? TECH_SUBTITLE[currentRequestStatus] ?? "Đang điều phối kỹ thuật viên"
                 : "Mô tả sự cố để được hỗ trợ nhanh"
           }
-          onBack={handleCancel}
+          onBack={requestCancel}
           trailing={step === "CALLING" || step === "TECHNICIAN" ? <Badge tone="danger">SOS</Badge> : null}
         />
       </header>
@@ -807,7 +823,7 @@ export default function SosPage() {
               {isSubmitting ? "Đang gửi yêu cầu..." : "Tiếp tục"}
             </button>
 
-            <button className="sos-cancel-link" onClick={handleCancel}>
+            <button className="sos-cancel-link" onClick={requestCancel}>
               Hủy yêu cầu khẩn cấp
             </button>
           </div>
@@ -849,7 +865,7 @@ export default function SosPage() {
             </div>
           </div>
 
-          <button className="sos-cancel-btn" onClick={handleCancel}>
+          <button className="sos-cancel-btn" onClick={requestCancel}>
             <span className="material-symbols-outlined">cancel</span>
             Hủy yêu cầu
           </button>
@@ -1012,17 +1028,61 @@ export default function SosPage() {
             <button
               type="button"
               className={buttonClasses("secondary", "lg", true, "text-rose-700 hover:border-rose-200 hover:bg-rose-50")}
-              onClick={() => {
-                if (confirm("Bạn có chắc chắn muốn hủy yêu cầu cứu hộ khẩn cấp này không?")) {
-                  handleCancel();
-                }
-              }}
+              onClick={requestCancel}
             >
               <XCircle className="size-5" />
               Hủy yêu cầu cứu hộ
             </button>
           </div>
         </section>
+      )}
+
+      {isCancelDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-5"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isCancellingRequest) setIsCancelDialogOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-sos-dialog-title"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <XCircle className="size-5" />
+              </span>
+              <div>
+                <h2 id="cancel-sos-dialog-title" className="text-base font-bold text-ink">Hủy yêu cầu cứu hộ?</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  Bạn có chắc chắn muốn hủy yêu cầu cứu hộ khẩn cấp này không?
+                </p>
+              </div>
+            </div>
+            {cancelError && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{cancelError}</p>}
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                disabled={isCancellingRequest}
+                onClick={() => setIsCancelDialogOpen(false)}
+              >
+                Không
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isCancellingRequest}
+                onClick={() => void handleCancel()}
+              >
+                {isCancellingRequest ? "Đang hủy..." : "Hủy yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

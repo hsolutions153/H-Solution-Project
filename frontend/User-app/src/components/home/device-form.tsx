@@ -22,6 +22,7 @@ Trash2
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChangeEvent,FormEvent,useRef,useState } from "react";
+import { showAppNotice } from "@/components/common/app-notice";
 
 type Props = { device?: Device };
 
@@ -240,7 +241,7 @@ export function DeviceForm({ device }: Props) {
       router.push("/home/device");
       router.refresh();
     } catch (err: any) {
-      alert(err.message || "Không thể xóa xe.");
+      showAppNotice(err.message || "Không thể xóa xe.");
     } finally {
       setDeleting(false);
     }

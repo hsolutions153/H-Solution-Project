@@ -1,7 +1,4 @@
-"""Regression coverage for SOS auto-dispatch, session revocation and signing-key config.
-
-Run from backend: python -m unittest discover -s tests -v
-"""
+# Kiểm tra điều phối SOS, thu hồi phiên và cấu hình khóa ký.
 
 import os
 import unittest
@@ -29,7 +26,7 @@ class MockedTest(unittest.TestCase):
 
 
 class AutoDispatchTests(MockedTest):
-    """reassign_timed_out_requests: race-safe writes and re-dispatch of unassigned SOS."""
+    # Kiểm tra điều phối lại đơn SOS an toàn khi có cạnh tranh.
 
     def setUp(self):
         old = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()

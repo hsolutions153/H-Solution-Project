@@ -1,4 +1,4 @@
-"""Input contracts and API rejection before writes; all external HTTP is blocked."""
+# Kiểm tra hợp đồng đầu vào và chặn gọi HTTP thật.
 import base64
 from datetime import datetime, timedelta
 from decimal import Decimal

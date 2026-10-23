@@ -14,8 +14,7 @@ _PLACEHOLDER_SECRETS = {"super-secret-key-change-it", "change-me", "changeme", "
 
 
 def _load_secret_key() -> str:
-    """Không bao giờ ký token bằng khóa biết trước. Production thiếu khóa thì dừng khởi động;
-    môi trường dev thiếu khóa dùng khóa ngẫu nhiên theo tiến trình (token mất hiệu lực khi restart)."""
+    # Không dùng khóa mẫu; production thiếu khóa thì dừng, dev dùng khóa tạm.
     secret = (os.getenv("JWT_SECRET_KEY") or "").strip()
     if secret and secret not in _PLACEHOLDER_SECRETS and len(secret) >= 32:
         return secret
@@ -53,7 +52,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def password_version(password_hash: str | None) -> str:
-    """Dấu vân tay ngắn của mật khẩu hiện tại; đổi mật khẩu làm access token cũ mất hiệu lực."""
+    # Tạo dấu vân tay mật khẩu để vô hiệu hóa access token cũ khi đổi mật khẩu.
     import hashlib
     return hashlib.sha256(f"{SECRET_KEY}:{password_hash or ''}".encode("utf-8")).hexdigest()[:16]
 

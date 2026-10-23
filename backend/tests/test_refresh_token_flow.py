@@ -1,8 +1,4 @@
-"""Refresh-token regression tests.
-
-Run from backend with:
-    python -m unittest tests.test_refresh_token_flow -v
-"""
+# Kiểm tra hồi quy refresh token.
 
 import hashlib
 import unittest

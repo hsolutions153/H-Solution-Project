@@ -8,6 +8,7 @@ import { HomeShell } from "@/components/home/home-shell";
 import { PageHeader } from "@/components/home/page-header";
 import { getCurrentLocation, type CurrentLocation } from "@/lib/location";
 import { LocationPicker } from "@/components/home/location-picker";
+import { showAppNotice } from "@/components/common/app-notice";
 
 type BookingStep = "PROBLEM" | "CAMERA" | "DETAILS" | "LOCATION" | "SCHEDULE" | "SUCCESS";
 type Issue = "battery" | "controller" | "wheel" | "motor" | "frame" | "other";
@@ -115,6 +116,7 @@ export default function BookingPage() {
   const [createdRequestId, setCreatedRequestId] = useState<string | null>(null);
   const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [cancelBookingSuccess, setCancelBookingSuccess] = useState(false);
+  const [showCancelBookingDialog, setShowCancelBookingDialog] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -783,7 +785,26 @@ export default function BookingPage() {
                 disabled={isCancellingBooking}
                 className="w-full py-3 mt-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
                 onClick={async () => {
-                  if (!window.confirm("Bạn có chắc chắn muốn hủy lịch hẹn sửa chữa này không?")) return;
+                  setShowCancelBookingDialog(true);
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>cancel</span>
+                {isCancellingBooking ? "Đang hủy lịch hẹn..." : "Hủy lịch hẹn này"}
+              </button>
+            )}
+
+            {showCancelBookingDialog && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-5" role="presentation">
+                <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
+                  <h2 id="cancel-booking-title" className="text-base font-bold text-ink">Hủy lịch hẹn?</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">Bạn có chắc chắn muốn hủy lịch hẹn sửa chữa này không?</p>
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700" disabled={isCancellingBooking} onClick={() => setShowCancelBookingDialog(false)}>Không</button>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      disabled={isCancellingBooking}
+                      onClick={async () => {
                   setIsCancellingBooking(true);
                   try {
                     const { fetchApi } = await import("@/lib/api-client");
@@ -795,16 +816,19 @@ export default function BookingPage() {
                       }),
                     });
                     setCancelBookingSuccess(true);
+                    setShowCancelBookingDialog(false);
                   } catch (err: any) {
-                    alert(err.message || "Không thể hủy lịch hẹn. Vui lòng mở trang Chi tiết lịch hẹn để thực hiện.");
+                    showAppNotice(err.message || "Không thể hủy lịch hẹn. Vui lòng mở trang Chi tiết lịch hẹn để thực hiện.");
                   } finally {
                     setIsCancellingBooking(false);
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>cancel</span>
-                {isCancellingBooking ? "Đang hủy lịch hẹn..." : "Hủy lịch hẹn này"}
-              </button>
+                      {isCancellingBooking ? "Đang hủy..." : "Hủy lịch hẹn"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             <button type="button" className="sos-cancel-link" onClick={() => router.push("/home")}>

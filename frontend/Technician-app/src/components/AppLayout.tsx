@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
+import { AppNotice } from "@/components/AppNotice";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -84,6 +85,7 @@ export const AppLayout = ({
 
       
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      <AppNotice />
     </div>
   );
 };

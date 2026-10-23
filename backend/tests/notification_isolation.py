@@ -1,8 +1,4 @@
-"""Keep notification side effects away from the real Supabase project in tests.
-
-Import ``setUpModule`` and ``tearDownModule`` into a test module so every
-notification read/write there goes to a mock instead of the live database.
-"""
+# Cô lập thao tác thông báo khỏi Supabase thật khi chạy test.
 
 from unittest.mock import MagicMock, patch
 

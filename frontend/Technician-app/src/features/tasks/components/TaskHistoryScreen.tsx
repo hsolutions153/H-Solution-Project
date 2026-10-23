@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, cn, inputClasses } from "@h-mobility/u
 import { Banknote, CheckCircle2, ChevronDown, FileText, MapPin, QrCode, RotateCw, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { InvoiceModal } from "./InvoiceModal";
+import { showAppNotice } from "@/components/AppNotice";
 
 interface TaskHistoryScreenProps {
   newCompletedTask?: HistoryTask | null;
@@ -54,7 +55,7 @@ export const TaskHistoryScreen: React.FC<TaskHistoryScreenProps> = ({
         setConfirmSuccess(null);
       }, 1200);
     } catch (err: any) {
-      alert(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
+      showAppNotice(err.message || "Không thể xác nhận thanh toán. Vui lòng thử lại.");
     } finally {
       setIsConfirming(false);
     }

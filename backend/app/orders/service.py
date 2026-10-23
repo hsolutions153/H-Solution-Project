@@ -39,7 +39,12 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
     if not technician.get("is_online"):
         raise AppException(ErrorCode.VALIDATION_ERROR, message="KTV chưa bật trạng thái nhận việc")
 
-    from app.repair_requests.service import _has_fresh_technician_location
+    from app.repair_requests.service import _ensure_technician_not_busy, _has_fresh_technician_location
+    # Kiểm tra khả năng nhận việc ngay tại thời điểm Admin phân công.
+    # Nếu để lọt bước này, KTV vẫn nhận thông báo nhưng chỉ bị từ chối muộn
+    # khi bấm di chuyển, tạo ra trạng thái phân công giả.
+    _ensure_technician_not_busy(technician_id, order)
+
     if not _has_fresh_technician_location(technician):
         if technician.get("last_latitude") is None or technician.get("last_longitude") is None:
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Kỹ thuật viên chưa cập nhật vị trí GPS.")

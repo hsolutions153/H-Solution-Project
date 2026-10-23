@@ -71,8 +71,10 @@ export const NewAssignmentModal = ({
         const { fetchApi } = await import("@/lib/api-client");
         const result = await fetchApi<RouteEstimate>(`/repair-requests/${taskId}/route`);
         if (!cancelled) setRoute(result);
-      } catch (error) {
-        console.warn("Không thể tính lộ trình Mapbox:", error);
+      } catch (error: any) {
+        if (error?.status !== 403) {
+          console.warn("Không thể tính lộ trình Mapbox:", error);
+        }
         if (!cancelled) setRouteError(true);
       } finally {
         if (!cancelled) setIsLoadingRoute(false);

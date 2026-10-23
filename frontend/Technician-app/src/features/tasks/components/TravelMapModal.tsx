@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Task, TaskStatus } from "@/types/task";
 import { X, CirclePlay, MapPin, CheckCircle2, Phone, Stethoscope } from "lucide-react";
 import { Button, StatusBadge } from "@h-mobility/ui";
+import { getCachedPresence } from "@/lib/presence";
 
 declare global {
   interface Window {
@@ -95,21 +96,26 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
         await fetchApi("/technicians/me/presence", {
           method: "PATCH",
           body: JSON.stringify({
-            is_online: true,
+            // Mở bản đồ chỉ cập nhật GPS, không tự bật lại trạng thái offline.
+            is_online: getCachedPresence() ?? true,
             last_latitude: coordinates.latitude,
             last_longitude: coordinates.longitude,
           }),
         });
-        const [nextRoute, token] = await Promise.all([
-          fetchApi<RouteData>(`/repair-requests/${task.id}/route`),
-          fetchApi<{ access_token: string }>("/repair-requests/map-token"),
-        ]);
+        const nextRoute = await fetchApi<RouteData>(`/repair-requests/${task.id}/route`);
         if (!cancelled) {
           setRoute(nextRoute);
-          setMapToken(token.access_token);
         }
-      } catch (error) {
-        if (!cancelled) setMapError(error instanceof Error ? error.message : "Không thể tải lộ trình.");
+      } catch (error: any) {
+        if (!cancelled) {
+          setMapError(
+            error?.status === 403
+              ? "Đơn đã được chuyển cho kỹ thuật viên khác hoặc không còn thuộc quyền xử lý của bạn."
+              : error instanceof Error
+                ? error.message
+                : "Không thể tải lộ trình."
+          );
+        }
       }
     };
     loadRoute();
@@ -117,6 +123,22 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
       cancelled = true;
     };
   }, [task.id, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    import("@/lib/api-client").then(({ fetchApi }) =>
+      fetchApi<{ access_token: string }>("/repair-requests/map-token")
+        .then((token) => {
+          if (!cancelled) setMapToken(token.access_token);
+        })
+        .catch((error) => {
+          if (!cancelled) setMapError(error instanceof Error ? error.message : "Không thể tải token bản đồ.");
+        })
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current || !mapToken || !route) return;
@@ -183,7 +205,8 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
             await fetchApi("/technicians/me/presence", {
               method: "PATCH",
               body: JSON.stringify({
-                is_online: true,
+            // Chỉ nút Online/Offline mới đổi trạng thái nhận việc.
+            is_online: getCachedPresence() ?? true,
                 last_latitude: position.coords.latitude,
                 last_longitude: position.coords.longitude,
               }),
