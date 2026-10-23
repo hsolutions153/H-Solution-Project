@@ -47,10 +47,25 @@ export function removeAuthToken(): void {
 let refreshPromise: Promise<boolean> | null = null;
 
 // Làm mới access token bằng cookie refresh, dùng chung một promise để tránh gọi trùng
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   if (!refreshPromise) {
-    refreshPromise = (async () => {
+    const expectedToken = getAuthToken();
+    const requestRefresh = async () => {
+      try {
+        const locks = (navigator as Navigator & { locks?: { request: (name: string, callback: (lock: unknown) => Promise<boolean>) => Promise<boolean> } }).locks;
+        if (locks) {
+          return await locks.request("h-solution-admin-refresh", async (lock: unknown) => {
+            if (!lock || (expectedToken && getAuthToken() !== expectedToken)) return true;
+            return requestRefreshRequest();
+          });
+        }
+        return requestRefreshRequest();
+      } catch {
+        return false;
+      }
+    };
+    const requestRefreshRequest = async () => {
       try {
         const res = await fetch(`${getBaseUrl()}/auth/refresh?role=${REFRESH_ROLE}`, {
           method: "POST",
@@ -63,7 +78,8 @@ async function refreshAccessToken(): Promise<boolean> {
       } catch {
         return false;
       }
-    })().finally(() => {
+    };
+    refreshPromise = requestRefresh().finally(() => {
       refreshPromise = null;
     });
   }

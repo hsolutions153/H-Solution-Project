@@ -201,6 +201,7 @@ export function SocialAuthCard({
         if (res.ok) {
           const session = await res.json();
           if (session?.accessToken) {
+            await fetch("/v1/auth/bootstrap", { method: "POST", credentials: "include" });
             const { setAuthToken } = await import("@/lib/api-client");
             const backendUser = session.backendUser || {
               id: session.user?.id || "google-user",

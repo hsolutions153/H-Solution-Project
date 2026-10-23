@@ -17,6 +17,13 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
     async function checkAuth() {
       let token = getAuthToken();
 
+      // Khôi phục access token từ refresh cookie khi mở lại app.
+      if (!token) {
+        const { refreshAccessToken } = await import("@/lib/api-client");
+        await refreshAccessToken();
+        token = getAuthToken();
+      }
+
       // Đồng bộ phiên đăng nhập NextAuth (Google OAuth)
       if (!token) {
         try {
@@ -24,6 +31,7 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
           if (res.ok) {
             const session = await res.json();
             if (session?.accessToken) {
+              await fetch("/v1/auth/bootstrap", { method: "POST", credentials: "include" });
               const { setAuthToken } = await import("@/lib/api-client");
               const backendUser = session.backendUser || {
                 id: session.user?.id || "google-user",

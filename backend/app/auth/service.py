@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 import os
 import secrets
 
@@ -27,6 +28,10 @@ def _generate_user_id() -> str:
     return secrets.token_hex(5).upper()
 
 
+def _refresh_token_hash(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
 def _issue_refresh_token(user_id: str, email: str, role_id: str, role: str) -> str:
     raw_token = create_refresh_token(
         {"sub": user_id, "email": email, "role_id": role_id, "role": role}
@@ -35,8 +40,7 @@ def _issue_refresh_token(user_id: str, email: str, role_id: str, role: str) -> s
         {
             "id": _generate_user_id(),
             "user_id": user_id,
-            # Cột có tên lịch sử là token_hash; theo luồng JWT này lưu token nguyên vẹn.
-            "token_hash": raw_token,
+            "token_hash": _refresh_token_hash(raw_token),
             "expires_at": (datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
         }
     )
@@ -48,7 +52,11 @@ def _issue_refresh_token(user_id: str, email: str, role_id: str, role: str) -> s
 def refresh_access_token(raw_refresh_token: str):
     payload = get_refresh_token_payload(raw_refresh_token)
     now = datetime.now(timezone.utc)
-    stored = repository.get_refresh_token_by_hash(raw_refresh_token)
+    # Hash mới là chuẩn; fallback chỉ để không làm mất các phiên được cấp
+    # trước khi triển khai thay đổi này. Các token cũ sẽ được xoay sang hash mới.
+    stored = repository.get_refresh_token_by_hash(_refresh_token_hash(raw_refresh_token))
+    if not stored:
+        stored = repository.get_refresh_token_by_hash(raw_refresh_token)
     if not stored:
         raise AppException(ErrorCode.TOKEN_INVALID, headers={"WWW-Authenticate": "Bearer"})
     if stored["user_id"] != payload["sub"]:
