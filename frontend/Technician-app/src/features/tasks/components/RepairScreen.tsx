@@ -597,22 +597,22 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
     const completedData: HistoryTask = {
       id: lastResponse?.id || task?.id || generateHistoryId(),
-      code: task?.code || lastResponse?.request_code || "JOB-8829",
+      code: task?.code || lastResponse?.request_code || task?.id || "Đơn sửa chữa",
       date: now.toLocaleDateString("vi-VN"),
       time: now.toLocaleTimeString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      serviceType: task?.serviceName || "Kiểm tra bánh xe và hệ thống xích",
+      serviceType: task?.serviceName || lastResponse?.issue_type || "Dịch vụ sửa chữa",
       customerName:
         task?.customerName ||
         lastResponse?.customer?.full_name ||
         "Khách hàng",
-      deviceInfo: task?.deviceInfo || "Xe lăn điện",
+      deviceInfo: task?.deviceInfo || lastResponse?.device?.model_name || "Xe lăn điện",
       address:
         task?.address ||
         lastResponse?.location_address ||
-        "Số 12 Chùa Bộc, Quang Trung, Đống Đa, Hà Nội",
+        "Địa chỉ không xác định",
       type: "repair",
       diagnosis:
         "Kiểm tra và khắc phục lỗi hoạt động của thiết bị theo lịch hẹn.",

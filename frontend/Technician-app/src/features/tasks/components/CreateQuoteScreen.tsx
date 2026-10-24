@@ -55,6 +55,20 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const { errors, validate, fromApi, clearError, inputProps } = useFieldErrors();
+  const displayCode = task.code || (task as any).request_code || task.id || "";
+  const formattedCode = displayCode ? (displayCode.startsWith("#") ? displayCode : `#${displayCode}`) : "";
+  const displayService =
+    task.serviceName ||
+    (task as any).issue_type ||
+    task.deviceInfo ||
+    ((task as any).device ? `${(task as any).device.manufacturer || ""} ${(task as any).device.model_name || ""}`.trim() : "") ||
+    "Dịch vụ sửa chữa";
+  const displayAddress =
+    task.address ||
+    (task as any).location_address ||
+    (task as any).customer?.address ||
+    "Chưa cập nhật địa chỉ";
+
   const existingQuoteId = task?.quote?.id;
   // Báo giá khách chưa phản hồi: gửi lại sẽ cập nhật trực tiếp thay vì tạo báo giá mới
   const [pendingQuote, setPendingQuote] = useState<{ id: string; diagnosis_note?: string } | null>(null);
@@ -257,7 +271,7 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
     <div className="space-y-5 px-4 pt-4">
       <ScreenHeader
         title={pendingQuote ? "Sửa báo giá" : "Tạo báo giá"}
-        subtitle={`Mã đơn ${task.code || "#JOB-99281"}`}
+        subtitle={formattedCode ? `Mã đơn ${formattedCode}` : "Tạo báo giá"}
         onBack={onBack}
         trailing={pendingQuote ? <Badge tone="warning">Chờ khách duyệt</Badge> : <Badge tone="brand">Khảo sát xong</Badge>}
       />
@@ -269,10 +283,13 @@ export const CreateQuoteScreen: React.FC<CreateQuoteScreenProps> = ({
       ) : null}
 
       <Card className="space-y-1">
-        <h3 className="text-sm font-bold text-ink">{task.serviceName || "Sửa chữa xe lăn điện Karma"}</h3>
+        <h3 className="text-sm font-bold text-ink">{displayService}</h3>
+        {task.deviceInfo ? (
+          <p className="text-xs font-medium text-slate-500">{task.deviceInfo}</p>
+        ) : null}
         <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
           <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-          {task.address || "Số 12 Chùa Bộc, Quang Trung, Đống Đa, Hà Nội"}
+          {displayAddress}
         </p>
       </Card>
 

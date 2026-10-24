@@ -571,7 +571,6 @@ export default function BookingPage() {
                       }}
                       placeholder="Ví dụ: Thành phố Hồ Chí Minh"
                       autoComplete="address-level1"
-                      autoFocus
                     />
                   </div>
                 </label>

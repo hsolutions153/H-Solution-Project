@@ -19,5 +19,8 @@
   "allowScripts": {
     "sharp@0.35.5": true,
     "unrs-resolver@1.12.2": true
+  },
+  "devDependencies": {
+    "@rolldown/binding-win32-x64-msvc": "^1.2.15"
   }
 }
