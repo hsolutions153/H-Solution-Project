@@ -503,7 +503,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     if (!backendStatus) {
       if (status === "ACCEPTED" || statusText === "Tiếp nhận đơn" || statusText === "Đã xác nhận lịch") {
         backendStatus = "ACCEPTED";
-      } else if (status === "WAITING_MOVE" || statusText === "Chờ di chuyển" || statusText === "Xác nhận di chuyển" || status === "MOVING" || statusText === "Đang di chuyển") {
+      } else if (status === "MOVING" || statusText === "Đang di chuyển") {
         backendStatus = "EN_ROUTE";
       } else if (status === "ARRIVED" || statusText === "Đã đến nơi") {
         backendStatus = "ARRIVED";

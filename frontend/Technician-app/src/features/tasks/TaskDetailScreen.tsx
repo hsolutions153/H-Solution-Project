@@ -5,6 +5,7 @@ import { DiagnosticScreen } from "./components/DiagnosticScreen";
 import { CreateQuoteScreen } from "./components/CreateQuoteScreen";
 import { QuoteStatusScreen } from "./components/QuoteStatusScreen";
 import { RepairScreen } from "./components/RepairScreen";
+import { mapApiTask } from "./mapApiTask";
 import { Button, Card, StatusBadge } from "@h-mobility/ui";
 import { ActionBar, ScreenHeader } from "@/components/ui";
 import { showAppNotice } from "@/components/AppNotice";
@@ -115,6 +116,12 @@ export const TaskDetailScreen = ({
   useEffect(() => {
     if (task) setCurrentTask(task);
   }, [task]);
+
+  useEffect(() => {
+    if (currentTask) {
+      sessionStorage.setItem("selectedTask", JSON.stringify(currentTask));
+    }
+  }, [currentTask]);
 
   const [isTravelModalOpen, setIsTravelModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -273,7 +280,15 @@ export const TaskDetailScreen = ({
         onSubmitDiagnostic={(data, updatedTask) => {
           setDiagnosticData(data);
           if (updatedTask) {
-            setCurrentTask(updatedTask);
+            const mapped = updatedTask.serviceName && updatedTask.code ? updatedTask : mapApiTask(updatedTask);
+            setCurrentTask((prev) => {
+              if (!prev) return mapped;
+              return {
+                ...prev,
+                ...mapped,
+                images: mapped.images && mapped.images.length > 0 ? mapped.images : (data.images?.length ? data.images : prev.images),
+              };
+            });
           }
           setSubStep("QUOTE");
         }}
@@ -300,13 +315,13 @@ export const TaskDetailScreen = ({
   const canStartTravel = !travelStart || currentTime >= travelStart;
   const travelStartLabel = travelStart?.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   const description = task.description?.replace(/\[Hẹn:[^\]]*\]/, "").trim();
-  const hasAction = ["WAITING_ACCEPT", "PENDING", "WAITING_MOVE", "MOVING", "ARRIVED"].includes(task.status);
+  const hasAction = ["WAITING_ACCEPT", "PENDING", "WAITING_MOVE", "MOVING", "ARRIVED"].includes(activeTask.status);
 
   return (
     <div className="space-y-4 px-4 pt-4">
       <ScreenHeader
         title="Chi tiết công việc"
-        subtitle={`Mã đơn ${task.code || `FS-290${task.id}`}`}
+        subtitle={`Mã đơn ${task.code || (task as any).request_code || task.id}`}
         onBack={onBack}
         trailing={<StatusBadge status={task.status} label={task.statusText} />}
       />
@@ -416,7 +431,7 @@ export const TaskDetailScreen = ({
 
       {hasAction ? (
         <ActionBar>
-          {task.status === "WAITING_ACCEPT" && (
+          {activeTask.status === "WAITING_ACCEPT" && (
             <Button
               size="lg"
               fullWidth
@@ -429,7 +444,7 @@ export const TaskDetailScreen = ({
             </Button>
           )}
 
-          {task.status === "PENDING" && (
+          {(activeTask.status === "PENDING" || activeTask.status === "WAITING_MOVE") && (
             <Button
               size="lg"
               fullWidth
@@ -437,7 +452,6 @@ export const TaskDetailScreen = ({
               disabled={!canStartTravel}
               onClick={() => {
                 if (!canStartTravel) return;
-                onUpdateStatus(task.id, "WAITING_MOVE", "Chờ di chuyển", "EN_ROUTE");
                 setIsTravelModalOpen(true);
               }}
             >
@@ -445,16 +459,16 @@ export const TaskDetailScreen = ({
             </Button>
           )}
 
-          {(task.status === "WAITING_MOVE" || task.status === "MOVING") && (
+          {activeTask.status === "MOVING" && (
             <div className="grid grid-cols-2 gap-2.5">
               <Button size="lg" variant="secondary" icon={<Bike className="size-5" />} onClick={() => setIsTravelModalOpen(true)}>
-                {task.status === "WAITING_MOVE" ? "Bản đồ" : "Hành trình"}
+                Hành trình
               </Button>
               <Button
                 size="lg"
                 icon={<CheckCircle2 className="size-5" />}
                 onClick={() => {
-                  onUpdateStatus(task.id, "ARRIVED", "Đã đến nơi", "ARRIVED");
+                  onUpdateStatus(activeTask.id, "ARRIVED", "Đã đến nơi", "ARRIVED");
                 }}
               >
                 Đã đến nơi
@@ -462,13 +476,13 @@ export const TaskDetailScreen = ({
             </div>
           )}
 
-          {task.status === "ARRIVED" && (
+          {activeTask.status === "ARRIVED" && (
             <Button
               size="lg"
               fullWidth
               icon={<Stethoscope className="size-5" />}
               onClick={() => {
-                onUpdateStatus(task.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
+                onUpdateStatus(activeTask.id, "DIAGNOSING", "Đang chẩn đoán", "DIAGNOSING");
                 setSubStep("DIAGNOSTIC");
               }}
             >
@@ -482,7 +496,7 @@ export const TaskDetailScreen = ({
 
       {isTravelModalOpen && (
         <TravelMapModal
-          task={task}
+          task={activeTask}
           onClose={() => setIsTravelModalOpen(false)}
           onStatusChange={handleStatusChange}
         />

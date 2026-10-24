@@ -27,6 +27,7 @@ interface RouteData {
 }
 
 const STATUS_LABEL: Partial<Record<TaskStatus, string>> = {
+  PENDING: "Chờ di chuyển",
   WAITING_MOVE: "Chờ di chuyển",
   MOVING: "Đang di chuyển",
   ARRIVED: "Đã đến nơi",
@@ -230,7 +231,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
   }, [status]);
 
   const handleNextStep = () => {
-    if (status === "WAITING_MOVE") {
+    if (status === "WAITING_MOVE" || status === "PENDING") {
       setStatus("MOVING");
       onStatusChange(task.id, "MOVING", "Đang di chuyển", "EN_ROUTE");
     } else if (status === "MOVING") {
@@ -259,7 +260,7 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
         <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" aria-hidden />
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-semibold tabular-nums text-slate-500">{task.code}</span>
-          {STATUS_LABEL[status] ? <StatusBadge status={status} label={STATUS_LABEL[status]} /> : null}
+          {STATUS_LABEL[status] ? <StatusBadge status={status === "PENDING" ? "WAITING_MOVE" : status} label={STATUS_LABEL[status]} /> : null}
         </div>
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
@@ -269,9 +270,21 @@ export const TravelMapModal: React.FC<TravelModalProps> = ({ task, onClose, onSt
           </div>
           {task.customerPhone ? <a href={`tel:${task.customerPhone}`} aria-label={`Gọi ${task.customerName}`} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100"><Phone className="size-5" /></a> : null}
         </div>
-        {status === "WAITING_MOVE" && <Button size="lg" fullWidth icon={<CirclePlay className="size-5" />} onClick={handleNextStep}>Bắt đầu di chuyển</Button>}
-        {status === "MOVING" && <Button size="lg" fullWidth icon={<CheckCircle2 className="size-5" />} onClick={handleNextStep}>Đã đến nơi</Button>}
-        {status === "ARRIVED" && <Button size="lg" fullWidth icon={<Stethoscope className="size-5" />} onClick={handleNextStep}>Bắt đầu công việc</Button>}
+        {(status === "WAITING_MOVE" || status === "PENDING") && (
+          <Button size="lg" fullWidth icon={<CirclePlay className="size-5" />} onClick={handleNextStep}>
+            Bắt đầu di chuyển
+          </Button>
+        )}
+        {status === "MOVING" && (
+          <Button size="lg" fullWidth icon={<CheckCircle2 className="size-5" />} onClick={handleNextStep}>
+            Đã đến nơi
+          </Button>
+        )}
+        {status === "ARRIVED" && (
+          <Button size="lg" fullWidth icon={<Stethoscope className="size-5" />} onClick={handleNextStep}>
+            Bắt đầu công việc
+          </Button>
+        )}
         {!STATUS_LABEL[status] && (
           <>
             <p role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-center text-[13px] font-medium text-amber-800">

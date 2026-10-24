@@ -56,6 +56,20 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
   // Nếu từ chối chi phí phát sinh, KTV vẫn tiếp tục hoàn tất các hạng mục đã được duyệt
   const canContinue = effectivelyApproved || (isRejected && hasApprovedQuote);
 
+  const displayCode = task.code || (task as any).request_code || task.id || "";
+  const formattedCode = displayCode ? (displayCode.startsWith("#") ? displayCode : `#${displayCode}`) : "";
+  const displayService =
+    task.serviceName ||
+    (task as any).issue_type ||
+    task.deviceInfo ||
+    ((task as any).device ? `${(task as any).device.manufacturer || ""} ${(task as any).device.model_name || ""}`.trim() : "") ||
+    "Dịch vụ sửa chữa";
+  const displayAddress =
+    task.address ||
+    (task as any).location_address ||
+    (task as any).customer?.address ||
+    "Chưa cập nhật địa chỉ";
+
   const COPY = supplementary
     ? {
         title: "Chi phí phát sinh",
@@ -100,16 +114,19 @@ export const QuoteStatusScreen: React.FC<QuoteStatusScreenProps> = ({
     <div className="space-y-4 px-4 pt-4">
       <ScreenHeader
         title={COPY.title}
-        subtitle={`Mã đơn ${task.code}`}
+        subtitle={formattedCode ? `Mã đơn ${formattedCode}` : ""}
         onBack={onBack}
         trailing={<Badge tone={STATE_UI.tone}>{STATE_UI.badge}</Badge>}
       />
 
       <Card className="space-y-1">
-        <h2 className="text-sm font-bold text-ink">{task.serviceName}</h2>
+        <h2 className="text-sm font-bold text-ink">{displayService}</h2>
+        {task.deviceInfo ? (
+          <p className="text-xs font-medium text-slate-500">{task.deviceInfo}</p>
+        ) : null}
         <p className="flex items-start gap-1.5 text-[13px] text-slate-600">
           <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-          {task.address}
+          {displayAddress}
         </p>
       </Card>
 

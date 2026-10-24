@@ -1296,6 +1296,7 @@
   position: sticky;
   top: 0;
   z-index: 20;
+  border-bottom: 1px solid var(--color-line, #e2e8f0);
 }
 
 .sos-flow-header-main {
@@ -1867,9 +1868,11 @@
 .sos-location-select-panel {
   min-height: calc(100dvh - 72px);
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   background: radial-gradient(circle at 50% 10%, #eef6fb, #dde3eb);
+  padding: 12px 20px 28px;
 }
 
 .sos-location-select-card {

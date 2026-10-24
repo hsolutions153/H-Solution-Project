@@ -116,6 +116,15 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
     );
   };
 
+  const displayCode = task.code || (task as any).request_code || task.id || "";
+  const formattedCode = displayCode ? (displayCode.startsWith("#") ? displayCode : `#${displayCode}`) : "";
+  const displayService =
+    task.serviceName ||
+    (task as any).issue_type ||
+    task.deviceInfo ||
+    ((task as any).device ? `${(task as any).device.manufacturer || ""} ${(task as any).device.model_name || ""}`.trim() : "") ||
+    "Dịch vụ sửa chữa";
+
   return (
     <div className="space-y-5 px-4 pt-4">
       <input
@@ -137,7 +146,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
 
       <ScreenHeader
         title="Chẩn đoán"
-        subtitle={`Mã đơn ${task.code || "#JOB-2904"} · ${task.serviceName || "Sửa chữa thiết bị y tế / Xe lăn"}`}
+        subtitle={formattedCode ? `Mã đơn ${formattedCode} · ${displayService}` : displayService}
         onBack={onBack}
       />
 
