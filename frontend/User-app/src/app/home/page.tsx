@@ -93,10 +93,10 @@ export default function HomePage() {
   return (
     <HomeShell activeNav="home">
       <div ref={revealRef} className="mx-auto w-full max-w-[480px] space-y-4 pb-4">
-        <section data-reveal className="relative isolate overflow-hidden rounded-card bg-brand-950 text-white shadow-card">
-          <Image src="/repair-photo-1.png" alt="" fill priority sizes="480px" className="-z-10 object-cover object-right opacity-80" />
-          <div className="absolute inset-0 -z-10 bg-linear-to-r from-brand-950 via-brand-950/85 to-brand-950/10" aria-hidden />
-          <div className="max-w-[70%] px-4 py-5">
+        <section data-reveal className="relative isolate flex min-h-[148px] items-center overflow-hidden rounded-card bg-brand-950 text-white shadow-card">
+          <Image src="/repair-photo.png" alt="" fill priority sizes="480px" className="-z-10 object-contain object-right" />
+          <div className="absolute inset-0 -z-10 bg-linear-to-r from-brand-950 via-brand-950/80 to-transparent" aria-hidden />
+          <div className="relative z-10 max-w-[62%] px-4 py-5">
             {name ? (
               <h1 className="text-xl font-bold leading-tight">
                 {greeting(new Date().getHours())}, {name}
