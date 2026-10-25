@@ -313,11 +313,20 @@
   margin-right: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* Không dùng justify-content: center vì khi nội dung dài hơn màn hình,
+     phần đầu bị đẩy ra ngoài vùng cuộn và không thể cuộn tới. */
   max-height: 100vh;
   max-height: 100dvh;
   overflow-y: auto;
   scrollbar-width: none;
+}
+
+.responsive-card > :first-child {
+  margin-top: auto;
+}
+
+.responsive-card > :last-child {
+  margin-bottom: auto;
 }
 
 .responsive-card::-webkit-scrollbar {
