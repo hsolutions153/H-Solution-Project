@@ -59,6 +59,9 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "type": err.get("type", "value_error"),
             })
 
+        if request.url.path.endswith("/devices"):
+            logger.warning("[Validation 422] %s %s -> %s", request.method, request.url.path, errors)
+
         return JSONResponse(
             status_code=422,
             content={

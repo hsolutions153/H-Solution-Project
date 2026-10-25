@@ -43,23 +43,6 @@ export default function CompleteProfilePage() {
     async function init() {
       let token = getAuthToken();
 
-      // Kiểm tra phiên đăng nhập nếu chưa có token trong localStorage
-      if (!token) {
-        try {
-          const res = await fetch("/api/auth/session");
-          if (res.ok) {
-            const session = await res.json();
-            if (session?.accessToken) {
-              const { setAuthToken } = await import("@/lib/api-client");
-              setAuthToken(session.accessToken, session.backendUser);
-              token = session.accessToken;
-            }
-          }
-        } catch (err) {
-          console.warn("Lỗi kiểm tra phiên đăng nhập:", err);
-        }
-      }
-
       if (!token) {
         if (isMounted) router.replace("/login");
         return;
