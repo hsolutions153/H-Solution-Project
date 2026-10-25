@@ -32,6 +32,13 @@ const localToday = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 };
 
+/** Convert the display format used by the detail page back to the API format. */
+const apiDate = (value: string) => {
+  const trimmed = value.trim();
+  const displayDate = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  return displayDate ? `${displayDate[3]}-${displayDate[2]}-${displayDate[1]}` : trimmed;
+};
+
 export function DeviceForm({ device }: Props) {
   const router = useRouter();
   const isEditing = Boolean(device);
@@ -141,6 +148,7 @@ export function DeviceForm({ device }: Props) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (saving) return;
     setError("");
     const today = localToday();
     const valid = validate(form, {
@@ -157,6 +165,14 @@ export function DeviceForm({ device }: Props) {
         if (!s) return undefined;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Ngày mua xe không đúng định dạng ngày.";
         if (s > today) return "Ngày mua xe không được ở tương lai.";
+      },
+      manufacturingYear: (v) => {
+        const s = String(v ?? "").trim();
+        if (!s) return undefined;
+        if (!/^\d{4}$/.test(s)) return "Năm sản xuất phải gồm 4 chữ số.";
+        if (Number(s) > new Date(`${today}T00:00:00`).getFullYear()) {
+          return "Năm sản xuất không được ở tương lai.";
+        }
       },
     });
     if (!valid) return;
@@ -193,8 +209,14 @@ export function DeviceForm({ device }: Props) {
         payload.notes = null;
       }
 
-      if (form.purchaseDate) payload.purchase_date = form.purchaseDate;
-      payload.image_url = form.image ? form.image : (isEditing ? null : undefined);
+      if (form.purchaseDate) payload.purchase_date = apiDate(form.purchaseDate);
+      // The API accepts an absolute URL only. Empty/default local placeholders
+      // must not be sent as image_url.
+      if (/^https?:\/\//i.test(form.image.trim())) {
+        payload.image_url = form.image.trim();
+      } else if (isEditing) {
+        payload.image_url = null;
+      }
       payload.is_default = form.isDefault;
 
       if (isEditing) {
@@ -247,9 +269,9 @@ export function DeviceForm({ device }: Props) {
     }
   };
 
-  // Danh sách năm sản xuất từ 2018 đến hiện tại + 1
+  // Backend không cho phép năm sản xuất ở tương lai.
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: currentYear - 2017 }, (_, i) => currentYear + 1 - i);
+  const yearOptions = Array.from({ length: currentYear - 2000 + 1 }, (_, i) => currentYear - i);
 
   return (
     <div className="device-form-page">

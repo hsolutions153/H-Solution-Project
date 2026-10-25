@@ -25,31 +25,6 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
         token = getAuthToken();
       }
 
-      // Đồng bộ phiên đăng nhập NextAuth (Google OAuth)
-      if (!token) {
-        try {
-          const res = await fetch("/api/auth/session");
-          if (res.ok) {
-            const session = await res.json();
-            if (session?.accessToken) {
-              await fetch("/v1/auth/bootstrap", { method: "POST", credentials: "include" });
-              const { setAuthToken } = await import("@/lib/api-client");
-              const backendUser = session.backendUser || {
-                id: session.user?.id || "google-user",
-                name: session.user?.name || "Khách hàng",
-                email: session.user?.email,
-              };
-              backendUser.is_new_user = session.isNewUser ?? backendUser.is_new_user;
-              backendUser.is_profile_complete = session.isProfileComplete ?? backendUser.is_profile_complete;
-              setAuthToken(session.accessToken, backendUser);
-              token = session.accessToken;
-            }
-          }
-        } catch (err) {
-          console.warn("Lỗi đồng bộ phiên đăng nhập:", err);
-        }
-      }
-
       if (!token) {
         if (isMounted) router.replace("/login");
         return;

@@ -176,6 +176,7 @@ def fetch_qr(repair_id: str, current_user: dict, payment_method: str | None = No
     # Lấy thông tin STK của kỹ thuật viên phụ trách đơn
     tech_id = repair.get('technician_id')
     tech_bank = get_bank_account(tech_id) if tech_id else None
+    payment = _ensure_payment(repair, current_user, method)
 
     if amount > 0 and method == 'BANK_TRANSFER':
         if tech_bank and tech_bank.get('account_number'):
@@ -183,7 +184,8 @@ def fetch_qr(repair_id: str, current_user: dict, payment_method: str | None = No
             acc = tech_bank['account_number']
             holder = (tech_bank.get('account_holder') or '').strip().upper()
             clean_holder = quote(holder)
-            qr_url = f"https://vietqr.app/img?bank={bank}&acc={acc}&template=qronly&amount={int(amount)}&showinfo=true&fullacc=true&holder={clean_holder}"
+            payment_code = quote(str(payment['payment_code']))
+            qr_url = f"https://vietqr.app/img?bank={bank}&acc={acc}&template=qronly&amount={int(amount)}&des={payment_code}&showinfo=true&fullacc=true&holder={clean_holder}"
             bank_account = acc
             bank_name = tech_bank.get('bank_name') or bank
             bank_account_name = holder
@@ -198,7 +200,6 @@ def fetch_qr(repair_id: str, current_user: dict, payment_method: str | None = No
         bank_name = None
         bank_account_name = None
 
-    payment = _ensure_payment(repair, current_user, method)
     if amount == 0:
         payment = _settle(payment, f'FREE:{payment["id"]}', current_user['sub'])
 

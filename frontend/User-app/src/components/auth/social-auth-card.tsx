@@ -13,17 +13,12 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-type SocialAuthCardProps = {
+type AuthCardProps = {
   mode: "login" | "register";
-  availableProviders: {
-    google: boolean;
-    apple: boolean;
-  };
 };
 
 const authErrors: Record<string, string> = {
@@ -34,10 +29,7 @@ const authErrors: Record<string, string> = {
   OAuthAccountNotLinked: "Email này đã được liên kết với một phương thức đăng nhập khác.",
 };
 
-export function SocialAuthCard({
-  mode,
-  availableProviders,
-}: SocialAuthCardProps) {
+export function SocialAuthCard({ mode }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [name, setName] = useState("");
@@ -187,51 +179,6 @@ export function SocialAuthCard({
     }
   }
 
-  // Kiểm tra phiên xác thực NextAuth (sau chuyển hướng Google OAuth)
-  useEffect(() => {
-    let isMounted = true;
-    async function checkNextAuthSession() {
-      if (searchParams?.get("logged_out")) {
-        const { removeAuthToken } = await import("@/lib/api-client");
-        removeAuthToken();
-        return;
-      }
-      try {
-        const res = await fetch("/api/auth/session");
-        if (res.ok) {
-          const session = await res.json();
-          if (session?.accessToken) {
-            await fetch("/v1/auth/bootstrap", { method: "POST", credentials: "include" });
-            const { setAuthToken } = await import("@/lib/api-client");
-            const backendUser = session.backendUser || {
-              id: session.user?.id || "google-user",
-              name: session.user?.name || "Khách hàng",
-              email: session.user?.email,
-            };
-            const isProfileComplete = session.isProfileComplete ?? backendUser.is_profile_complete;
-            const isNewUser = session.isNewUser ?? backendUser.is_new_user;
-
-            backendUser.is_new_user = isNewUser;
-            backendUser.is_profile_complete = isProfileComplete;
-
-            setAuthToken(session.accessToken, backendUser);
-            if (isMounted) {
-              if (isNewUser || isProfileComplete === false) {
-                router.push("/complete-profile");
-              } else {
-                router.push("/home");
-              }
-            }
-          }
-        }
-      } catch { }
-    }
-    checkNextAuthSession();
-    return () => {
-      isMounted = false;
-    };
-  }, [router, searchParams]);
-
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
@@ -305,24 +252,6 @@ export function SocialAuthCard({
         setFormError(err.message || "Máy chủ không thể xử lý yêu cầu. Vui lòng thử lại.");
       }
     } finally {
-      setLoadingProvider(null);
-    }
-  }
-
-  async function handleSocialSignIn(provider: "google" | "apple") {
-    if (!availableProviders[provider]) {
-      setFormError(
-        `${provider === "google" ? "Google" : "Apple"} chưa được cấu hình trên máy chủ.`,
-      );
-      return;
-    }
-
-    setFormError("");
-    setLoadingProvider(provider);
-    try {
-      await signIn(provider, { callbackUrl: "/home" });
-    } catch {
-      setFormError("Không thể bắt đầu đăng nhập với nhà cung cấp này.");
       setLoadingProvider(null);
     }
   }
@@ -686,50 +615,6 @@ export function SocialAuthCard({
           </button>
         </form>
 
-        <div className="flex items-center gap-md my-lg">
-          <div className="grow h-px bg-outline-variant" />
-          <span className="text-xs text-outline">HOẶC</span>
-          <div className="grow h-px bg-outline-variant" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-md">
-          <button
-            type="button"
-            onClick={() => handleSocialSignIn("google")}
-            disabled={isBusy || !availableProviders.google}
-            title={
-              availableProviders.google
-                ? "Đăng nhập bằng Google"
-                : "Google chưa được cấu hình"
-            }
-            className="flex items-center justify-center gap-sm h-14 border border-outline-variant rounded-xl bg-surface-container-lowest disabled:opacity-60 cursor-pointer"
-          >
-            <svg fill="none" height="24" viewBox="0 0 24 24" width="24" aria-hidden="true">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#7fb8da" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-            <span>Google</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSocialSignIn("apple")}
-            disabled={isBusy || !availableProviders.apple}
-            title={
-              availableProviders.apple
-                ? "Đăng nhập bằng Apple"
-                : "Apple chưa được cấu hình"
-            }
-            className="flex items-center justify-center gap-sm h-14 bg-black text-white rounded-xl disabled:opacity-60 cursor-pointer"
-          >
-            <svg className="w-6 h-6" viewBox="0 0 24 24" aria-hidden="true">
-              <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.79 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.1ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z" />
-            </svg>
-            <span>Apple</span>
-          </button>
-        </div>
         <p className="mt-lg text-center text-sm text-on-surface-variant">
           {isLogin ? "Chưa có tài khoản?" : "Đã có tài khoản?"}{" "}
           <Link href={isLogin ? "/register" : "/login"} className="font-semibold text-primary hover:underline">

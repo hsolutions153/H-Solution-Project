@@ -2,29 +2,16 @@
 
 ## Xác thực người dùng
 
-Dự án dùng Auth.js cho tài khoản email/mật khẩu và OAuth/OIDC trực tiếp với
-Google, Apple; không dùng Clerk. Mật khẩu được băm bằng `scrypt` với salt riêng
+Dự án dùng tài khoản email/mật khẩu và OTP; Mật khẩu được băm bằng `scrypt` với salt riêng
 trước khi lưu.
 
 1. Sao chép `.env.example` thành `.env.local`.
-2. Chạy `npx auth secret` để tạo `AUTH_SECRET`.
-3. Điền Google OAuth Client ID/Secret và thông tin Apple Developer.
-4. Cấu hình redirect URI:
-
-```text
-Google: http://localhost:3000/api/auth/callback/google
-Apple:  https://your-domain.com/api/auth/callback/apple
-```
-
-Apple không chấp nhận callback HTTP localhost cho web. Khi phát triển, dùng một
-HTTPS tunnel hoặc domain staging.
+2. Chạy `npx auth secret` để tạo `AUTH_SECRET` nếu cần dùng Auth.js cho session.
 
 Các endpoint Auth.js:
 
 - `POST /api/auth/register` — đăng ký email/mật khẩu.
 - `GET|POST /api/auth/signin`
-- `GET|POST /api/auth/callback/google`
-- `GET|POST /api/auth/callback/apple`
 - `GET /api/auth/session`
 - `POST /api/auth/signout`
 
