@@ -47,12 +47,13 @@
 .device-subheader button { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid #d5e5e9; border-radius: 12px; color: #114567; background: white; cursor: pointer; }
 .device-subheader h1 { margin: 0; text-align: center; font-size: 24px; color: #0f3a56; }
 .device-form { width: min(100%, 590px); margin: 0 auto; padding: 30px; border: 1px solid #dce8ec; border-radius: var(--radius-card); background: white; box-shadow: 0 10px 35px rgba(26, 68, 81, .06); }
-.device-form > label { display: block; margin-bottom: 18px; }
-.device-form > label > span { display: block; margin-bottom: 7px; color: #315765; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+/* Ô nằm trong .device-form-grid-2 không phải con trực tiếp của form nên phải liệt kê riêng */
+.device-form > label, .device-form-grid-2 > label { display: block; margin-bottom: 20px; }
+.device-form > label > span, .device-form-grid-2 > label > span { display: block; margin-bottom: 8px; color: #315765; font-size: 13px; font-weight: 700; line-height: 1.35; }
 .device-form input:not([type=checkbox]), .device-form select { width: 100%; height: 47px; padding: 0 13px; border: 1px solid #d6e3e7; border-radius: 9px; outline: none; color: #0f3a56; background: #fbfdfd; font: inherit; font-size: 14px; }
 .device-form input:focus, .device-form select:focus { border-color: #156495; box-shadow: 0 0 0 3px #d7eaf5; }
 .device-form input:disabled { color: #84949a; background: #f0f4f5; }
-.device-form small { display: block; margin-top: 6px; color: #8a9a9f; font-size: 12px; }
+.device-form small { display: block; margin-top: 6px; color: #64777e; font-size: 12px; line-height: 1.45; }
 .device-upload { width: 100%; min-height: 110px; margin: 2px 0 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1.5px dashed #bfd9e0; border-radius: 12px; color: #2479ad; background: #eef6fb; cursor: pointer; }
 .device-upload span { color: #91a0a5; font-size: 12px; }
 .device-upload-preview { position: relative; width: 80px; height: 80px; overflow: hidden; border-radius: var(--radius-control); background: #edf3f5; }
@@ -89,7 +90,7 @@
 .device-danger-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .device-default-note { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; color: var(--color-brand-700); font-size: 13px; font-weight: 600; }
 .device-upload-container { margin-bottom: 22px; }
-.device-upload-label { display: block; margin-bottom: 7px; color: #315765; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.device-upload-label { display: block; margin-bottom: 8px; color: #315765; font-size: 13px; font-weight: 700; line-height: 1.35; }
 .device-upload-active { display: flex; align-items: center; gap: 14px; }
 .device-upload-info { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
 .device-upload-info strong { font-size: 13px; color: #12537d; }
@@ -416,7 +417,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 12px 14px;
   margin-bottom: 14px;
   border-radius: 12px;
   background: #eef6fb;
@@ -428,8 +430,11 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
+  line-height: 1.45;
   color: #12537d;
 }
+
+.vp-brand-pill svg { flex-shrink: 0; }
 
 .vp-change-brand-link {
   border: 0;
