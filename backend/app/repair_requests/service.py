@@ -794,10 +794,17 @@ def reverse_geocode_location(latitude: float, longitude: float, current_user: di
         properties = features[0].get("properties") or {}
         context = properties.get("context") or {}
         address = properties.get("name_preferred") or properties.get("name") or properties.get("full_address") or ""
-        ward = (context.get("neighborhood") or context.get("locality") or {}).get("name") or ""
-        province = (
-            (context.get("place") or context.get("region") or context.get("district") or context.get("country") or {}).get("name")
-            or ""
+        def _name(key: str) -> str:
+            return (context.get(key) or {}).get("name") or ""
+
+        # Thành phố: place = region = "Hà Nội". Nông thôn: place là xã/thị trấn, tỉnh nằm ở region.
+        province = _name("region") or _name("place") or _name("country")
+        place = _name("place")
+        ward = (
+            _name("neighborhood")
+            or _name("locality")
+            or (place if place and place != province else "")
+            or _name("district")
         )
         return {"address": address, "ward": ward, "province": province, "latitude": latitude, "longitude": longitude}
     except (requests.RequestException, KeyError, TypeError, ValueError) as error:
