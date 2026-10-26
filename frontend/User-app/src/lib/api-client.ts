@@ -41,7 +41,8 @@ export function updateUserInfo(partial: Partial<UserSession>): void {
 
 export function removeAuthToken(): void {
   if (typeof window === "undefined") return;
-  if (getAuthToken()) {
+  const token = getAuthToken();
+  if (token) {
     // Thu hồi refresh token (cookie httpOnly) trên server, không chờ kết quả
     fetch(`${getBaseUrl()}/auth/logout?role=${REFRESH_ROLE}`, {
       method: "POST",
@@ -49,8 +50,11 @@ export function removeAuthToken(): void {
       keepalive: true,
     }).catch(() => {});
   }
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("user_info");
+  localStorage.clear();
+  sessionStorage.clear();
+  if ("caches" in window) {
+    void window.caches.keys().then((keys) => Promise.all(keys.map((key) => window.caches.delete(key)))).catch(() => {});
+  }
 }
 
 let refreshPromise: Promise<boolean> | null = null;

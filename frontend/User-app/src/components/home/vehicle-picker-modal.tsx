@@ -464,24 +464,6 @@ export function VehiclePickerModal({
                 </label>
               </div>
 
-              <div className="vp-form-field">
-                <label>
-                  <span>4. Phân loại phương tiện</span>
-                  <div className="vp-device-type-options">
-                    <label className="vp-radio-chip active">
-                      <input
-                        type="radio"
-                        name="customDeviceType"
-                        value="SCOOTER"
-                        checked
-                        readOnly
-                      />
-                      Xe máy điện
-                    </label>
-                  </div>
-                </label>
-              </div>
-
               <div className="vp-form-actions">
                 <button
                   type="button"

@@ -39,8 +39,11 @@ export function removeAuthToken(): void {
       keepalive: true,
     }).catch(() => {});
   }
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("user_info");
+  localStorage.clear();
+  sessionStorage.clear();
+  if ("caches" in window) {
+    void window.caches.keys().then((keys) => Promise.all(keys.map((key) => window.caches.delete(key)))).catch(() => {});
+  }
   window.dispatchEvent(new Event("session-changed"));
 }
 
@@ -133,11 +136,15 @@ export async function fetchApi<T>(
   }
 
   const baseUrl = getBaseUrl();
+  const method = (options.method || "GET").toUpperCase();
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${endpoint}`, {
       credentials: "include",
       ...options,
+      ...(method === "GET" || method === "HEAD"
+        ? { cache: options.cache ?? "no-store" }
+        : {}),
       headers,
     });
   } catch (err: unknown) {

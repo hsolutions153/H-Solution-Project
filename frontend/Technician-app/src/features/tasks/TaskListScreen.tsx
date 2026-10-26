@@ -149,12 +149,14 @@ interface TaskListScreenProps {
   onCompleteRepair?: (completedTask: HistoryTask) => void;
   view?: "home" | "tasks";
   onNavigate?: (tab: "home" | "tasks") => void;
+  onAcceptedAssignment?: () => void;
 }
 
 export const TaskListScreen: React.FC<TaskListScreenProps> = ({
   onCompleteRepair,
   view = "tasks",
   onNavigate,
+  onAcceptedAssignment,
 }) => {
   const [activeTab, setActiveTab] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
@@ -394,6 +396,9 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
       sessionStorage.setItem("currentView", "detail");
       setIsModalOpen(false);
       setCurrentView("detail");
+      // Modal có thể được mở khi đang ở Lịch hẹn/Lịch sử/Hồ sơ. Chuyển về
+      // tab Công việc để màn chi tiết đang giữ trong TaskListScreen hiển thị.
+      onAcceptedAssignment?.();
       if (view === "home") onNavigate?.("tasks");
     } catch (err: any) {
       // Không chuyển màn hình trước khi backend xác nhận. Nếu KTV đang có
@@ -716,6 +721,11 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     </>
   );
 
+  const modalPortalTarget = isClient && typeof document !== "undefined"
+    ? document.querySelector(".app-shell") || document.body
+    : null;
+  const globalModals = modalPortalTarget ? createPortal(modals, modalPortalTarget) : null;
+
   if (view === "home") {
     return (
       <div className="relative pb-8">
@@ -733,7 +743,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           }}
           onViewAll={() => onNavigate?.("tasks")}
         />
-        {modals}
+        {globalModals}
       </div>
     );
   }
@@ -841,7 +851,7 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
 
       {fabContainer ? createPortal(fab, fabContainer) : <div className="absolute bottom-6 right-4 z-30">{fab}</div>}
 
-      {modals}
+      {globalModals}
     </div>
   );
 };

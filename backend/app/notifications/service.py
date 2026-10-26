@@ -291,6 +291,31 @@ def notify_request_assigned(request_dict: dict, technician_id: str):
         )
 
 
+def notify_appointment_overdue(request_dict: dict):
+    """Warn the assigned technician once when an accepted appointment is late."""
+    technician_id = request_dict.get("technician_id")
+    repair_id = request_dict.get("id", "")
+    if not technician_id or not repair_id:
+        return False
+
+    type_code = "APPOINTMENT_OVERDUE"
+    if repository.has_notification_for_repair(technician_id, "TECHNICIAN", type_code, repair_id):
+        return False
+
+    notify_user(
+        user_id=technician_id,
+        title="Lịch hẹn đã quá giờ",
+        body=(
+            f"Đơn #{repair_id} đã đến giờ hẹn nhưng bạn chưa bắt đầu di chuyển. "
+            "Vui lòng cập nhật trạng thái hoặc liên hệ khách hàng ngay."
+        ),
+        type_code=type_code,
+        role="TECHNICIAN",
+        data={"repair_id": repair_id, "url": "/"},
+    )
+    return True
+
+
 def notify_status_changed(
     request_dict: dict,
     new_status: str,

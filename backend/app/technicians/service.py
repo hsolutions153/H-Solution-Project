@@ -20,6 +20,7 @@ from app.technicians.repository import (
     get_technician_by_id_card_number,
     get_technician_by_user_id,
     insert_technician,
+    update_user_presence_in_db,
     update_technician_in_db,
     upsert_bank_account,
 )
@@ -192,6 +193,8 @@ def update_technician(user_id: str, data):
             if api_name in payload:
                 payload[column] = payload.pop(api_name)
         update_technician_in_db(user_id, payload)
+        if "is_online" in payload:
+            update_user_presence_in_db(user_id, payload["is_online"])
     return fetch_technician_by_user_id(user_id)
 
 
@@ -283,6 +286,7 @@ def update_my_presence(current_user: dict, data):
             raise AppException(ErrorCode.VALIDATION_ERROR, message="Tọa độ GPS không hợp lệ.")
         payload["last_location_at"] = datetime.now(timezone.utc).isoformat()
     update_technician_in_db(current_user["sub"], payload)
+    update_user_presence_in_db(current_user["sub"], payload["is_online"])
     from app.repair_requests.service import invalidate_technician_cache
     invalidate_technician_cache(current_user["sub"])
     return fetch_my_technician(current_user)

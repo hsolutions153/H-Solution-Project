@@ -129,6 +129,7 @@ CREATE TABLE public.repair_requests (
   request_code character varying NOT NULL UNIQUE,
   customer_id character varying NOT NULL,
   technician_id character varying,
+  appointment_key character varying(16),
   device_id character varying NOT NULL,
   issue_type character varying NOT NULL CHECK (issue_type::text = ANY (ARRAY['BATTERY'::character varying, 'MOTOR'::character varying, 'TIRE'::character varying, 'BRAKE'::character varying, 'OTHER'::character varying]::text[])),
   issue_description text NOT NULL,

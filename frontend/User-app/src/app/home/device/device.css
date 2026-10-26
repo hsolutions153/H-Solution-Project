@@ -11,9 +11,9 @@
 .device-card { overflow: hidden; background: white; border: 1px solid #dce9ed; border-radius: var(--radius-card); box-shadow: var(--shadow-card); transition: transform .2s, box-shadow .2s; }
 .device-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-raised); }
 .device-image-wrap { position: relative; display: block; height: 220px; overflow: hidden; background: linear-gradient(145deg, #f8fbfb, #eaf2f4); }
-.device-image { object-fit: contain; padding: 16px; mix-blend-mode: multiply; transition: transform .3s; }
+.device-image { object-fit: contain; padding: 16px; border-radius: 22px; mix-blend-mode: multiply; transition: transform .3s; }
 .device-card:hover .device-image { transform: scale(1.03); }
-.device-badge { position: absolute; z-index: 2; top: 14px; right: 14px; padding: 5px 9px; border-radius: 999px; color: #12537d; background: rgba(229, 247, 250, .94); font-size: 12px; font-weight: 850; }
+.device-badge { position: static; display: inline-flex; align-self: flex-start; align-items: center; width: max-content; height: fit-content; flex-shrink: 0; margin-top: 1px; padding: 3px 7px; border-radius: 999px; color: #12537d; background: #e5f7fa; font-size: 10px; font-weight: 800; line-height: 1.25; white-space: nowrap; }
 .device-card-body { padding: 18px; }
 .device-card-title-row { display: flex; justify-content: space-between; gap: 12px; }
 .device-card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: var(--color-ink); }
@@ -57,7 +57,7 @@
 .device-upload { width: 100%; min-height: 110px; margin: 2px 0 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1.5px dashed #bfd9e0; border-radius: 12px; color: #2479ad; background: #eef6fb; cursor: pointer; }
 .device-upload span { color: #91a0a5; font-size: 12px; }
 .device-upload-preview { position: relative; width: 80px; height: 80px; overflow: hidden; border-radius: var(--radius-control); background: #edf3f5; }
-.device-upload-preview img { object-fit: cover; }
+.device-upload-preview img { object-fit: contain; padding: 4px; }
 .device-file-input { display: none; }
 .device-upload-spinner { animation: device-upload-spin 800ms linear infinite; }
 .device-upload:disabled { cursor: not-allowed; opacity: .75; }
@@ -83,6 +83,7 @@
 .device-detail-back { margin-bottom: 18px; }
 .device-detail-back a { display: inline-flex; align-items: center; gap: 7px; color: #55737e; text-decoration: none; font-size: 12px; font-weight: 700; }
 .device-hero { position: relative; height: 240px; overflow: hidden; border-radius: var(--radius-card); background: linear-gradient(140deg, #f7faf9, #e7f0f1); }
+.device-detail-image { object-fit: contain; padding: 20px; border-radius: 24px; mix-blend-mode: multiply; }
 .device-detail-actions { display: flex; gap: 10px; margin: 16px 0; align-items: center; flex-wrap: wrap; }
 .device-detail-actions .device-primary-button { flex: 1; min-width: 140px; }
 .device-danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 0 18px; border: 1px solid #fecdd3; border-radius: var(--radius-control); color: #be123c; background: #fff1f2; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }

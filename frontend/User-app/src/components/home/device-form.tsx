@@ -397,7 +397,7 @@ export function DeviceForm({ device }: Props) {
         </div>
 
         <div className="device-form-grid-2">
-          <label>
+          <label style={{ gridColumn: "1 / -1" }}>
             <span>
               3. ID xe / Số sê-ri / Biển số <b style={{ color: "#d13b4c" }}>*</b>
             </span>
@@ -414,23 +414,12 @@ export function DeviceForm({ device }: Props) {
               <small>Số khung/máy hoặc biển số để kỹ thuật viên nhận diện khi sửa chữa.</small>
             )}
           </label>
-
-          <label>
-            <span>Phân loại phương tiện</span>
-            <select
-              value={form.deviceType}
-              onChange={(e) => update("deviceType", e.target.value)}
-            >
-              <option value="SCOOTER">Xe máy điện</option>
-            </select>
-            <small>Hệ thống chuyên biệt cho dịch vụ xe máy điện.</small>
-          </label>
         </div>
 
         <div className="device-form-grid-2">
           <label>
             <span>
-              4. Loại pin của xe <b style={{ color: "#d13b4c" }}>*</b>
+              3. Loại pin của xe <b style={{ color: "#d13b4c" }}>*</b>
             </span>
             <select
               value={form.batteryType}
@@ -446,7 +435,7 @@ export function DeviceForm({ device }: Props) {
           </label>
 
           <label>
-            <span>5. Năm sản xuất (Tùy chọn)</span>
+            <span>4. Năm sản xuất (Tùy chọn)</span>
             <select
               value={form.manufacturingYear}
               onChange={(e) => update("manufacturingYear", e.target.value)}

@@ -109,6 +109,7 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedTime, setSelectedTime] = useState("09:00");
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
   const [nowTick, setNowTick] = useState(() => new Date());
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,7 +130,9 @@ export default function BookingPage() {
     TIME_GROUPS.flatMap((group) => group.slots).find((slot) => slot.id === selectedTime)?.label ?? selectedTime;
   const fullAddress = [streetAddress.trim(), ward.trim(), province.trim()].filter(Boolean).join(", ");
 
-  const isSlotDisabled = (slotId: string) => slotDateTime(selectedDate, slotId) < nowTick;
+  const slotKey = (date: Date, slotId: string) => `${toDateKey(date)}|${slotId}`;
+  const isSlotDisabled = (slotId: string) =>
+    slotDateTime(selectedDate, slotId) < nowTick || bookedSlots.has(slotKey(selectedDate, slotId));
   const hasAvailableSlot = TIME_GROUPS.some((group) => group.slots.some((slot) => !isSlotDisabled(slot.id)));
 
   const fillCurrentLocation = async () => {
@@ -163,11 +166,39 @@ export default function BookingPage() {
   }, [step]);
 
   useEffect(() => {
+    if (step !== "SCHEDULE") return;
+    let cancelled = false;
+    async function loadBookedSlots() {
+      try {
+        const { fetchApi } = await import("@/lib/api-client");
+        const result = await fetchApi<{ items?: any[] }>("/repair-requests/me?limit=100");
+        const next = new Set<string>();
+        for (const item of result?.items || []) {
+          if (["COMPLETED", "CANCELLED"].includes(String(item.status || "").toUpperCase())) continue;
+          const match = String(item.issue_description || "").match(/\[Hẹn:\s*([^\]]+)\]/i);
+          if (!match) continue;
+          const text = match[1];
+          const date = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
+          const time = text.match(/\b(\d{1,2}:\d{2})\b/)?.[1];
+          if (date && time) next.add(`${date}|${time}`);
+        }
+        if (!cancelled) setBookedSlots(next);
+      } catch {
+        // Backend remains the source of truth and rejects a race condition.
+      }
+    }
+    void loadBookedSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, selectedDate]);
+
+  useEffect(() => {
     if (!isSlotDisabled(selectedTime)) return;
     const nextAvailable = TIME_GROUPS.flatMap((group) => group.slots).find((slot) => !isSlotDisabled(slot.id));
     setSelectedTime(nextAvailable ? nextAvailable.id : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, nowTick]);
+  }, [selectedDate, nowTick, bookedSlots]);
 
   useEffect(() => {
     if (step !== "CAMERA") return;
@@ -696,6 +727,7 @@ export default function BookingPage() {
                   <span>{group.label}</span>
                   <div className="booking-time-grid">
                     {group.slots.map((slot) => {
+                      const isBooked = bookedSlots.has(slotKey(selectedDate, slot.id));
                       const disabled = isSlotDisabled(slot.id);
                       return (
                         <button
@@ -705,7 +737,7 @@ export default function BookingPage() {
                           className={selectedTime === slot.id ? "is-selected" : ""}
                           onClick={() => setSelectedTime(slot.id)}
                         >
-                          {slot.label}
+                          {isBooked ? `${slot.label} (đã đặt)` : slot.label}
                         </button>
                       );
                     })}

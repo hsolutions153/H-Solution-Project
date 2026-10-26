@@ -276,11 +276,11 @@ export function HistoryDetail() {
                 ? {
                     name: found.technicianName,
                     phone: "",
-                    rating: 4.9,
-                    reviews: 25,
+                    rating: 0,
+                    reviews: 0,
                     avatar: "",
-                    specialization: "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
-                    verified: true,
+                    specialization: "",
+                    verified: false,
                   }
                 : null,
               jobs: [],
@@ -407,12 +407,12 @@ export function HistoryDetail() {
             ? {
                 name: res.technician.name || "Kỹ thuật viên",
                 phone: res.technician.phone || "",
-                rating: res.technician.rating || 4.9,
-                reviews: res.technician.reviews || 25,
-                specialization: res.technician.specialization || "Kỹ thuật viên cứu hộ & bảo trì xe máy điện V-HCare",
-                experience_years: res.technician.experience_years || 3,
+                rating: res.technician.rating ?? 0,
+                reviews: res.technician.reviews ?? 0,
+                specialization: res.technician.specialization || "",
+                experience_years: res.technician.experience_years ?? 0,
                 avatar: res.technician.avatar || "",
-                verified: true,
+                verified: res.technician.verified === true,
               }
             : null;
 
@@ -1530,11 +1530,12 @@ export function HistoryDetail() {
                 </div>
                 <div className="rd-tech-info flex-1">
                   <span className="rd-tech-name font-bold text-slate-900 text-base">{detail.technician.name}</span>
-                  <p className="text-xs text-slate-500 font-medium">{detail.technician.specialization || "Kỹ thuật viên chuyên nghiệp"}</p>
+                  <p className="text-xs text-slate-500 font-medium">{detail.technician.specialization || "Chưa cập nhật chuyên môn"}</p>
                   <div className="rd-tech-rating mt-1">
                     <span className="material-symbols-outlined rd-star-icon">star</span>
                     <span className="rd-rating-text font-semibold">
-                      {detail.technician.rating || 4.9} ({detail.technician.reviews || 25} đánh giá)
+                      {detail.technician.rating > 0 ? detail.technician.rating.toFixed(1) : "Chưa có đánh giá"}
+                      {detail.technician.rating > 0 ? ` (${detail.technician.reviews} đánh giá)` : ""}
                     </span>
                   </div>
                 </div>
@@ -1545,14 +1546,18 @@ export function HistoryDetail() {
                   <span className="material-symbols-outlined text-brand-600" style={{ fontSize: 18 }}>workspace_premium</span>
                   <div>
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Kinh nghiệm</span>
-                    <span className="font-bold text-slate-800">{detail.technician.experience_years || 3} năm</span>
+                    <span className="font-bold text-slate-800">
+                      {detail.technician.experience_years ? `${detail.technician.experience_years} năm` : "Chưa cập nhật"}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>verified_user</span>
                   <div>
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Chứng nhận</span>
-                    <span className="font-bold text-slate-800">KTV Chính Thức</span>
+                    <span className="font-bold text-slate-800">
+                      {detail.technician.verified ? "Đã xác minh" : "Chưa xác minh"}
+                    </span>
                   </div>
                 </div>
               </div>

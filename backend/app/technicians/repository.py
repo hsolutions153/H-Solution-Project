@@ -172,15 +172,37 @@ def update_technician_in_db(user_id: str, data: dict):
     return response.data[0] if response and response.data else None
 
 
+def update_user_presence_in_db(user_id: str, is_online: bool):
+    """Keep the legacy users.is_online mirror in sync with the technician profile."""
+    return (
+        supabase.table("users")
+        .update({"is_online": is_online})
+        .eq("id", user_id)
+        .execute()
+    )
+
+
 def expire_stale_presence(max_age_seconds: int = 120) -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)).isoformat()
-    response = (
+    stale_response = (
         supabase.table(TECHNICIAN_PROFILES_TABLE)
-        .update({"is_online": False})
+        .select("user_id")
         .eq("is_online", True)
         .lt("last_location_at", cutoff)
         .execute()
     )
+    stale_ids = [row.get("user_id") for row in (stale_response.data or []) if row.get("user_id")]
+    if not stale_ids:
+        return 0
+
+    response = (
+        supabase.table(TECHNICIAN_PROFILES_TABLE)
+        .update({"is_online": False})
+        .in_("user_id", stale_ids)
+        .eq("is_online", True)
+        .execute()
+    )
+    supabase.table("users").update({"is_online": False}).in_("id", stale_ids).execute()
     return len(response.data or []) if response else 0
 
 

@@ -30,7 +30,20 @@ export function setAuthToken(token: string, user?: UserSession): void {
 
 export function removeAuthToken(): void {
   if (typeof window === "undefined") return;
-  if (getAuthToken()) {
+  const token = getAuthToken();
+  if (token) {
+    // Đưa KTV về offline trước khi xóa token để không bị điều phối tiếp.
+    fetch(`${getBaseUrl()}/technicians/me/presence`, {
+      method: "PATCH",
+      credentials: "include",
+      keepalive: true,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ is_online: false }),
+    }).catch(() => {});
+
     // Thu hồi refresh token (cookie httpOnly) trên server, không chờ kết quả
     fetch(`${getBaseUrl()}/auth/logout?role=${REFRESH_ROLE}`, {
       method: "POST",
@@ -38,8 +51,11 @@ export function removeAuthToken(): void {
       keepalive: true,
     }).catch(() => {});
   }
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("user_info");
+  localStorage.clear();
+  sessionStorage.clear();
+  if ("caches" in window) {
+    void window.caches.keys().then((keys) => Promise.all(keys.map((key) => window.caches.delete(key)))).catch(() => {});
+  }
   window.dispatchEvent(new Event("AUTH_LOGOUT"));
 }
 
