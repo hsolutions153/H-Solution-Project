@@ -23,6 +23,25 @@ export const AppLayout = ({
   useEffect(() => {
     let cancelled = false;
 
+    const markOfflineOnExit = () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+        void fetch("/v1/technicians/me/presence", {
+          method: "PATCH",
+          credentials: "include",
+          keepalive: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ is_online: false }),
+        });
+      } catch {
+        // Server-side heartbeat expiry remains the fallback.
+      }
+    };
+
     const sendPresence = async () => {
       try {
         const { fetchApi, getAuthToken } = await import("@/lib/api-client");
@@ -57,9 +76,11 @@ export const AppLayout = ({
 
     void sendPresence();
     const interval = window.setInterval(sendPresence, 30_000);
+    window.addEventListener("pagehide", markOfflineOnExit);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      window.removeEventListener("pagehide", markOfflineOnExit);
     };
   }, []);
 

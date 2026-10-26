@@ -70,11 +70,19 @@ def _scheduled_start_at(request: dict) -> datetime | None:
     appointment = match.group(1).strip()
     date_match = re.search(r"(\d{4}-\d{2}-\d{2})", appointment)
     time_match = re.search(r"\b(\d{1,2}:\d{2})\b", appointment)
-    if not date_match or not time_match:
+    if not time_match:
+        return None
+    if date_match:
+        appointment_date = date_match.group(1)
+    elif re.search(r"\b(hôm nay|today)\b", appointment, re.IGNORECASE):
+        appointment_date = datetime.now(VN_TZ).date().isoformat()
+    elif re.search(r"\b(ngày mai|tomorrow)\b", appointment, re.IGNORECASE):
+        appointment_date = (datetime.now(VN_TZ).date() + timedelta(days=1)).isoformat()
+    else:
         return None
     try:
         return datetime.strptime(
-            f"{date_match.group(1)} {time_match.group(1)}", "%Y-%m-%d %H:%M"
+            f"{appointment_date} {time_match.group(1)}", "%Y-%m-%d %H:%M"
         ).replace(tzinfo=VN_TZ)
     except ValueError:
         return None
@@ -87,7 +95,24 @@ def _is_future_appointment(request: dict, now: datetime) -> bool:
 
 
 def _ensure_technician_not_busy(technician_id: str, request: dict) -> None:
-    # KTV chỉ làm một đơn; lịch hẹn còn xa chưa tính là đang bận.
+    # Không cho cùng một KTV nhận hai lịch hẹn ở cùng ngày và cùng khung giờ,
+    # kể cả khi cả hai lịch đều ở tương lai.
+    scheduled_start = _scheduled_start_at(request)
+    if scheduled_start is not None:
+        scheduled_jobs = repository.get_technician_requests_in_statuses(
+            technician_id,
+            sorted(TECHNICIAN_IN_PROGRESS_STATUSES | {"ASSIGNED"}),
+        )
+        for job in scheduled_jobs:
+            if job.get("id") == request.get("id") or job.get("status") == "CANCELLED":
+                continue
+            if _scheduled_start_at(job) == scheduled_start:
+                raise AppException(
+                    ErrorCode.INVALID_STATUS_TRANSITION,
+                    message="Kỹ thuật viên đã có lịch hẹn trong cùng khung giờ này.",
+                )
+
+    # KTV chỉ làm một đơn đang xử lý; lịch hẹn còn xa chưa tính là đang bận.
     now_vn = datetime.now(VN_TZ)
     if _is_future_appointment(request, now_vn):
         return
@@ -144,7 +169,7 @@ _TECH_CACHE: dict[str, tuple[float, dict]] = {}
 _USER_CACHE: dict[str, tuple[float, dict]] = {}
 _DEVICE_CACHE: dict[str, tuple[float, dict]] = {}
 TECH_CACHE_TTL_SECONDS = 300
-TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 300
+TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 120
 EARTH_RADIUS_KM = 6371.0088
 
 
@@ -386,13 +411,13 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
         )
         techs = resp.data if resp and resp.data else []
 
-        # is_online là trạng thái chủ động của KTV. Không tự chuyển offline khi
-        # KTV đóng app; chỉ nút Online/Offline mới thay đổi cờ này. GPS gần nhất
-        # vẫn được dùng để xếp khoảng cách nếu còn dữ liệu.
+        # is_online chỉ có hiệu lực khi heartbeat/GPS còn mới. Nếu browser
+        # không kịp gửi lệnh offline lúc đóng app, KTV vẫn bị loại khỏi điều phối.
         techs = [
             technician for technician in techs
             if technician.get("user_id") not in excluded
             and _skill_matches_device(technician, device_type)
+            and _has_fresh_technician_location(technician)
         ]
         if techs:
             # Tài khoản bị khóa/xóa không được nhận việc dù hồ sơ vẫn online.
