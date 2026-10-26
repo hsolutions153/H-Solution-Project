@@ -15,10 +15,12 @@ async def lifespan(app: FastAPI):
     # Background worker quét các đơn hàng quá 2 phút chưa được KTV tiếp nhận
     async def auto_timeout_worker():
         from app.repair_requests.service import reassign_timed_out_requests
+        from app.technicians.repository import expire_stale_presence
         while True:
             try:
                 # Client Supabase là đồng bộ: chạy trong thread để không chặn event loop.
                 await asyncio.to_thread(reassign_timed_out_requests, timeout_seconds=120)
+                await asyncio.to_thread(expire_stale_presence, max_age_seconds=120)
             except Exception as err:
                 logging.getLogger(__name__).warning(f"Auto-timeout worker failed: {err}")
             await asyncio.sleep(10)

@@ -144,7 +144,14 @@ export default function DeviceDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="device-hero">
-          <Image src={device.image} alt={device.nickname} fill sizes="(max-width: 720px) 100vw, 600px" unoptimized />
+          <Image
+            src={device.image}
+            alt={device.nickname}
+            fill
+            sizes="(max-width: 720px) 100vw, 600px"
+            className="device-detail-image"
+            unoptimized
+          />
         </div>
 
         <div className="device-detail-actions">

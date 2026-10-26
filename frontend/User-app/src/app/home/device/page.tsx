@@ -139,7 +139,6 @@ export default function DevicesPage() {
             {devices.map((device) => (
               <article className="device-card" key={device.id} data-reveal>
                 <Link href={`/home/device/${device.id}`} className="device-image-wrap">
-                  {device.isDefault && <span className="device-badge">Mặc định</span>}
                   <Image src={device.image} alt={device.nickname} fill sizes="(max-width: 720px) 100vw, 380px" className="device-image" unoptimized />
                 </Link>
                 <div className="device-card-body">
@@ -160,6 +159,7 @@ export default function DevicesPage() {
                         )}
                       </div>
                     </div>
+                    {device.isDefault && <span className="device-badge">Mặc định</span>}
                   </div>
                   <div className="device-card-actions">
                     <Link href={`/home/device/${device.id}`} className="device-primary-button">Chi tiết & Quản lý</Link>

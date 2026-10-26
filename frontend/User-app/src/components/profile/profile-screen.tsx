@@ -373,7 +373,6 @@ export function ProfileScreen({ initialProfile, mode }: ProfileScreenProps) {
         <header className="profile-topbar">
           <PageHeader
             title="Hồ sơ cá nhân"
-            backHref="/home"
           />
         </header>
 

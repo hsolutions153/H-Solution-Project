@@ -60,6 +60,36 @@ def create_notification(data: dict) -> dict:
     return _format_record(record)
 
 
+def has_notification_for_repair(user_id: str, role: str, type_code: str, repair_id: str) -> bool:
+    """Return whether a domain notification was already emitted for a repair."""
+    try:
+        response = (
+            supabase.table(NOTIFICATIONS_TABLE)
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("role", role)
+            .eq("type", type_code)
+            .contains("data", {"repair_id": repair_id})
+            .limit(1)
+            .execute()
+        )
+        if response and response.data:
+            return True
+    except Exception as exc:
+        err_str = str(exc)
+        if "PGRST205" not in err_str and "schema cache" not in err_str:
+            logger.warning("Lỗi kiểm tra thông báo trùng cho đơn %s: %s", repair_id, exc)
+
+    return any(
+        item.get("user_id") == user_id
+        and item.get("role") == role
+        and item.get("type") == type_code
+        and isinstance(item.get("data"), dict)
+        and item["data"].get("repair_id") == repair_id
+        for item in _MEMORY_NOTIFICATIONS
+    )
+
+
 def get_notifications_by_user(
     user_id: str,
     *,

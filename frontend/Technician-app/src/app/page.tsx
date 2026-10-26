@@ -110,14 +110,14 @@ export default function HomePage() {
         }}
       >
         
-        {(activeTab === "home" || activeTab === "tasks") && (
+        <div className={activeTab === "home" || activeTab === "tasks" ? "" : "hidden"}>
           <TaskListScreen
-            key={activeTab}
-            view={activeTab as "home" | "tasks"}
+            view={activeTab === "home" ? "home" : "tasks"}
             onNavigate={setActiveTab}
+            onAcceptedAssignment={() => setActiveTab("tasks")}
             onCompleteRepair={handleCompleteRepair}
           />
-        )}
+        </div>
 
         {activeTab === "schedule" && (
           <ScheduleScreen

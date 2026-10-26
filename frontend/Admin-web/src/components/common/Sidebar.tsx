@@ -33,7 +33,8 @@ export const Sidebar = ({
 
   const handleLogout = () => {
     import("@/lib/api-client").then(({ removeAuthToken }) => removeAuthToken());
-    localStorage.removeItem("isLoggedIn");
+    localStorage.clear();
+    sessionStorage.clear();
     router.replace("/");
   };
 

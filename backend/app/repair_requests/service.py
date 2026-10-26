@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 
 import requests
+from postgrest import APIError
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,15 @@ def _scheduled_start_at(request: dict) -> datetime | None:
     # Trả về giờ bắt đầu lịch hẹn theo giờ Việt Nam.
     if request.get("is_sos"):
         return None
+    appointment_key = request.get("appointment_key")
+    if isinstance(appointment_key, str) and "|" in appointment_key:
+        date_part, time_part = appointment_key.split("|", 1)
+        try:
+            return datetime.strptime(
+                f"{date_part.strip()} {time_part.strip()}", "%Y-%m-%d %H:%M"
+            ).replace(tzinfo=VN_TZ)
+        except ValueError:
+            pass
     text = str(request.get("issue_description") or request.get("description") or "")
     match = re.search(r"\[Hẹn:\s*([^\]]+)\]", text, re.IGNORECASE)
     if not match:
@@ -70,11 +80,19 @@ def _scheduled_start_at(request: dict) -> datetime | None:
     appointment = match.group(1).strip()
     date_match = re.search(r"(\d{4}-\d{2}-\d{2})", appointment)
     time_match = re.search(r"\b(\d{1,2}:\d{2})\b", appointment)
-    if not date_match or not time_match:
+    if not time_match:
+        return None
+    if date_match:
+        appointment_date = date_match.group(1)
+    elif re.search(r"\b(hôm nay|today)\b", appointment, re.IGNORECASE):
+        appointment_date = datetime.now(VN_TZ).date().isoformat()
+    elif re.search(r"\b(ngày mai|tomorrow)\b", appointment, re.IGNORECASE):
+        appointment_date = (datetime.now(VN_TZ).date() + timedelta(days=1)).isoformat()
+    else:
         return None
     try:
         return datetime.strptime(
-            f"{date_match.group(1)} {time_match.group(1)}", "%Y-%m-%d %H:%M"
+            f"{appointment_date} {time_match.group(1)}", "%Y-%m-%d %H:%M"
         ).replace(tzinfo=VN_TZ)
     except ValueError:
         return None
@@ -87,7 +105,22 @@ def _is_future_appointment(request: dict, now: datetime) -> bool:
 
 
 def _ensure_technician_not_busy(technician_id: str, request: dict) -> None:
-    # KTV chỉ làm một đơn; lịch hẹn còn xa chưa tính là đang bận.
+    # Không cho cùng một KTV được gán/nhận hai lịch ở cùng ngày và cùng
+    # khung giờ. Bao gồm cả REQUESTED/CONFIRMED vì một số luồng quản trị có
+    # thể lưu lịch đã giữ KTV ở các trạng thái này.
+    scheduled_start = _scheduled_start_at(request)
+    if scheduled_start is not None:
+        scheduled_jobs = repository.get_technician_open_requests(technician_id)
+        for job in scheduled_jobs:
+            if job.get("id") == request.get("id") or job.get("status") == "CANCELLED":
+                continue
+            if _scheduled_start_at(job) == scheduled_start:
+                raise AppException(
+                    ErrorCode.INVALID_STATUS_TRANSITION,
+                    message="Kỹ thuật viên đã có lịch hẹn trong cùng khung giờ này.",
+                )
+
+    # KTV chỉ làm một đơn đang xử lý; lịch hẹn còn xa chưa tính là đang bận.
     now_vn = datetime.now(VN_TZ)
     if _is_future_appointment(request, now_vn):
         return
@@ -144,7 +177,7 @@ _TECH_CACHE: dict[str, tuple[float, dict]] = {}
 _USER_CACHE: dict[str, tuple[float, dict]] = {}
 _DEVICE_CACHE: dict[str, tuple[float, dict]] = {}
 TECH_CACHE_TTL_SECONDS = 300
-TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 300
+TECHNICIAN_LOCATION_MAX_AGE_SECONDS = 120
 EARTH_RADIUS_KM = 6371.0088
 
 
@@ -289,11 +322,26 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
 
             p_resp = (
                 supabase.table("technician_profiles")
-                .select("user_id,specialization,rating_avg,total_jobs_done,experience_years")
+                .select("user_id,specialization,rating_avg,total_jobs_done,experience_years,kyc_status")
                 .in_("user_id", missing_ids)
                 .execute()
             )
             profiles_by_id = {p["user_id"]: p for p in (p_resp.data or [])}
+
+            review_counts: dict[str, int] = {}
+            try:
+                r_resp = (
+                    supabase.table("reviews")
+                    .select("technician_id")
+                    .in_("technician_id", missing_ids)
+                    .execute()
+                )
+                for review in (r_resp.data or []):
+                    review_tech_id = review.get("technician_id")
+                    if review_tech_id:
+                        review_counts[review_tech_id] = review_counts.get(review_tech_id, 0) + 1
+            except Exception:
+                pass
 
             for tid in missing_ids:
                 tu = users_by_id.get(tid)
@@ -302,13 +350,13 @@ def _get_technicians_map(technician_ids: set[str]) -> dict[str, dict]:
                     t_info = {
                         "id": tu["id"],
                         "name": tu.get("full_name") or "Kỹ thuật viên",
-                        "phone": tu.get("phone") or "0912 345 678",
+                        "phone": tu.get("phone") or "",
                         "avatar": tu.get("avatar_url") or "",
-                        "specialization": (tp and tp.get("specialization")) or "Kỹ thuật viên cứu hộ & bảo trì xe máy điện E-Mobi Care",
-                        "rating": float(tp.get("rating_avg")) if (tp and tp.get("rating_avg")) else 4.9,
-                        "reviews": int(tp.get("total_jobs_done")) if (tp and tp.get("total_jobs_done")) else 25,
-                        "experience_years": int(tp.get("experience_years")) if (tp and tp.get("experience_years")) else 3,
-                        "verified": True,
+                        "specialization": (tp or {}).get("specialization") or "",
+                        "rating": float(tp["rating_avg"]) if tp and tp.get("rating_avg") is not None else None,
+                        "reviews": review_counts.get(tid, 0),
+                        "experience_years": int(tp["experience_years"]) if tp and tp.get("experience_years") is not None else None,
+                        "verified": (tp or {}).get("kyc_status") == "APPROVED",
                     }
                     _TECH_CACHE[tid] = (now, t_info)
                     techs_map[tid] = t_info
@@ -371,7 +419,13 @@ def _skill_matches_device(technician: dict, device_type: str | None) -> bool:
     return skill in {"BOTH", str(device_type).upper()}
 
 
-def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type: str | None = None, exclude_tech_ids=None):
+def _find_best_sos_technician(
+    customer_lat=None,
+    customer_lng=None,
+    device_type: str | None = None,
+    exclude_tech_ids=None,
+    appointment_start: datetime | None = None,
+):
     from app.db.database import supabase
 
     excluded = set(exclude_tech_ids or [])
@@ -386,13 +440,13 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
         )
         techs = resp.data if resp and resp.data else []
 
-        # is_online là trạng thái chủ động của KTV. Không tự chuyển offline khi
-        # KTV đóng app; chỉ nút Online/Offline mới thay đổi cờ này. GPS gần nhất
-        # vẫn được dùng để xếp khoảng cách nếu còn dữ liệu.
+        # is_online chỉ có hiệu lực khi heartbeat/GPS còn mới. Nếu browser
+        # không kịp gửi lệnh offline lúc đóng app, KTV vẫn bị loại khỏi điều phối.
         techs = [
             technician for technician in techs
             if technician.get("user_id") not in excluded
             and _skill_matches_device(technician, device_type)
+            and _has_fresh_technician_location(technician)
         ]
         if techs:
             # Tài khoản bị khóa/xóa không được nhận việc dù hồ sơ vẫn online.
@@ -408,13 +462,15 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
             logger.info("No eligible SOS technician: active account, online, KYC-approved, matching skill and fresh GPS are required")
             return None
 
-        active_statuses = sorted(TECHNICIAN_IN_PROGRESS_STATUSES | {"ASSIGNED"})
+        active_statuses = sorted(TECHNICIAN_IN_PROGRESS_STATUSES | {"PENDING", "REQUESTED", "CONFIRMED", "ASSIGNED"})
         job_counts = {}
         busy_tech_ids = set()
         try:
             active_jobs_resp = (
                 supabase.table("repair_requests")
-                .select("id,technician_id,status,is_sos,issue_description,description")
+                # Keep this query compatible with deployments that have not
+                # applied the optional appointment_key migration yet.
+                .select("id,technician_id,status,is_sos,issue_description")
                 .in_("status", active_statuses)
                 .execute()
             )
@@ -423,7 +479,10 @@ def _find_best_sos_technician(customer_lat=None, customer_lng=None, device_type:
                     tid = job.get("technician_id")
                     if tid:
                         job_counts[tid] = job_counts.get(tid, 0) + 1
-                        if not _is_future_appointment(job, datetime.now(VN_TZ)):
+                        job_start = _scheduled_start_at(job)
+                        if appointment_start is not None and job_start == appointment_start:
+                            busy_tech_ids.add(tid)
+                        elif not _is_future_appointment(job, datetime.now(VN_TZ)):
                             busy_tech_ids.add(tid)
         except Exception as j_err:
             logger.warning(f"Failed to fetch active jobs count: {j_err}")
@@ -599,7 +658,43 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
 
         reassigned_count += 1
 
+    # Also warn technicians who accepted an appointment but have not started
+    # moving after its scheduled time. The worker invokes this every 10s;
+    # notification repository deduplication keeps it one-time per repair.
+    notify_overdue_accepted_appointments()
     return reassigned_count
+
+
+def notify_overdue_accepted_appointments() -> int:
+    """Notify technicians whose accepted appointment has passed its start time."""
+    from app.db.database import supabase
+
+    try:
+        response = (
+            supabase.table(REPAIR_REQUESTS_TABLE)
+            .select("id,technician_id,status,issue_description,is_sos,location_address")
+            .eq("status", "ACCEPTED")
+            .not_.is_("technician_id", "null")
+            .execute()
+        )
+        requests = response.data if response and response.data else []
+    except Exception as err:
+        logger.warning(f"Error querying overdue appointments: {err}")
+        return 0
+
+    now = datetime.now(VN_TZ)
+    notified = 0
+    for request in requests:
+        scheduled_start = _scheduled_start_at(request)
+        if scheduled_start is None or scheduled_start >= now:
+            continue
+        try:
+            from app.notifications import service as notif_service
+            if notif_service.notify_appointment_overdue(request):
+                notified += 1
+        except Exception as err:
+            logger.warning(f"Failed to notify overdue appointment {request.get('id')}: {err}")
+    return notified
 
 
 def _validate_booking_schedule(booking_date: str | None, booking_slot: str | None):
@@ -653,12 +748,31 @@ def create_request(current_user: dict, data):
     booking_date = payload.get("booking_date") or payload.get("appointment_date")
     booking_slot = payload.get("booking_slot") or payload.get("appointment_slot")
     _validate_booking_schedule(booking_date, booking_slot)
+    requested_start = None
+    appointment_key = None
     if booking_date or booking_slot:
         date_str = "Hôm nay" if booking_date == "TODAY" else ("Ngày mai" if booking_date == "TOMORROW" else (booking_date or ""))
         slot_str = booking_slot or ""
         sched_note = f"[Hẹn: {date_str} {slot_str}]".strip()
         if sched_note and sched_note not in description:
             description = f"{description} | {sched_note}".strip() if description else sched_note
+        requested_start = _scheduled_start_at({"issue_description": sched_note})
+        if requested_start is not None:
+            appointment_key = requested_start.strftime("%Y-%m-%d|%H:%M")
+
+    if requested_start is not None:
+        # Lịch chưa được phân công vẫn phải chiếm khung giờ của chính khách
+        # hàng ngay từ lúc tạo, thay vì đợi đến bước Admin gán KTV mới phát hiện.
+        try:
+            existing_bookings = repository.get_open_customer_requests(customer_id)
+        except Exception as err:
+            logger.warning(f"Failed to check duplicate appointment slot: {err}")
+            existing_bookings = []
+        if any(_scheduled_start_at(item) == requested_start for item in existing_bookings):
+            raise AppException(
+                ErrorCode.DUPLICATE_REQUEST,
+                message="Bạn đã có lịch hẹn trong khung giờ này. Vui lòng chọn khung giờ khác.",
+            )
     
     is_sos = payload.get("is_sos", False)
     if payload.get("request_type") in ["SOS", "EMERGENCY"]:
@@ -701,6 +815,7 @@ def create_request(current_user: dict, data):
         "request_code": _request_id(),
         "customer_id": customer_id,
         "technician_id": tech_id,
+        "appointment_key": appointment_key,
         "device_id": device_id,
         "issue_type": issue_type,
         "issue_description": description,
@@ -712,7 +827,30 @@ def create_request(current_user: dict, data):
         "created_by": current_user["sub"],
         "updated_by": current_user["sub"],
     }
-    created = repository.create_repair_request(record)
+    try:
+        created = repository.create_repair_request(record)
+    except APIError as error:
+        if getattr(error, "code", None) == "PGRST204" and appointment_key:
+            # Keep older deployments usable until the appointment migration is
+            # applied. The application-level duplicate check still protects
+            # normal sequential requests; the unique index protects races
+            # once the migration is live.
+            logger.error(
+                "repair_requests.appointment_key is missing; retrying without it. "
+                "Apply the prevent_duplicate_customer_appointments migration."
+            )
+            legacy_record = dict(record)
+            legacy_record.pop("appointment_key", None)
+            created = repository.create_repair_request(legacy_record)
+        elif getattr(error, "code", None) == "23505" and appointment_key:
+            # The partial unique index is the final guard against two concurrent
+            # booking requests for the same customer and appointment slot.
+            raise AppException(
+                ErrorCode.DUPLICATE_REQUEST,
+                message="Bạn đã có lịch hẹn trong khung giờ này. Vui lòng chọn khung giờ khác.",
+            ) from error
+        else:
+            raise
     if not created:
         raise AppException(ErrorCode.INTERNAL_SERVER_ERROR)
 
@@ -1247,12 +1385,17 @@ def update_request_status(request_id: str, current_user: dict, data):
         )
 
         # 3. Tự động tìm KTV tiếp theo khả dụng (nếu là đơn khẩn cấp SOS)
-        is_sos_request = request.get("is_sos") or (request.get("latitude") and request.get("longitude"))
+        # Lịch hẹn thường cũng cần tự tìm KTV thay thế khi bị từ chối;
+        # không được phụ thuộc vào việc request có GPS hay không.
+        is_sos_request = bool(request.get("is_sos")) or _scheduled_start_at(request) is not None or bool(
+            request.get("latitude") and request.get("longitude")
+        )
         next_tech_id = _find_best_sos_technician(
             customer_lat=request.get("latitude"),
             customer_lng=request.get("longitude"),
             device_type=repository.get_device_type(request.get("device_id")),
             exclude_tech_ids=excluded_tech_ids,
+            appointment_start=_scheduled_start_at(request),
         ) if is_sos_request and history_ok else None  # Không rõ ai đã từ chối -> để Admin điều phối.
 
         from app.notifications import service as notif_service

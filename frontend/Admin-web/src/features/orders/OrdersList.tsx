@@ -87,6 +87,7 @@ export const OrdersList = () => {
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchOrdersAndTechs = async () => {
+    setLoading(true);
     try {
       const { fetchApi, fetchApiPages } = await import("@/lib/api-client");
       const [orderRes, techRes] = await Promise.all([

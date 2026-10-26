@@ -277,6 +277,11 @@
   display: none;
 }
 
+.home-content.home-content--history-detail {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .sos-section {
   display: flex;
   flex-direction: column;
@@ -4838,7 +4843,7 @@
   padding: 16px 0 12px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   background: var(--color-canvas);
 }
 
@@ -4872,7 +4877,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 120px;
+  padding-bottom: 100px;
   animation: fadeSlideUp 0.35s ease-out;
 }
 

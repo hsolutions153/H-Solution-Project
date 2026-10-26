@@ -46,8 +46,10 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
     _ensure_technician_not_busy(technician_id, order)
 
     if not _has_fresh_technician_location(technician):
-        if technician.get("last_latitude") is None or technician.get("last_longitude") is None:
-            raise AppException(ErrorCode.VALIDATION_ERROR, message="Kỹ thuật viên chưa cập nhật vị trí GPS.")
+        raise AppException(
+            ErrorCode.VALIDATION_ERROR,
+            message="Trạng thái online hoặc vị trí GPS của kỹ thuật viên đã hết hạn.",
+        )
 
     assigned_at = datetime.now(timezone.utc).isoformat()
     repository.assign_order(order_id, technician_id, assigned_at, assigned_by)

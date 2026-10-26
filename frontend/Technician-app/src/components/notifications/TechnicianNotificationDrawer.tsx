@@ -71,6 +71,8 @@ function getIconForTech(type: string) {
       return <Star className="size-5 text-amber-500 fill-amber-500" />;
     case "CANCELLED":
       return <AlertTriangle className="size-5 text-rose-500" />;
+    case "APPOINTMENT_OVERDUE":
+      return <AlertTriangle className="size-5 text-amber-600" />;
     case "COMPLETED":
       return <CheckCircle className="size-5 text-emerald-500" />;
     default:

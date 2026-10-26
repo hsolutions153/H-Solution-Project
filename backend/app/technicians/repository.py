@@ -1,14 +1,9 @@
-import json
-import logging
-import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.db.database import supabase
 from app.technicians.models import TECHNICIAN_PROFILES_TABLE
 from app.technicians.ratings import sync_technician_rating
-
-logger = logging.getLogger("h_solution")
 
 BANK_ACCOUNTS_TABLE = "technician_bank_accounts"
 
@@ -151,42 +146,8 @@ def get_technician_by_user_id(user_id: str):
             item["bank_account"] = bank_resp
         return _sync_technician_stats(item)
 
-    # Tự động tạo hồ sơ KTV nếu user đã có trong bảng users
-    try:
-        user_resp = (
-            supabase.table("users")
-            .select("id,full_name,email,phone,avatar_url,is_active")
-            .eq("id", user_id)
-            .maybe_single()
-            .execute()
-        )
-        if user_resp and user_resp.data:
-            user_info = user_resp.data
-            clean_id = str(user_id).replace("-", "")[:8]
-            new_profile = {
-                "user_id": user_id,
-                "id_card_number": f"ID-{clean_id}",
-                "id_card_front": "https://example.com/front.jpg",
-                "id_card_back": "https://example.com/back.jpg",
-                "certificate_img": "https://example.com/cert.jpg",
-                "skills": "BOTH",
-                "specialization": "Kỹ thuật viên Sửa chữa H-Solution",
-                "experience_years": 3,
-                "kyc_status": "APPROVED",
-                "is_online": False,
-                "rating_avg": 5.0,
-                "total_jobs_done": 0,
-                "created_by": "SYSTEM",
-                "updated_by": "SYSTEM",
-            }
-            ins_resp = supabase.table(TECHNICIAN_PROFILES_TABLE).insert(new_profile).execute()
-            if ins_resp and ins_resp.data:
-                created = ins_resp.data[0]
-                created["user"] = user_info
-                return _sync_technician_stats(created)
-    except Exception:
-        pass
-
+    # Không tự tạo hồ sơ từ bảng users. Hồ sơ KTV phải được tạo qua quy trình
+    # quản trị và được kiểm duyệt rõ ràng.
     return None
 
 
@@ -211,112 +172,79 @@ def update_technician_in_db(user_id: str, data: dict):
     return response.data[0] if response and response.data else None
 
 
+def update_user_presence_in_db(user_id: str, is_online: bool):
+    """Keep the legacy users.is_online mirror in sync with the technician profile."""
+    return (
+        supabase.table("users")
+        .update({"is_online": is_online})
+        .eq("id", user_id)
+        .execute()
+    )
+
+
+def expire_stale_presence(max_age_seconds: int = 120) -> int:
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)).isoformat()
+    stale_response = (
+        supabase.table(TECHNICIAN_PROFILES_TABLE)
+        .select("user_id")
+        .eq("is_online", True)
+        .lt("last_location_at", cutoff)
+        .execute()
+    )
+    stale_ids = [row.get("user_id") for row in (stale_response.data or []) if row.get("user_id")]
+    if not stale_ids:
+        return 0
+
+    response = (
+        supabase.table(TECHNICIAN_PROFILES_TABLE)
+        .update({"is_online": False})
+        .in_("user_id", stale_ids)
+        .eq("is_online", True)
+        .execute()
+    )
+    supabase.table("users").update({"is_online": False}).in_("id", stale_ids).execute()
+    return len(response.data or []) if response else 0
+
+
 def delete_technician_from_db(user_id: str):
     response = supabase.table(TECHNICIAN_PROFILES_TABLE).delete().eq("user_id", user_id).execute()
     return response.data[0] if response and response.data else None
 
 
-FALLBACK_BANK_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "uploads",
-    "technician_bank_accounts.json"
-)
-
-
-def _read_local_bank_accounts() -> dict:
-    if not os.path.exists(FALLBACK_BANK_FILE):
-        return {}
-    try:
-        with open(FALLBACK_BANK_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def _write_local_bank_accounts(data: dict) -> None:
-    try:
-        os.makedirs(os.path.dirname(FALLBACK_BANK_FILE), exist_ok=True)
-        with open(FALLBACK_BANK_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"Cannot save local bank accounts: {e}")
-
-
 def get_bank_account(technician_id: str):
-    # 1. Thử lấy từ Supabase
-    try:
-        resp = (
-            supabase.table(BANK_ACCOUNTS_TABLE)
-            .select("*")
-            .eq("technician_id", technician_id)
-            .maybe_single()
-            .execute()
-        )
-        if resp and resp.data:
-            return resp.data
-    except Exception:
-        pass
-
-    # 2. Fallback: Lấy từ file lưu cục bộ nếu Supabase bị chặn RLS
-    local_data = _read_local_bank_accounts()
-    return local_data.get(technician_id)
+    resp = (
+        supabase.table(BANK_ACCOUNTS_TABLE)
+        .select("*")
+        .eq("technician_id", technician_id)
+        .maybe_single()
+        .execute()
+    )
+    return resp.data if resp and resp.data else None
 
 
 def upsert_bank_account(technician_id: str, data: dict):
     now = datetime.now(timezone.utc).isoformat()
     existing = get_bank_account(technician_id)
-    saved_record = None
+    if existing and existing.get("id"):
+        resp = (
+            supabase.table(BANK_ACCOUNTS_TABLE)
+            .update({**data, "updated_at": now})
+            .eq("technician_id", technician_id)
+            .execute()
+        )
+    else:
+        resp = supabase.table(BANK_ACCOUNTS_TABLE).insert({
+            "id": secrets.token_hex(5).upper(),
+            "technician_id": technician_id,
+            "created_at": now,
+            "updated_at": now,
+            **data,
+        }).execute()
 
-    # 1. Thử ghi dữ liệu lên Supabase
-    try:
-        if existing and existing.get("id"):
-            resp = (
-                supabase.table(BANK_ACCOUNTS_TABLE)
-                .update({**data, "updated_at": now})
-                .eq("technician_id", technician_id)
-                .execute()
-            )
-            if resp and resp.data:
-                saved_record = resp.data[0]
-        else:
-            acc_id = secrets.token_hex(5).upper()
-            resp = supabase.table(BANK_ACCOUNTS_TABLE).insert({
-                "id": acc_id,
-                "technician_id": technician_id,
-                "created_at": now,
-                "updated_at": now,
-                **data,
-            }).execute()
-            if resp and resp.data:
-                saved_record = resp.data[0]
-    except Exception as e:
-        logger.warning(f"[Bank Account DB Fallback] Supabase RLS blocked write: {e}. Storing locally.")
-
-    # 2. Đồng bộ vào fallback local storage để luôn đảm bảo dữ liệu không bị mất và không sập 500
-    local_accounts = _read_local_bank_accounts()
-    current_local = local_accounts.get(technician_id) or {}
-    record = {
-        "id": (saved_record or existing or current_local).get("id") or secrets.token_hex(5).upper(),
-        "technician_id": technician_id,
-        "created_at": (saved_record or existing or current_local).get("created_at") or now,
-        "updated_at": now,
-        **data,
-    }
-    local_accounts[technician_id] = record
-    _write_local_bank_accounts(local_accounts)
-
-    return saved_record or record
+    return resp.data[0] if resp and resp.data else None
 
 
 def delete_bank_account(technician_id: str):
-    try:
-        supabase.table(BANK_ACCOUNTS_TABLE).delete().eq("technician_id", technician_id).execute()
-    except Exception:
-        pass
-
-    local_accounts = _read_local_bank_accounts()
-    deleted = local_accounts.pop(technician_id, None)
-    if deleted:
-        _write_local_bank_accounts(local_accounts)
-    return deleted
+    resp = supabase.table(BANK_ACCOUNTS_TABLE).delete().eq("technician_id", technician_id).execute()
+    return resp.data[0] if resp and resp.data else None
 
