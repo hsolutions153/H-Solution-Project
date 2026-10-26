@@ -48,6 +48,7 @@ export interface Technician {
   kyc_reviewed_at?: string;
   kyc_reviewed_by?: string;
   rating_avg?: number;
+  review_count?: number;
   total_jobs_done?: number;
   created_at?: string;
   stats?: {

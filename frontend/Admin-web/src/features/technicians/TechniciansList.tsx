@@ -638,7 +638,7 @@ export const TechniciansList = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1 text-xs font-bold text-amber-600">
                               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span>{Number(tech.rating_avg || 5.0).toFixed(1)}</span>
+                              <span>{tech.review_count ? Number(tech.rating_avg ?? 0).toFixed(1) : "Chưa có"}</span>
                             </div>
                             <div className="text-[11px] text-slate-500 mt-0.5">
                               Hoàn thành: <b>{totalDone}</b> đơn
@@ -987,7 +987,7 @@ export const TechniciansList = () => {
                           <span className="text-slate-400">Đánh giá:</span>
                           <span className="font-bold text-amber-600 flex items-center gap-1">
                             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                            {Number(tech.rating_avg || 5.0).toFixed(1)} ({stats.allOrders || 0} lượt)
+                            {tech.review_count ? Number(tech.rating_avg ?? 0).toFixed(1) : "Chưa có"} ({tech.review_count ?? 0} lượt đánh giá)
                           </span>
                         </div>
                       </div>

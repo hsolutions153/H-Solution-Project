@@ -134,7 +134,9 @@ export const ViewTechnicianModal = ({
       value: (
         <span className="inline-flex items-center gap-1 text-amber-600 font-bold">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span>{Number(technician.rating_avg || 5.0).toFixed(1)} / 5.0</span>
+          <span>
+            {technician.review_count ? Number(technician.rating_avg ?? 0).toFixed(1) : "Chưa có đánh giá"} / 5.0
+          </span>
         </span>
       ),
     },

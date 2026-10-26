@@ -78,6 +78,32 @@ def get_all_technicians(kyc_status: str | None = None):
             if "user" not in item or not item["user"]:
                 item["user"] = users_map.get(item.get("user_id"))
 
+    # rating_avg trên profile chỉ là cache; nguồn điểm và số lượt đánh giá là reviews.
+    try:
+        reviews_resp = supabase.table("reviews").select("technician_id,rating").execute()
+        rating_totals: dict[str, float] = {}
+        rating_counts: dict[str, int] = {}
+        for review in reviews_resp.data or []:
+            technician_id = review.get("technician_id")
+            if not technician_id or review.get("rating") is None:
+                continue
+            rating_totals[technician_id] = rating_totals.get(technician_id, 0.0) + float(review["rating"])
+            rating_counts[technician_id] = rating_counts.get(technician_id, 0) + 1
+
+        for item in data:
+            technician_id = item.get("user_id")
+            count = rating_counts.get(technician_id, 0)
+            item["review_count"] = count
+            if count:
+                current_average = item.get("rating_avg")
+                average = round(rating_totals[technician_id] / count, 2)
+                item["rating_avg"] = average
+                if current_average is None or float(current_average) != average:
+                    supabase.table(TECHNICIAN_PROFILES_TABLE).update({"rating_avg": average}).eq("user_id", technician_id).execute()
+    except Exception:
+        # Không làm hỏng danh sách KTV nếu reviews tạm thời không truy cập được.
+        pass
+
     # Cập nhật số ca hoàn thành thực tế cho toàn danh sách
     try:
         req_resp = (
