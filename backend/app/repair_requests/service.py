@@ -785,6 +785,14 @@ def create_request(current_user: dict, data):
 
     booking_date = payload.get("booking_date") or payload.get("appointment_date")
     booking_slot = payload.get("booking_slot") or payload.get("appointment_slot")
+    logger.info(
+        "[Booking] create request customer=%s device=%s booking_date=%s booking_slot=%s is_sos=%s",
+        customer_id,
+        device_id,
+        booking_date,
+        booking_slot,
+        payload.get("is_sos", False),
+    )
     _validate_booking_schedule(booking_date, booking_slot)
     requested_start = None
     appointment_key = None
@@ -797,6 +805,12 @@ def create_request(current_user: dict, data):
         requested_start = _scheduled_start_at({"issue_description": sched_note})
         if requested_start is not None:
             appointment_key = requested_start.strftime("%Y-%m-%d|%H:%M")
+        logger.info(
+            "[Booking] normalized customer=%s appointment_key=%s requested_start=%s",
+            customer_id,
+            appointment_key,
+            requested_start.isoformat() if requested_start else None,
+        )
 
     if requested_start is not None:
         # Lịch chưa được phân công vẫn phải chiếm khung giờ của chính khách
@@ -804,7 +818,11 @@ def create_request(current_user: dict, data):
         try:
             existing_bookings = repository.get_open_customer_requests(customer_id)
         except Exception as err:
-            logger.error(f"Cannot verify duplicate appointment slot: {err}")
+            logger.exception(
+                "[Booking] failed checking existing appointments customer=%s appointment_key=%s",
+                customer_id,
+                appointment_key,
+            )
             raise AppException(
                 ErrorCode.INTERNAL_SERVER_ERROR,
                 message="Không thể kiểm tra lịch hẹn hiện tại. Vui lòng thử lại sau.",
@@ -871,6 +889,13 @@ def create_request(current_user: dict, data):
     try:
         created = repository.create_repair_request(record)
     except Exception as error:
+        logger.exception(
+            "[Booking] failed inserting repair request customer=%s request_id=%s appointment_key=%s error_code=%s",
+            customer_id,
+            request_id,
+            appointment_key,
+            getattr(error, "code", None),
+        )
         # Một số Supabase/PostgREST deployment trả PGRST204, một số trả
         # undefined_column (42703) khi migration appointment_key chưa được áp dụng.
         error_code = getattr(error, "code", None)
@@ -890,7 +915,15 @@ def create_request(current_user: dict, data):
             )
             legacy_record = dict(record)
             legacy_record.pop("appointment_key", None)
-            created = repository.create_repair_request(legacy_record)
+            try:
+                created = repository.create_repair_request(legacy_record)
+            except Exception:
+                logger.exception(
+                    "[Booking] fallback insert without appointment_key failed customer=%s request_id=%s",
+                    customer_id,
+                    request_id,
+                )
+                raise
         elif getattr(error, "code", None) == "23505" and appointment_key:
             # The partial unique index is the final guard against two concurrent
             # booking requests for the same customer and appointment slot.
