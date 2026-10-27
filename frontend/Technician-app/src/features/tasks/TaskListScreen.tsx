@@ -11,7 +11,7 @@ import { TaskDetailScreen } from "./TaskDetailScreen";
 
 import { HistoryTask,Task,TaskStatus } from "@/types/task";
 import { EmptyState } from "@h-mobility/ui";
-import { ClipboardList, Plus, Search, X } from "lucide-react";
+import { ClipboardList, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { mapApiTask, parseAppointment } from "./mapApiTask";
 import { showAppNotice } from "@/components/AppNotice";
@@ -675,23 +675,6 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
     );
   }
 
-  const openCreate = () => {
-    sessionStorage.setItem("currentView", "create");
-    setCurrentView("create");
-  };
-  const fabContainer = isClient && typeof document !== "undefined" ? document.getElementById("fab-container") : null;
-  const fab = (
-    <button
-      type="button"
-      onClick={openCreate}
-      className="flex size-14 items-center justify-center rounded-card bg-brand-600 text-white shadow-raised transition-[background-color,transform] hover:bg-brand-700 active:scale-95 cursor-pointer"
-      aria-label="Tạo phiếu tiếp nhận mới"
-      title="Tạo phiếu tiếp nhận mới"
-    >
-      <Plus className="size-6" strokeWidth={2.25} />
-    </button>
-  );
-
   const modals = (
     <>
       <NewAssignmentModal
@@ -848,8 +831,6 @@ export const TaskListScreen: React.FC<TaskListScreenProps> = ({
           ))
         )}
       </div>
-
-      {fabContainer ? createPortal(fab, fabContainer) : <div className="absolute bottom-6 right-4 z-30">{fab}</div>}
 
       {globalModals}
     </div>
