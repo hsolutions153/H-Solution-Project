@@ -292,6 +292,7 @@ class RepairRequestResponse(BaseModel):
     request_code: str
     customer_id: str
     technician_id: str | None = None
+    appointment_key: str | None = None
     device_id: str
     issue_type: str
     issue_description: str

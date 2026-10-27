@@ -52,7 +52,17 @@ def assign_technician(order_id: str, technician_id: str, assigned_by: str):
         )
 
     assigned_at = datetime.now(timezone.utc).isoformat()
-    repository.assign_order(order_id, technician_id, assigned_at, assigned_by)
+    try:
+        repository.assign_order(order_id, technician_id, assigned_at, assigned_by)
+    except Exception as error:
+        # Unique partial indexes là lớp bảo vệ cuối cùng cho hai request phân
+        # công đồng thời vượt qua lần kiểm tra khả dụng ở application layer.
+        if getattr(error, "code", None) == "23505":
+            raise AppException(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                message="Kỹ thuật viên đã có đơn đang xử lý hoặc trùng khung giờ.",
+            ) from error
+        raise
     action_note = "Quản trị viên phân công kỹ thuật viên"
     repository.add_status_history(
         {

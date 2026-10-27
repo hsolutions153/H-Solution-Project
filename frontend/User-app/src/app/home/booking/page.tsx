@@ -175,10 +175,18 @@ export default function BookingPage() {
         const next = new Set<string>();
         for (const item of result?.items || []) {
           if (["COMPLETED", "CANCELLED"].includes(String(item.status || "").toUpperCase())) continue;
+          if (typeof item.appointment_key === "string" && item.appointment_key.includes("|")) {
+            next.add(item.appointment_key);
+            continue;
+          }
           const match = String(item.issue_description || "").match(/\[Hẹn:\s*([^\]]+)\]/i);
           if (!match) continue;
           const text = match[1];
-          const date = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
+          const date = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1]
+            ?? (/(?:hôm nay|today)/i.test(text) ? toDateKey(new Date()) : undefined)
+            ?? (/(?:ngày mai|tomorrow)/i.test(text)
+              ? toDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000))
+              : undefined);
           const time = text.match(/\b(\d{1,2}:\d{2})\b/)?.[1];
           if (date && time) next.add(`${date}|${time}`);
         }

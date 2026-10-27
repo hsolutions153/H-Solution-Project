@@ -37,6 +37,9 @@ VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 DUPLICATE_REQUEST_WINDOW_SECONDS = 60
 # Trạng thái KTV đã nhận đơn và chưa hoàn tất / hủy.
 TECHNICIAN_IN_PROGRESS_STATUSES = {
+    # Đơn đã giao cho KTV cũng phải giữ chỗ nếu là đơn không có lịch hẹn;
+    # nếu không Admin có thể dồn nhiều đơn chưa nhận vào cùng một KTV.
+    "ASSIGNED",
     "ACCEPTED",
     "EN_ROUTE",
     "ARRIVED",
@@ -60,17 +63,19 @@ def _payload(data):
     return dict(data)
 
 
-def _scheduled_start_at(request: dict) -> datetime | None:
-    # Trả về giờ bắt đầu lịch hẹn theo giờ Việt Nam.
+def _scheduled_window(request: dict) -> tuple[datetime, datetime] | None:
+    # Trả về khoảng thời gian lịch hẹn theo giờ Việt Nam.
     if request.get("is_sos"):
         return None
     appointment_key = request.get("appointment_key")
     if isinstance(appointment_key, str) and "|" in appointment_key:
         date_part, time_part = appointment_key.split("|", 1)
         try:
-            return datetime.strptime(
+            start = datetime.strptime(
                 f"{date_part.strip()} {time_part.strip()}", "%Y-%m-%d %H:%M"
             ).replace(tzinfo=VN_TZ)
+            # Các khung giờ đặt lịch của Customer hiện dài 60 phút.
+            return start, start + timedelta(hours=1)
         except ValueError:
             pass
     text = str(request.get("issue_description") or request.get("description") or "")
@@ -79,7 +84,8 @@ def _scheduled_start_at(request: dict) -> datetime | None:
         return None
     appointment = match.group(1).strip()
     date_match = re.search(r"(\d{4}-\d{2}-\d{2})", appointment)
-    time_match = re.search(r"\b(\d{1,2}:\d{2})\b", appointment)
+    time_matches = re.findall(r"\b(\d{1,2}:\d{2})\b", appointment)
+    time_match = time_matches[0] if time_matches else None
     if not time_match:
         return None
     if date_match:
@@ -91,11 +97,27 @@ def _scheduled_start_at(request: dict) -> datetime | None:
     else:
         return None
     try:
-        return datetime.strptime(
-            f"{appointment_date} {time_match.group(1)}", "%Y-%m-%d %H:%M"
+        start = datetime.strptime(
+            f"{appointment_date} {time_match}", "%Y-%m-%d %H:%M"
         ).replace(tzinfo=VN_TZ)
+        end = start + timedelta(hours=1)
+        if len(time_matches) > 1:
+            try:
+                end = datetime.strptime(
+                    f"{appointment_date} {time_matches[1]}", "%Y-%m-%d %H:%M"
+                ).replace(tzinfo=VN_TZ)
+                if end <= start:
+                    end += timedelta(days=1)
+            except ValueError:
+                pass
+        return start, end
     except ValueError:
         return None
+
+
+def _scheduled_start_at(request: dict) -> datetime | None:
+    window = _scheduled_window(request)
+    return window[0] if window else None
 
 
 def _is_future_appointment(request: dict, now: datetime) -> bool:
@@ -105,19 +127,27 @@ def _is_future_appointment(request: dict, now: datetime) -> bool:
 
 
 def _ensure_technician_not_busy(technician_id: str, request: dict) -> None:
-    # Không cho cùng một KTV được gán/nhận hai lịch ở cùng ngày và cùng
-    # khung giờ. Bao gồm cả REQUESTED/CONFIRMED vì một số luồng quản trị có
-    # thể lưu lịch đã giữ KTV ở các trạng thái này.
+    # Không cho cùng một KTV được gán/nhận hai lịch bị chồng lấn thời gian.
+    # Bao gồm cả ASSIGNED/REQUESTED/CONFIRMED vì các trạng thái này đã giữ
+    # lịch của KTV trong luồng quản trị.
     scheduled_start = _scheduled_start_at(request)
     if scheduled_start is not None:
+        current_window = _scheduled_window(request)
         scheduled_jobs = repository.get_technician_open_requests(technician_id)
         for job in scheduled_jobs:
             if job.get("id") == request.get("id") or job.get("status") == "CANCELLED":
                 continue
-            if _scheduled_start_at(job) == scheduled_start:
+            job_window = _scheduled_window(job)
+            overlaps = (
+                current_window
+                and job_window
+                and current_window[0] < job_window[1]
+                and job_window[0] < current_window[1]
+            )
+            if overlaps:
                 raise AppException(
                     ErrorCode.INVALID_STATUS_TRANSITION,
-                    message="Kỹ thuật viên đã có lịch hẹn trong cùng khung giờ này.",
+                    message="Kỹ thuật viên đã có lịch hẹn bị trùng khung giờ này.",
                 )
 
     # KTV chỉ làm một đơn đang xử lý; lịch hẹn còn xa chưa tính là đang bận.
@@ -658,9 +688,8 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
 
         reassigned_count += 1
 
-    # Also warn technicians who accepted an appointment but have not started
-    # moving after its scheduled time. The worker invokes this every 10s;
-    # notification repository deduplication keeps it one-time per repair.
+    # Worker quét định kỳ cũng phát cảnh báo cho đơn hẹn đã quá giờ.
+    # Repository tự khử trùng theo repair_id nên không gửi lặp.
     notify_overdue_accepted_appointments()
     return reassigned_count
 
@@ -670,13 +699,23 @@ def notify_overdue_accepted_appointments() -> int:
     from app.db.database import supabase
 
     try:
-        response = (
+        query = (
             supabase.table(REPAIR_REQUESTS_TABLE)
-            .select("id,technician_id,status,issue_description,is_sos,location_address")
+            .select("id,technician_id,status,appointment_key,issue_description,is_sos,location_address")
             .eq("status", "ACCEPTED")
             .not_.is_("technician_id", "null")
-            .execute()
         )
+        try:
+            response = query.execute()
+        except Exception:
+            # DB cũ chưa có appointment_key: vẫn cảnh báo được bằng ghi chú lịch.
+            response = (
+                supabase.table(REPAIR_REQUESTS_TABLE)
+                .select("id,technician_id,status,issue_description,is_sos,location_address")
+                .eq("status", "ACCEPTED")
+                .not_.is_("technician_id", "null")
+                .execute()
+            )
         requests = response.data if response and response.data else []
     except Exception as err:
         logger.warning(f"Error querying overdue appointments: {err}")
@@ -766,8 +805,11 @@ def create_request(current_user: dict, data):
         try:
             existing_bookings = repository.get_open_customer_requests(customer_id)
         except Exception as err:
-            logger.warning(f"Failed to check duplicate appointment slot: {err}")
-            existing_bookings = []
+            logger.error(f"Cannot verify duplicate appointment slot: {err}")
+            raise AppException(
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                message="Không thể kiểm tra lịch hẹn hiện tại. Vui lòng thử lại sau.",
+            ) from err
         if any(_scheduled_start_at(item) == requested_start for item in existing_bookings):
             raise AppException(
                 ErrorCode.DUPLICATE_REQUEST,

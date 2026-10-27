@@ -13,6 +13,7 @@ import {
   Check,
   Plus,
   Camera,
+  ImagePlus,
   ChevronDown,
   Settings,
   FileText,
@@ -108,6 +109,8 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
     }
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newPartName, setNewPartName] = useState("");
@@ -770,6 +773,13 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           onChange={handleImageUpload}
           className="hidden"
         />
+        <input
+          type="file"
+          accept="image/*"
+          ref={galleryInputRef}
+          onChange={handleImageUpload}
+          className="hidden"
+        />
         <div className="grid grid-cols-3 gap-2">
           {images.map((img, idx) => (
             <div key={idx} className="relative aspect-square overflow-hidden rounded-control border border-line bg-slate-100">
@@ -793,14 +803,46 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           ))}
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowImagePickerModal(true)}
             className="flex aspect-square flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed border-slate-300 bg-white text-slate-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 cursor-pointer"
           >
             <Camera className="size-5" />
-            <span className="text-xs font-semibold">Chụp ảnh</span>
+            <span className="text-xs font-semibold">Thêm ảnh</span>
           </button>
         </div>
       </section>
+
+      <Modal
+        open={showImagePickerModal}
+        onClose={() => setShowImagePickerModal(false)}
+        variant="sheet"
+        title="Thêm ảnh nghiệm thu"
+      >
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowImagePickerModal(false);
+              fileInputRef.current?.click();
+            }}
+            className="flex w-full items-center gap-3 rounded-control bg-brand-50 px-4 py-3.5 text-left text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 cursor-pointer"
+          >
+            <Camera className="size-5" />
+            Chụp ảnh bằng camera
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowImagePickerModal(false);
+              galleryInputRef.current?.click();
+            }}
+            className="flex w-full items-center gap-3 rounded-control bg-slate-100 px-4 py-3.5 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 cursor-pointer"
+          >
+            <ImagePlus className="size-5" />
+            Chọn ảnh từ thư viện
+          </button>
+        </div>
+      </Modal>
 
       <section className="space-y-2.5">
         <SectionTitle icon={<FileText />}>
