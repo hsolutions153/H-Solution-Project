@@ -108,13 +108,14 @@ def find_recent_open_request(customer_id: str, device_id: str, is_sos: bool, cre
 
 
 def get_open_customer_requests(customer_id: str):
-    response = (
-        supabase.table(REPAIR_REQUESTS_TABLE)
-        .select("id,status,issue_description,customer_id")
-        .eq("customer_id", customer_id)
-        .not_.in_("status", ["COMPLETED", "CANCELLED"])
-        .execute()
-    )
+    base_query = supabase.table(REPAIR_REQUESTS_TABLE).eq("customer_id", customer_id).not_.in_("status", ["COMPLETED", "CANCELLED"])
+    try:
+        # appointment_key là nguồn định danh chuẩn sau migration.
+        response = base_query.select("id,status,issue_description,customer_id,appointment_key").execute()
+    except Exception:
+        # Tương thích tạm thời với DB chưa áp migration; vẫn đọc được lịch từ
+        # ghi chú [Hẹn: ...] để lớp service chặn trùng theo cách cũ.
+        response = base_query.select("id,status,issue_description,customer_id").execute()
     return response.data or [] if response else []
 
 

@@ -37,6 +37,9 @@ VALID_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 DUPLICATE_REQUEST_WINDOW_SECONDS = 60
 # Trạng thái KTV đã nhận đơn và chưa hoàn tất / hủy.
 TECHNICIAN_IN_PROGRESS_STATUSES = {
+    # Đơn đã giao cho KTV cũng phải giữ chỗ nếu là đơn không có lịch hẹn;
+    # nếu không Admin có thể dồn nhiều đơn chưa nhận vào cùng một KTV.
+    "ASSIGNED",
     "ACCEPTED",
     "EN_ROUTE",
     "ARRIVED",
@@ -658,9 +661,8 @@ def reassign_timed_out_requests(timeout_seconds: int = 120) -> int:
 
         reassigned_count += 1
 
-    # Also warn technicians who accepted an appointment but have not started
-    # moving after its scheduled time. The worker invokes this every 10s;
-    # notification repository deduplication keeps it one-time per repair.
+    # Worker quét định kỳ cũng phát cảnh báo cho đơn hẹn đã quá giờ.
+    # Repository tự khử trùng theo repair_id nên không gửi lặp.
     notify_overdue_accepted_appointments()
     return reassigned_count
 
@@ -670,13 +672,23 @@ def notify_overdue_accepted_appointments() -> int:
     from app.db.database import supabase
 
     try:
-        response = (
+        query = (
             supabase.table(REPAIR_REQUESTS_TABLE)
-            .select("id,technician_id,status,issue_description,is_sos,location_address")
+            .select("id,technician_id,status,appointment_key,issue_description,is_sos,location_address")
             .eq("status", "ACCEPTED")
             .not_.is_("technician_id", "null")
-            .execute()
         )
+        try:
+            response = query.execute()
+        except Exception:
+            # DB cũ chưa có appointment_key: vẫn cảnh báo được bằng ghi chú lịch.
+            response = (
+                supabase.table(REPAIR_REQUESTS_TABLE)
+                .select("id,technician_id,status,issue_description,is_sos,location_address")
+                .eq("status", "ACCEPTED")
+                .not_.is_("technician_id", "null")
+                .execute()
+            )
         requests = response.data if response and response.data else []
     except Exception as err:
         logger.warning(f"Error querying overdue appointments: {err}")
@@ -766,8 +778,11 @@ def create_request(current_user: dict, data):
         try:
             existing_bookings = repository.get_open_customer_requests(customer_id)
         except Exception as err:
-            logger.warning(f"Failed to check duplicate appointment slot: {err}")
-            existing_bookings = []
+            logger.error(f"Cannot verify duplicate appointment slot: {err}")
+            raise AppException(
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                message="Không thể kiểm tra lịch hẹn hiện tại. Vui lòng thử lại sau.",
+            ) from err
         if any(_scheduled_start_at(item) == requested_start for item in existing_bookings):
             raise AppException(
                 ErrorCode.DUPLICATE_REQUEST,
