@@ -5,6 +5,7 @@ import { Task, HistoryTask, QuoteItem } from "@/types/task";
 import { fetchApi } from "@/lib/api-client";
 import { Badge, Button, Card, Field, FieldError, cn, inputClasses, rules, useFieldErrors } from "@h-mobility/ui";
 import { ActionBar, Modal, QtyStepper, ScreenHeader, SectionTitle, SkeletonList, labelClasses, selectClasses, textareaClasses } from "@/components/ui";
+import { CameraCaptureModal } from "@/components/CameraCaptureModal";
 import { showAppNotice } from "@/components/AppNotice";
 import { SlideToConfirm } from "./SlideToConfirm";
 import {
@@ -111,6 +112,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newPartName, setNewPartName] = useState("");
@@ -823,7 +825,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             type="button"
             onClick={() => {
               setShowImagePickerModal(false);
-              fileInputRef.current?.click();
+              setShowCameraModal(true);
             }}
             className="flex w-full items-center gap-3 rounded-control bg-brand-50 px-4 py-3.5 text-left text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 cursor-pointer"
           >
@@ -843,6 +845,16 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
           </button>
         </div>
       </Modal>
+      <CameraCaptureModal
+        open={showCameraModal}
+        title="Chụp ảnh nghiệm thu"
+        onClose={() => setShowCameraModal(false)}
+        onCapture={(file) => {
+          const imageUrl = URL.createObjectURL(file);
+          setImages((prev) => [...prev, imageUrl]);
+          setImageFiles((prev) => [...prev, file]);
+        }}
+      />
 
       <section className="space-y-2.5">
         <SectionTitle icon={<FileText />}>

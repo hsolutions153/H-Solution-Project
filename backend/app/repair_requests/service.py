@@ -8,7 +8,6 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 
 import requests
-from postgrest import APIError
 
 logger = logging.getLogger(__name__)
 
@@ -871,8 +870,16 @@ def create_request(current_user: dict, data):
     }
     try:
         created = repository.create_repair_request(record)
-    except APIError as error:
-        if getattr(error, "code", None) == "PGRST204" and appointment_key:
+    except Exception as error:
+        # Một số Supabase/PostgREST deployment trả PGRST204, một số trả
+        # undefined_column (42703) khi migration appointment_key chưa được áp dụng.
+        error_code = getattr(error, "code", None)
+        error_text = str(error)
+        missing_appointment_column = (
+            error_code in {"PGRST204", "42703"}
+            or ("appointment_key" in error_text and "column" in error_text.lower())
+        )
+        if missing_appointment_column and appointment_key:
             # Keep older deployments usable until the appointment migration is
             # applied. The application-level duplicate check still protects
             # normal sequential requests; the unique index protects races
