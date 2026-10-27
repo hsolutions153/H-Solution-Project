@@ -5,6 +5,7 @@ import { Task } from "@/types/task";
 import { ArrowRight, Camera, Check, Wrench, Cpu, XCircle, Info, ImagePlus, Plus, X, FileText, Sparkles, AlertCircle } from "lucide-react";
 import { Button, cn } from "@h-mobility/ui";
 import { ActionBar, Modal, ScreenHeader, SectionTitle, textareaClasses } from "@/components/ui";
+import { CameraCaptureModal } from "@/components/CameraCaptureModal";
 
 interface DiagnosticScreenProps {
   task: Task;
@@ -37,6 +38,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
   const [isUploading, setIsUploading] = useState(false);
 
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -357,7 +359,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
             type="button"
             onClick={() => {
               setShowImagePickerModal(false);
-              document.getElementById("cameraInput")?.click();
+              setShowCameraModal(true);
             }}
             className="flex w-full items-center gap-3 rounded-control bg-brand-50 px-4 py-3.5 text-left text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 cursor-pointer"
           >
@@ -377,6 +379,16 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({
           </button>
         </div>
       </Modal>
+      <CameraCaptureModal
+        open={showCameraModal}
+        title="Chụp ảnh hiện trạng"
+        onClose={() => setShowCameraModal(false)}
+        onCapture={(file) => {
+          const imageUrl = URL.createObjectURL(file);
+          setImages((prev) => [...prev, imageUrl]);
+          setImageFiles((prev) => [...prev, file]);
+        }}
+      />
     </div>
   );
 };
